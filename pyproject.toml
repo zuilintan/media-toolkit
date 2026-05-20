@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "manga-toolkit"
+version = "0.1.0"
+description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
+authors = []
+readme = "README.md"
+packages = [{include = "mt"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# 繁简转换（可选，二选一）
+zhconv = {version = ">=1.4.0", optional = true}
+
+[tool.poetry.extras]
+zhconv = ["zhconv"]
+
+[tool.poetry.scripts]
+manga-rename    = "mt.cli.rename_cmd:main"
+manga-comicinfo = "mt.cli.comicinfo_cmd:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
