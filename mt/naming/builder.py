@@ -19,9 +19,9 @@ builder.py — 新文件名构建
 
 from __future__ import annotations
 
-from mt.models import MangaInfo
-from mt import patterns as P
-from mt.utils import dot, norm_punct
+from mt.core.models import MangaInfo
+from mt.core import patterns as P
+from mt.infra.utils import dot, norm_punct
 
 
 def build_new_name(info: MangaInfo) -> str:

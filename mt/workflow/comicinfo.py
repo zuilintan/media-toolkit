@@ -20,12 +20,11 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from mt.models import MangaInfo
-from mt import patterns as P
-from mt.config import SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME
-from mt.console import (
-    print_comicinfo_fields, SEP, SEP2, warn, error, ok, info,
-)
+from mt.core.models import MangaInfo
+from mt.core import patterns as P
+from mt.core.config import SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME
+from mt.infra.console import (
+    print_comicinfo_fields, SEP, warn, error, )
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
 WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
@@ -273,7 +272,7 @@ def process_cbz(cbz_path: str, apply: bool = False) -> str:
     Returns:
         ``'ok'`` / ``'skip'`` / ``'error'`` / ``'warn'``
     """
-    from mt.parser import parse_name  # 在此导入，避免顶层循环
+    from mt.naming.parser import parse_name  # 在此导入，避免顶层循环
 
     filename = os.path.basename(cbz_path)
     print(f'\n{SEP}')

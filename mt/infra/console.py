@@ -18,7 +18,7 @@ import inspect
 import logging
 from itertools import zip_longest
 
-from mt.models import RenamePlan
+from mt.core.models import RenamePlan
 
 # ── ANSI 颜色 ─────────────────────────────────────────────────────────────────
 RESET  = '\033[0m'

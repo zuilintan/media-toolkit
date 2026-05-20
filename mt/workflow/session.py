@@ -12,10 +12,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from mt.models import RenamePlan
-from mt.config import SESSIONS_FILE
-from mt.utils import try_rename
-from mt.console import print_op_result, SEP, warn, error, ok, info
+from mt.core.models import RenamePlan
+from mt.core.config import SESSIONS_FILE
+from mt.infra.utils import try_rename
+from mt.infra.console import print_op_result, SEP, warn, error, info
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

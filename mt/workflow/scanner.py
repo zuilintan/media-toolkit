@@ -9,13 +9,13 @@ import shlex
 import shutil
 from pathlib import Path
 
-from mt.models import MangaInfo, RenamePlan
-from mt.config import FILE_EXTS
-from mt.parser import parse_name
-from mt.builder import build_new_name
-from mt.utils import try_rename, safe_unlink, safe_rmdir
-from mt.console import (
-    print_preview, print_op_result, SEP, warn, error, ok, info,
+from mt.core.models import RenamePlan
+from mt.core.config import FILE_EXTS
+from mt.naming.parser import parse_name
+from mt.naming.builder import build_new_name
+from mt.infra.utils import try_rename, safe_unlink, safe_rmdir
+from mt.infra.console import (
+    print_preview, print_op_result, SEP, warn, error, info,
 )
 
 
@@ -79,7 +79,7 @@ def apply_renames(plans: list[RenamePlan], dry_run: bool = True) -> int:
         return 0
 
     # 延迟导入，避免循环（session 反向依赖 RenamePlan）
-    from mt.session import append_session
+    from mt.workflow.session import append_session
 
     ok_n = fail = skip = 0
     renamed: list[RenamePlan] = []
@@ -207,7 +207,7 @@ def _process_author_dir(author_dir: Path, target: str) -> None:
 
 def run_drag_loop(target: str) -> None:
     """循环拖入模式：持续等待拖入目录并处理，Ctrl+C 退出。"""
-    from mt.console import SEP2
+    from mt.infra.console import SEP2
     print(f'\n{SEP2}')
     print('🔁  循环拖入模式（支持同时拖入多个目录）')
     if target:

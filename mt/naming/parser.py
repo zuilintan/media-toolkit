@@ -11,14 +11,14 @@ import re
 from collections.abc import Callable
 from typing import TypeVar
 
-from mt.models import Chapter, Volume, MangaInfo
-from mt import patterns as P
-from mt.utils import (
-    any_match, dot, norm_punct, trad_to_simp,
+from mt.core.models import Chapter, Volume, MangaInfo
+from mt.core import patterns as P
+from mt.infra.utils import (
+    any_match, norm_punct, trad_to_simp,
     extract_flag, extract_flag_from_list, to_circle, conv_roman_suffix,
     similar,
 )
-from mt.console import debug, CYAN, RESET
+from mt.infra.console import debug, CYAN, RESET
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

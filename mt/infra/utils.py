@@ -17,8 +17,7 @@ import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 
-from mt import patterns as P
-
+from mt.core import patterns as P
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 繁简转换（可选依赖）
