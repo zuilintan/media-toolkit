@@ -213,7 +213,7 @@ def run_drag_loop(target: str) -> None:
     if target:
         print(f'    处理完成后将移动到: {target}')
     else:
-        print('    处理完成后不移动（未指定 --target）')
+        print('    处理完成后不移动（未指定 --move-to）')
     print('    Ctrl+C 退出')
     print(SEP2)
 

@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-toolkit-cli rename --root <dir>         # 批量预览\n'
             '  manga-toolkit-cli rename --root <dir> --apply # 批量执行\n'
             '  manga-toolkit-cli rename --drag               # 循环拖入模式（推荐）\n'
-            '  manga-toolkit-cli rename --drag --target <dir># 拖入后移动至目录\n'
+            '  manga-toolkit-cli rename --drag --move-to <dir># 拖入后移动至目录\n'
             '  manga-toolkit-cli rename --examples           # 内置解析示例\n'
         ),
     )

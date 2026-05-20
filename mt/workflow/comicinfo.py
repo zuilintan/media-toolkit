@@ -143,7 +143,7 @@ def collect_fields(
         'Genre':       build_genre(info),
         'PageCount':   str(page_count) if page_count else '',
         'Tags':        existing_tags or '',
-        'Notes':       f'"metadata creator": "{SCRIPT_NAME} {SCRIPT_VERSION}"',
+        'Notes':       f'"metadata creator": "{SCRIPT_NAME} {SCRIPT_VERSION}"\n',
     }
 
 
