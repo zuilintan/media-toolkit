@@ -15,8 +15,8 @@ zhconv = {version = ">=1.4.0", optional = true}
 zhconv = ["zhconv"]
 
 [tool.poetry.scripts]
-manga-rename    = "mt.cli.rename_cmd:main"
-manga-comicinfo = "mt.cli.comicinfo_cmd:main"
+# CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
+manga-toolkit-cli = "mt.manga_toolkit_cli:main"
 
 [build-system]
 requires = ["poetry-core"]

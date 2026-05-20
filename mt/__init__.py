@@ -1,20 +1,22 @@
 """
 manga-toolkit — 漫画文件整理工具集
 
-子模块:
-    models     — 数据模型（Chapter / Volume / MangaInfo / RenamePlan）
-    patterns   — 正则表达式常量
-    utils      — 纯工具函数（无 I/O）
-    console    — 终端输出 & 日志
-    parser     — 文件名解析
-    builder    — 新文件名构建
-    scanner    — 目录扫描 & 重命名执行
-    session    — 操作记录 & 回退
-    comicinfo  — ComicInfo.xml 生成 & 写入
+分层架构:
+    core/      — 纯数据层（config / models / patterns）
+    infra/     — 基础设施层（utils / console）
+    naming/    — 名称解析与构建（parser / builder）
+    workflow/  — 高层工作流（scanner / session / comicinfo）
 
-CLI 入口（由 pyproject.toml scripts 注册）:
-    manga-rename      → cli.rename_cmd:main
-    manga-comicinfo   → cli.comicinfo_cmd:main
+CLI 入口:
+    manga_toolkit_cli.py        — 统一命令行实现（PEP 8 模块名）
+    __main__.py                 — 适配 `python -m mt` 调用
+
+console 命令:
+    manga-toolkit-cli           — 由 pyproject.toml 注册，指向 mt.manga_toolkit_cli:main
+
+子命令:
+    rename     — 批量重命名漫画文件 / 目录
+    comicinfo  — 向 CBZ 写入 ComicInfo.xml
 """
 
 __version__ = "0.1.0"

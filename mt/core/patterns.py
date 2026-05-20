@@ -10,7 +10,7 @@ patterns.py — 正则表达式常量与规则表
 from __future__ import annotations
 import re
 from collections.abc import Callable
-from mt.core.models import Chapter, Volume
+from mt.core.models import Chapter, Volume, fmt_num
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

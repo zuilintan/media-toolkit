@@ -9,13 +9,13 @@ import shlex
 import shutil
 from pathlib import Path
 
-from mt.core.models import RenamePlan
+from mt.core.models import MangaInfo, RenamePlan
 from mt.core.config import FILE_EXTS
 from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
 from mt.infra.utils import try_rename, safe_unlink, safe_rmdir
 from mt.infra.console import (
-    print_preview, print_op_result, SEP, warn, error, info,
+    print_preview, print_op_result, SEP, warn, error, ok, info,
 )
 
 

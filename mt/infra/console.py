@@ -144,7 +144,7 @@ def print_preview(plans: list[RenamePlan]) -> None:
 
 COMICINFO_TAGS = [
     'Publisher', 'Writer', 'Title', 'Volume', 'Number',
-    'Series', 'Genre', 'LanguageISO', 'Tags', 'Notes',
+    'Series', 'LanguageISO', 'Genre', 'PageCount', 'Tags', 'Notes',
 ]
 
 

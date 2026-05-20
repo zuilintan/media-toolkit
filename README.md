@@ -1,11 +1,11 @@
 # manga-toolkit
 
-漫画文件整理工具集，包含两个 CLI 工具：
+漫画文件整理工具集，提供统一 CLI `manga-toolkit-cli`，含两个子命令：
 
-| 命令 | 功能 |
+| 子命令 | 功能 |
 |---|---|
-| `manga-rename` | 批量重命名漫画文件/目录，统一格式 |
-| `manga-comicinfo` | 向 CBZ 写入 ComicInfo.xml 元数据 |
+| `rename` | 批量重命名漫画文件 / 目录，统一格式 |
+| `comicinfo` | 向 CBZ 写入 ComicInfo.xml 元数据 |
 
 ---
 
@@ -46,52 +46,59 @@ poetry install -E zhconv
 
 ---
 
-## manga-rename
+## rename 子命令
 
 ```bash
-# 循环拖入模式（推荐日常使用）
-manga-rename --drag
+# 循环拖入模式（推荐日常使用，默认不移动）
+manga-toolkit-cli rename --drag
 
-# 拖入后自动移动到整理目录
-manga-rename --drag --target /path/to/sorted
+# 拖入后自动移动到整理目录（仅当显式指定 --target 时启用移动）
+manga-toolkit-cli rename --drag --target /path/to/sorted
 
 # 批量预览（不修改文件）
-manga-rename --root /path/to/manga
+manga-toolkit-cli rename --root /path/to/manga
 
 # 批量执行
-manga-rename --root /path/to/manga --apply
+manga-toolkit-cli rename --root /path/to/manga --apply
 
 # 回退上次操作
-manga-rename --rollback
+manga-toolkit-cli rename --rollback
 
 # 列出所有操作记录
-manga-rename --list-sessions
+manga-toolkit-cli rename --list-sessions
 
 # 内置解析示例（回归测试）
-manga-rename --examples
+manga-toolkit-cli rename --examples
 
-# 启用调试输出
-manga-rename --drag --debug
+# 启用调试输出（放在子命令之前）
+manga-toolkit-cli --debug rename --drag
 ```
 
 ---
 
-## manga-comicinfo
+## comicinfo 子命令
 
 生成 ComicInfo v2.1 XML，写入 CBZ 文件。
 
 ```bash
 # 预览（不修改文件）
-manga-comicinfo --root /path/to/cbz
+manga-toolkit-cli comicinfo --root /path/to/cbz
 
 # 实际写入
-manga-comicinfo --root /path/to/cbz --apply
+manga-toolkit-cli comicinfo --root /path/to/cbz --apply
 
 # 内置示例
-manga-comicinfo --examples
+manga-toolkit-cli comicinfo --examples
 ```
 
-### 字段映射
+### 字段映射与顺序
+
+ComicInfo.xml 中字段输出顺序：
+
+```
+Publisher → Writer → Title → Volume → Number → Series →
+LanguageISO → Genre → PageCount → Tags → Notes
+```
 
 | ComicInfo 字段 | 来源 |
 |---|---|
@@ -99,11 +106,13 @@ manga-comicinfo --examples
 | `Writer` | 文件名中的 `[作者]` |
 | `Title` | 文件名（去除标签括号） |
 | `Volume` | `VOL.XX` |
-| `Number` | `CH.XX` 数字部分，**或** 独立附录词（番外篇/后日谈/…） |
+| `Number` | `CH.XX` 数字部分，**或** 独立附录词（番外篇 / 后日谈 / …） |
 | `Series` | `(系列名)` |
-| `Genre` | uncensored / colorized / ongoing |
 | `LanguageISO` | `[zh]` / `[ja]` / `[ko]` / `[en]` / `[zxx]` |
+| `Genre` | uncensored / colorized / ongoing |
+| `PageCount` | 压缩包内图片文件数（jpg / jpeg / png / bmp / gif / psd / webp / avif / jxl） |
 | `Tags` | 保留 CBZ 内已有值（不覆盖） |
+| `Notes` | `"metadata creator": "manga-toolkit-cli 0.1.0"` |
 
 ---
 
@@ -112,39 +121,47 @@ manga-comicinfo --examples
 ```
 mt/
 ├── __init__.py
-├── config.py          — 全局默认配置
-├── models.py          — 数据模型（Chapter / Volume / MangaInfo / RenamePlan）
-├── patterns.py        — 正则表达式常量
-├── utils.py           — 纯工具函数（无 I/O）
-├── console.py         — 终端输出 & 日志
-├── parser.py          — 文件名解析（parse_name）
-├── builder.py         — 新文件名构建（build_new_name）
-├── scanner.py         — 目录扫描、重命名执行、拖入模式
-├── session.py         — 操作记录 & 回退
-├── comicinfo.py       — ComicInfo.xml 生成 & 写入
-└── cli/
-    ├── rename_cmd.py  — manga-rename 入口
-    └── comicinfo_cmd.py — manga-comicinfo 入口
+├── __main__.py                  — 适配 `python -m mt` 的转发层
+├── manga_toolkit_cli.py         — 统一 CLI 实现（rename + comicinfo 子命令）
+├── core/                        — 纯数据层（无 I/O，无内部依赖）
+│   ├── __init__.py
+│   ├── config.py                — 全局默认配置
+│   ├── models.py                — Chapter / Volume / MangaInfo / RenamePlan
+│   └── patterns.py              — 正则表达式常量与规则表
+├── infra/                       — 基础设施层（终端、I/O、字符串工具）
+│   ├── __init__.py
+│   ├── utils.py                 — 纯工具函数（繁简、路径、重命名）
+│   └── console.py               — 终端输出 & 日志
+├── naming/                      — 名称解析与构建
+│   ├── __init__.py
+│   ├── parser.py                — parse_name(author, name) → MangaInfo
+│   └── builder.py               — build_new_name(info) → str
+└── workflow/                    — 高层工作流
+    ├── __init__.py
+    ├── scanner.py               — 目录扫描、重命名执行、拖入模式
+    ├── session.py               — 操作记录 & 回退
+    └── comicinfo.py             — ComicInfo.xml 生成 & 写入
 ```
+
+> 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
+> `pyproject.toml` 中 `manga-toolkit-cli = "mt.manga_toolkit_cli:main"` 即为两者的桥接。
 
 依赖关系（低层 → 高层）：
 
 ```
-models / config
-    ↓
-patterns
-    ↓
-utils ← patterns
-    ↓
-console ← models
-    ↓
-parser ← models, patterns, utils, console
-builder ← models, patterns, utils
-    ↓
-scanner ← parser, builder, utils, console, session
-session ← models, utils, console, config
-comicinfo ← models, patterns, config, parser, console
-    ↓
-cli/rename_cmd.py
-cli/comicinfo_cmd.py
+core/config · core/models
+        ↓
+core/patterns      ← core/models
+        ↓
+infra/utils        ← core/patterns
+infra/console      ← core/models
+        ↓
+naming/parser      ← core/models · core/patterns · infra/utils · infra/console
+naming/builder     ← core/models · core/patterns · infra/utils
+        ↓
+workflow/session   ← core/models · core/config · infra/utils · infra/console
+workflow/scanner   ← core/models · core/config · naming/* · infra/* · workflow/session
+workflow/comicinfo ← core/models · core/config · core/patterns · infra/console · naming/parser
+        ↓
+mt/manga_toolkit_cli.py
 ```

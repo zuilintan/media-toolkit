@@ -1,72 +1,60 @@
 """
-cli/comicinfo_cmd.py — manga-comicinfo CLI 入口
+manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 
-用法:
-  manga-comicinfo --root <dir>          # 预览（不修改文件）
-  manga-comicinfo --root <dir> --apply  # 实际写入
-  manga-comicinfo --examples            # 内置示例解析
+整合了原先两个独立工具：
+  - 子命令 rename     → 漫画文件 / 目录批量重命名（原 manga-rename）
+  - 子命令 comicinfo  → 向 CBZ 写入 ComicInfo.xml（原 manga-comicinfo）
 
-文件数量 >= 100 时，每条目的详细日志自动写入同级目录的 .log 文件，
-终端仅显示进度和汇总统计，避免输出溢出。
+模块名遵循 PEP 8（下划线），对外暴露的 console 命令则使用连字符
+``manga-toolkit-cli``（CLI 惯例）。两者解耦，互不影响。
 
+用法示例:
+  manga-toolkit-cli rename --drag                          # 循环拖入模式（推荐）
+  manga-toolkit-cli rename --drag --target /sorted         # 拖入后移动到指定目录
+  manga-toolkit-cli rename --root /path/to/manga           # 批量预览
+  manga-toolkit-cli rename --root /path/to/manga --apply   # 批量执行
+  manga-toolkit-cli rename --rollback                      # 回退上次操作
+  manga-toolkit-cli rename --list-sessions                 # 列出所有操作记录
+  manga-toolkit-cli rename --examples                      # 内置解析示例
 
-cli/rename_cmd.py — manga-rename CLI 入口
+  manga-toolkit-cli comicinfo --root /path/to/cbz          # 预览
+  manga-toolkit-cli comicinfo --root /path/to/cbz --apply  # 写入 ComicInfo.xml
+  manga-toolkit-cli comicinfo --examples                   # 内置示例
 
-用法:
-  manga-rename                  # 批量预览（需 --root）
-  manga-rename --drag           # 循环拖入模式（推荐）
-  manga-rename --apply          # 批量执行
-  manga-rename --examples       # 内置解析示例
-  manga-rename --rollback       # 回退上次操作
-  manga-rename --list-sessions  # 列出所有操作记录
+兼容性: 也可使用 `python -m mt <subcommand> ...`。
 """
 
 from __future__ import annotations
-import sys
-import io
-import contextlib
-import argparse
-from pathlib import Path
-from datetime import datetime
 
-from mt.infra.console import setup_logging, SEP, SEP2
+import argparse
+import contextlib
+import io
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from mt.infra.console import (
+    setup_logging, highlight_diff, print_preview, print_comicinfo_fields,
+    SEP, SEP2, RED, GREEN,
+)
+from mt.naming.parser import parse_name
+from mt.naming.builder import build_new_name
+from mt.workflow.scanner import (
+    scan_and_plan, apply_renames, run_drag_loop, confirm,
+)
+from mt.workflow.session import list_sessions, rollback
 from mt.workflow.comicinfo import (
     _get_stem, _extract_publisher_name, extract_author,
     collect_fields, process_cbz,
 )
-from mt.naming.parser import parse_name
-
-from mt.infra.console import (
-    setup_logging, highlight_diff, print_preview, SEP2, RED, GREEN,
-)
-from mt.naming.parser import parse_name
-from mt.naming.builder import build_new_name
-from mt.workflow.scanner import scan_and_plan, apply_renames, run_drag_loop, confirm
-from mt.workflow.session import list_sessions, rollback
-
-# 超过此数量时将详细输出写入日志文件
-_LARGE_THRESHOLD = 100
-
-# ── 内置示例 ──────────────────────────────────────────────────────────────────
-
-_EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
-
-_BUILTIN_EXAMPLES = [
-    '[ゆ] 真夏 [zxx].zip',
-    '[爱] 催眠 CH.01-04.5+番外篇 ～总集篇～ [zh][uncensored]',
-    '[煌] JK VOL.04 CH.01-03+番外篇 ～アイデア落書き集～ (原神) ¦想法涂鸦集¦ [zh][uncensored].zip',
-    '[mil] MyLittleLover (小林さんちのメイドラゴン) [zh].cbz',
-    '[作者] タイトル 总集篇 VOL.03 [zh].cbz',
-    '[作者] タイトル 番外篇 [zh].cbz',
-    '[作者] タイトル 后日谈 ～素晴らしき日々～ [zh].cbz',
-]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 内置解析示例（用于 --examples，同时作为回归测试）
+#                          ── rename 子命令 ──
 # ═══════════════════════════════════════════════════════════════════════════════
 
-EXAMPLES: list[tuple[str, str, str]] = [
+# 内置解析示例（同时作为回归测试）
+RENAME_EXAMPLES: list[tuple[str, str, str]] = [
     # (author, input, expected_output)
     ## 命名稳定性
     ("动", "[动] ニャーニャーワンワン VOL.01 CH.01-09 ～大危機～ (动物世界) [zh][uncensored]",
@@ -171,18 +159,14 @@ EXAMPLES: list[tuple[str, str, str]] = [
 ]
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# --examples 模式
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def run_examples() -> None:
+def run_rename_examples() -> None:
     """运行内建示例测试，逐条验证解析结果。"""
     print(f'\n{SEP2}')
     print('🧪 解析示例')
     print(SEP2)
     fail = 0
-    for author, name, expected in EXAMPLES:
-        info = parse_name(author, name)
+    for author, name, expected in RENAME_EXAMPLES:
+        info   = parse_name(author, name)
         result = build_new_name(info)
         passed = result == expected
         if not passed:
@@ -197,18 +181,90 @@ def run_examples() -> None:
     print()
 
 
-def run_examples() -> None:
-    """解析内置示例并打印字段，Publisher 由常量模拟。"""
+def cmd_rename(args: argparse.Namespace) -> int:
+    """rename 子命令调度。"""
+    if args.examples:
+        run_rename_examples()
+        return 0
+    if args.list_sessions:
+        list_sessions()
+        return 0
+    if args.rollback:
+        rollback(args.session)
+        return 0
+    if args.drag:
+        run_drag_loop(args.target)
+        return 0
+
+    # 批量模式
+    if not args.root:
+        print('❌ 请指定 --root <目录> 或使用 --drag / --examples')
+        return 2
+
+    print(f'\n📂 扫描目录: {args.root}')
+    plans = scan_and_plan(args.root)
+    print_preview(plans)
+
+    if args.apply and confirm():
+        apply_renames(plans, dry_run=False)
+    elif not args.apply:
+        apply_renames(plans, dry_run=True)
+    return 0
+
+
+def add_rename_args(p: argparse.ArgumentParser) -> None:
+    """挂载 rename 子命令的参数。"""
+    p.add_argument('--root',          default='',
+                   help='漫画根目录（批量模式）')
+    p.add_argument('--target',        default='',
+                   help='拖入模式：处理后将作者目录移动到此目录（未指定则不移动）')
+    p.add_argument('--apply',         action='store_true',
+                   help='执行重命名（批量模式）')
+    p.add_argument('--drag',          action='store_true',
+                   help='循环拖入模式')
+    p.add_argument('--rollback',      action='store_true',
+                   help='回退上次操作')
+    p.add_argument('--session',       default=None,
+                   help='指定回退的 session ID（配合 --rollback）')
+    p.add_argument('--list-sessions', action='store_true',
+                   dest='list_sessions',
+                   help='列出所有可回退的操作记录')
+    p.add_argument('--examples',      action='store_true',
+                   help='运行内置解析示例（回归测试）')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                          ── comicinfo 子命令 ──
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 文件数量 ≥ 此阈值时，详细日志写入 .log 文件，终端仅显示进度条与汇总
+_LARGE_THRESHOLD = 100
+
+# 内置示例用的模拟出版商文件名
+_EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
+
+_COMICINFO_BUILTIN_EXAMPLES = [
+    '[ゆ] 真夏 [zxx].zip',
+    '[爱] 催眠 CH.01-04.5+番外篇 ～总集篇～ [zh][uncensored]',
+    '[煌] JK VOL.04 CH.01-03+番外篇 ～アイデア落書き集～ (原神) ¦想法涂鸦集¦ [zh][uncensored].zip',
+    '[mil] MyLittleLover (小林さんちのメイドラゴン) [zh].cbz',
+    '[作者] タイトル 总集篇 VOL.03 [zh].cbz',
+    '[作者] タイトル 番外篇 [zh].cbz',
+    '[作者] タイトル 后日谈 ～素晴らしき日々～ [zh].cbz',
+]
+
+
+def run_comicinfo_examples() -> None:
+    """解析内置示例并打印字段，Publisher 由常量模拟，PageCount 留空。"""
     sim_pub = _extract_publisher_name(_EXAMPLES_PUBLISHER_FILE)
 
     print(SEP2)
-    print(f'  manga-comicinfo  —  内置示例解析（共 {len(_BUILTIN_EXAMPLES)} 条）')
+    print(f'  comicinfo  —  内置示例解析（共 {len(_COMICINFO_BUILTIN_EXAMPLES)} 条）')
     print(f'  模拟出版商文件: {_EXAMPLES_PUBLISHER_FILE}  →  Publisher: {sim_pub}')
     print(SEP2)
 
-    from mt.infra.console import print_comicinfo_fields
     ok_n = fail = 0
-    for fname in _BUILTIN_EXAMPLES:
+    for fname in _COMICINFO_BUILTIN_EXAMPLES:
         stem   = _get_stem(fname)
         author = extract_author(fname)
         print(f'\n{SEP}')
@@ -228,11 +284,7 @@ def run_examples() -> None:
     print(SEP2)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 大批量处理：捕获每条目输出写入日志
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _run_with_log(
+def _run_comicinfo_with_log(
     cbz_files: list[Path],
     apply: bool,
     counts: dict[str, int],
@@ -246,7 +298,7 @@ def _run_with_log(
     lines: list[str] = []
 
     ts_header = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    lines.append(f'manga-comicinfo 批量日志  {ts_header}')
+    lines.append(f'manga-toolkit-cli comicinfo 批量日志  {ts_header}')
     lines.append(f'模式: {"写入" if apply else "预览"}   总文件数: {total}')
     lines.append(SEP2)
 
@@ -259,7 +311,7 @@ def _run_with_log(
         lines.append(buf.getvalue().rstrip('\n'))
 
         # 终端进度（覆盖同一行）
-        done = idx
+        done   = idx
         bar_w  = 30
         filled = int(bar_w * done / total)
         bar    = '█' * filled + '░' * (bar_w - filled)
@@ -285,56 +337,30 @@ def _run_with_log(
     log_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CLI 入口
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog='manga-comicinfo',
-        description='CBZ 漫画 ComicInfo.xml 批量生成/更新工具（ComicInfo v2.1）',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
-            '示例:\n'
-            '  manga-comicinfo --examples\n'
-            '  manga-comicinfo --root ./manga\n'
-            '  manga-comicinfo --root ./manga --apply\n'
-        ),
-    )
-    parser.add_argument('--root',     metavar='DIR',
-                        help='CBZ 文件根目录（递归处理所有子目录）')
-    parser.add_argument('--apply',    action='store_true',
-                        help='实际写入 ComicInfo.xml（不加此参数则仅预览）')
-    parser.add_argument('--examples', action='store_true',
-                        help='解析内置示例并展示结果，不处理任何文件')
-    parser.add_argument('--debug',    action='store_true',
-                        help='启用 debug 日志')
-    args = parser.parse_args()
-
-    setup_logging(args.debug)
-
+def cmd_comicinfo(args: argparse.Namespace) -> int:
+    """comicinfo 子命令调度。"""
     if args.examples:
-        run_examples()
-        return
+        run_comicinfo_examples()
+        return 0
 
     if not args.root:
-        parser.error('请指定 --root <目录> 或使用 --examples')
+        print('❌ 请指定 --root <目录> 或使用 --examples')
+        return 2
 
     root = Path(args.root).resolve()
     if not root.exists():
         print(f'❌ 目录不存在: {root}')
-        sys.exit(1)
+        return 1
     if not root.is_dir():
         print(f'❌ 路径不是目录: {root}')
-        sys.exit(1)
+        return 1
 
     cbz_files = sorted(root.rglob('*.cbz'))
     total     = len(cbz_files)
     use_log   = (total >= _LARGE_THRESHOLD)
 
     print(SEP2)
-    print('  manga-comicinfo  —  CBZ ComicInfo.xml 批量工具')
+    print('  manga-toolkit-cli  —  comicinfo (CBZ ComicInfo.xml 批量工具)')
     print(SEP2)
     print(f'  根目录:   {root}')
     print(f'  模式:     {"【写入模式】实际修改文件" if args.apply else "【预览模式】仅展示解析结果，不修改文件"}')
@@ -342,16 +368,17 @@ def main() -> None:
 
     if not cbz_files:
         print('\n  没有需要处理的文件。')
-        return
+        return 0
 
     counts: dict[str, int] = {'ok': 0, 'skip': 0, 'error': 0, 'warn': 0}
+    log_path: Path | None  = None
 
     if use_log:
         ts       = datetime.now().strftime('%Y%m%d_%H%M%S')
         mode_tag = 'apply' if args.apply else 'preview'
         log_path = root.parent / f'comicinfo_{mode_tag}_{ts}.log'
         print(f'\n  文件数量 {total} ≥ {_LARGE_THRESHOLD}，详细结果将写入:\n  {log_path}\n')
-        _run_with_log(cbz_files, args.apply, counts, log_path)
+        _run_comicinfo_with_log(cbz_files, args.apply, counts, log_path)
     else:
         for fp in cbz_files:
             counts[process_cbz(str(fp), apply=args.apply)] += 1
@@ -364,73 +391,97 @@ def main() -> None:
     if counts['skip']:  parts.append(f'— {counts["skip"]} 跳过')
     if counts['error']: parts.append(f'❌ {counts["error"]} 失败')
     print(f'  完成{note}  {"   ".join(parts)}')
-    if use_log:
+    if use_log and log_path is not None:
         print(f'  📄 详细日志: {log_path}')
     if not args.apply and counts['ok'] > 0:
         print('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
     print(SEP2)
+    return 0
 
 
-    ap = argparse.ArgumentParser(
-        prog='manga-rename',
-        description='漫画重命名工具',
+def add_comicinfo_args(p: argparse.ArgumentParser) -> None:
+    """挂载 comicinfo 子命令的参数。"""
+    p.add_argument('--root',     metavar='DIR',
+                   help='CBZ 文件根目录（递归处理所有子目录）')
+    p.add_argument('--apply',    action='store_true',
+                   help='实际写入 ComicInfo.xml（不加此参数则仅预览）')
+    p.add_argument('--examples', action='store_true',
+                   help='解析内置示例并展示结果，不处理任何文件')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                          ── 主入口 ──
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog='manga-toolkit-cli',
+        description='manga-toolkit 统一命令行工具（rename + comicinfo）',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            '示例:\n'
+            '  manga-toolkit-cli rename --drag\n'
+            '  manga-toolkit-cli rename --drag --target /sorted\n'
+            '  manga-toolkit-cli rename --root /path/to/manga --apply\n'
+            '  manga-toolkit-cli rename --rollback\n'
+            '  manga-toolkit-cli rename --examples\n'
+            '  manga-toolkit-cli comicinfo --root /path/to/cbz\n'
+            '  manga-toolkit-cli comicinfo --root /path/to/cbz --apply\n'
+            '  manga-toolkit-cli comicinfo --examples\n'
+        ),
+    )
+    parser.add_argument('--debug', action='store_true',
+                        help='启用 debug 日志')
+
+    sub = parser.add_subparsers(
+        dest='command', metavar='<command>', required=True,
+        help='可用子命令'
+    )
+
+    # rename
+    p_rename = sub.add_parser(
+        'rename',
+        help='漫画文件 / 目录批量重命名',
+        description='漫画文件 / 目录批量重命名工具',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '常用模式:\n'
-            '  manga-rename --root <dir>         # 批量预览\n'
-            '  manga-rename --root <dir> --apply # 批量执行\n'
-            '  manga-rename --drag               # 循环拖入模式（推荐）\n'
-            '  manga-rename --examples           # 内置解析示例\n'
+            '  manga-toolkit-cli rename --root <dir>         # 批量预览\n'
+            '  manga-toolkit-cli rename --root <dir> --apply # 批量执行\n'
+            '  manga-toolkit-cli rename --drag               # 循环拖入模式（推荐）\n'
+            '  manga-toolkit-cli rename --drag --target <dir># 拖入后移动至目录\n'
+            '  manga-toolkit-cli rename --examples           # 内置解析示例\n'
         ),
     )
-    ap.add_argument('--root',          default='',
-                    help='漫画根目录（批量模式）')
-    ap.add_argument('--target',        default='',
-                    help='拖入模式：处理后将作者目录移动到此目录')
-    ap.add_argument('--apply',         action='store_true',
-                    help='执行重命名（批量模式）')
-    ap.add_argument('--drag',          action='store_true',
-                    help='循环拖入模式')
-    ap.add_argument('--rollback',      action='store_true',
-                    help='回退上次操作')
-    ap.add_argument('--session',       default=None,
-                    help='指定回退的 session ID（配合 --rollback）')
-    ap.add_argument('--list-sessions', action='store_true',
-                    help='列出所有可回退的操作记录')
-    ap.add_argument('--examples',      action='store_true',
-                    help='运行内置解析示例（回归测试）')
-    ap.add_argument('--debug',         action='store_true',
-                    help='启用 debug 日志')
-    args = ap.parse_args()
+    add_rename_args(p_rename)
+    p_rename.set_defaults(func=cmd_rename)
 
+    # comicinfo
+    p_ci = sub.add_parser(
+        'comicinfo',
+        help='向 CBZ 写入 ComicInfo.xml',
+        description='CBZ 漫画 ComicInfo.xml 批量生成/更新工具（ComicInfo v2.1）',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
+            '示例:\n'
+            '  manga-toolkit-cli comicinfo --examples\n'
+            '  manga-toolkit-cli comicinfo --root ./manga\n'
+            '  manga-toolkit-cli comicinfo --root ./manga --apply\n'
+        ),
+    )
+    add_comicinfo_args(p_ci)
+    p_ci.set_defaults(func=cmd_comicinfo)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args   = parser.parse_args(argv)
     setup_logging(args.debug)
-
-    if args.examples:
-        run_examples()
-        return
-    if args.list_sessions:
-        list_sessions()
-        return
-    if args.rollback:
-        rollback(args.session)
-        return
-    if args.drag:
-        run_drag_loop(args.target)
-        return
-
-    # 批量模式
-    if not args.root:
-        ap.error('请指定 --root <目录> 或使用 --drag / --examples')
-
-    print(f'\n📂 扫描目录: {args.root}')
-    plans = scan_and_plan(args.root)
-    print_preview(plans)
-
-    if args.apply and confirm():
-        apply_renames(plans, dry_run=False)
-    elif not args.apply:
-        apply_renames(plans, dry_run=True)
+    return args.func(args) or 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
