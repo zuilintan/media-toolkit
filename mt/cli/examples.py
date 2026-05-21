@@ -35,8 +35,12 @@ def load_examples() -> list[tuple[str, str, str]]:
     return [(e['author'], e['input'], e['expected']) for e in raw]
 
 
-def run_rename_examples() -> None:
-    """运行内建示例测试，逐条验证「输入 → 规范化输出」解析结果。"""
+def run_rename_examples() -> int:
+    """运行内建示例测试，逐条验证「输入 → 规范化输出」解析结果。
+
+    Returns:
+        失败条数（0 表示全部通过），供调用方据此设定退出码。
+    """
     print(f'\n{SEP2}')
     print('🧪 解析示例')
     print(SEP2)
@@ -55,12 +59,16 @@ def run_rename_examples() -> None:
         print()
     print(f'{"  全部通过 ✅" if not fail else f"  {fail} 个失败 ❌"}')
     print()
+    return fail
 
 
-def run_comicinfo_examples() -> None:
+def run_comicinfo_examples() -> int:
     """将规范化文件名（示例的 expected）解析为 ComicInfo 字段并展示。
 
     Publisher 由常量模拟，PageCount 留空。
+
+    Returns:
+        失败条数（0 表示全部通过），供调用方据此设定退出码。
     """
     examples = load_examples()
     sim_pub  = _extract_publisher_name(_EXAMPLES_PUBLISHER_FILE)
@@ -87,3 +95,4 @@ def run_comicinfo_examples() -> None:
     print(f'\n{SEP2}')
     print(f'  示例解析完成  ✅ {ok_n} 成功   ❌ {fail} 失败')
     print(SEP2)
+    return fail

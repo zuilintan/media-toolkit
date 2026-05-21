@@ -6,7 +6,7 @@ comicinfo.py — ComicInfo.xml 生成、读取与写入
 Number 字段规则（与 CH. 同级且互斥）:
   - chapter 不为 None  → 数字格式，如 "01-05+番外篇"
   - chapter 为 None，appendix 在 CH. 级别 → 直接用附录词，如 "番外篇"/"后日谈"
-  - 否则              → "1"（默认）
+  - 否则              → ''（留空，不显式指定）
 
 依赖: models / patterns / config / parser / console
 """
@@ -20,10 +20,10 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from mt.core.models import MangaInfo
+from mt.core.models import MangaInfo, fmt_num
 from mt.core import patterns as P
 from mt.core.config import (
-    SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS,
+    SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
 from mt.infra.console import (
     print_comicinfo_fields, SEP, SEP2, warn, error, ok, info,
@@ -34,12 +34,6 @@ WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
 BAR         = '\u00a6'   # ¦   间断竖线  （译名定界符）
 MIDDLE_DOT  = '\u30fb'   # ・  片假名中点（标题内空格替代符）
 FCOLON      = '\uff1a'   # ：  全角冒号  （社团文件分隔符）
-
-# ── ComicInfo 字段顺序 ────────────────────────────────────────────────────────
-COMICINFO_TAGS = [
-    'Publisher', 'Writer', 'Title', 'Volume', 'Number',
-    'Series', 'LanguageISO', 'Genre', 'PageCount', 'Tags', 'Notes',
-]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -93,27 +87,11 @@ def build_number(info: MangaInfo) -> str:
     return ''
 
 
-def _pad2(v: float) -> str:
-    """将数值格式化为至少两位整数，超过两位不截断。
-
-    Examples:
-        1   → "01"
-        3   → "03"
-        10  → "10"
-        100 → "100"
-        4.5 → "04.5"
-    """
-    i = int(v)
-    if v == i:
-        return f"{i:02d}"
-    return f"{i:02d}.{str(v).split('.')[1]}"
-
-
 def build_volume(info: MangaInfo) -> str:
     """<Volume>：两位补零卷号字符串，无卷时为空。"""
     if info.volume is None:
         return ''
-    return _pad2(info.volume.start)
+    return fmt_num(info.volume.start)
 
 
 def build_genre(info: MangaInfo) -> str:

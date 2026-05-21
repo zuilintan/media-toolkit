@@ -78,8 +78,7 @@ def _run_comicinfo_with_log(
 def cmd_comicinfo(args: argparse.Namespace) -> int:
     """comicinfo 子命令调度。"""
     if args.examples:
-        run_comicinfo_examples()
-        return 0
+        return 0 if run_comicinfo_examples() == 0 else 1
 
     if not args.root:
         print('❌ 请指定 --root <目录> 或使用 --examples')

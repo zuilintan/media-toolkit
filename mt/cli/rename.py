@@ -18,8 +18,7 @@ from mt.cli.examples import run_rename_examples
 def cmd_rename(args: argparse.Namespace) -> int:
     """rename 子命令调度。"""
     if args.examples:
-        run_rename_examples()
-        return 0
+        return 0 if run_rename_examples() == 0 else 1
     if args.list_sessions:
         list_sessions()
         return 0

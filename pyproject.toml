@@ -8,15 +8,18 @@ packages = [{include = "mt"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-# 繁简转换（可选，二选一）
-zhconv = {version = ">=1.4.0", optional = true}
+# 繁简转换（译名繁体→简体，必选）
+zhconv = ">=1.4.0"
 
-[tool.poetry.extras]
-zhconv = ["zhconv"]
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
 
 [tool.poetry.scripts]
 # CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
 manga-toolkit-cli = "mt.manga_toolkit_cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["poetry-core"]

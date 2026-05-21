@@ -15,16 +15,16 @@
 # 安装 poetry（如尚未安装）
 pip install poetry
 
-# 安装项目（含可选繁简转换）
+# 安装项目
 cd manga-toolkit
-poetry install -E zhconv
+poetry install
 ```
 
-### 可选依赖
+### 依赖
 
-| 包 | 用途 | 安装方式 |
-|---|---|---|
-| `zhconv` | 译名繁体→简体转换 | `poetry install -E zhconv` |
+| 包 | 用途 |
+|---|---|
+| `zhconv` | 译名繁体→简体转换（必选） |
 
 ---
 

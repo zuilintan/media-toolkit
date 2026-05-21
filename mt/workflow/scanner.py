@@ -17,6 +17,7 @@ from mt.infra.utils import try_rename, safe_unlink, safe_rmdir
 from mt.infra.console import (
     print_preview, print_op_result, SEP, warn, error, ok, info,
 )
+from mt.workflow.session import append_session
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -77,9 +78,6 @@ def apply_renames(plans: list[RenamePlan], dry_run: bool = True) -> int:
     if dry_run:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')
         return 0
-
-    # 延迟导入，避免循环（session 反向依赖 RenamePlan）
-    from mt.workflow.session import append_session
 
     ok_n = fail = skip = 0
     renamed: list[RenamePlan] = []

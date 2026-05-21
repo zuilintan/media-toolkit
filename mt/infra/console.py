@@ -10,15 +10,17 @@ console.py — 终端输出 & 统一日志
   - print_op_result()  — 操作统计行
   - SEP / SEP2         — 分隔线常量
 
-依赖: models（RenamePlan）
+依赖: core.models（RenamePlan）/ core.config（COMICINFO_TAGS）
 """
 
 from __future__ import annotations
 import inspect
 import logging
+import os
 from itertools import zip_longest
 
 from mt.core.models import RenamePlan
+from mt.core.config import COMICINFO_TAGS
 
 # ── ANSI 颜色 ─────────────────────────────────────────────────────────────────
 RESET  = '\033[0m'
@@ -142,12 +144,6 @@ def print_preview(plans: list[RenamePlan]) -> None:
 # ComicInfo 字段打印
 # ═══════════════════════════════════════════════════════════════════════════════
 
-COMICINFO_TAGS = [
-    'Publisher', 'Writer', 'Title', 'Volume', 'Number',
-    'Series', 'LanguageISO', 'Genre', 'PageCount', 'Tags', 'Notes',
-]
-
-
 def print_comicinfo_fields(fields: dict[str, str],
                            pub_conflict: list[str] | None = None) -> None:
     """以 'TagName: value' 格式打印 ComicInfo 字段。"""
@@ -155,7 +151,6 @@ def print_comicinfo_fields(fields: dict[str, str],
         if tag == 'Publisher' and pub_conflict:
             print(f'  {tag}: ⚠️  多个社团文件，请手动确认！')
             for p in pub_conflict:
-                import os
                 print(f'           • {os.path.basename(p)}')
         elif tag == 'Tags':
             val = fields.get(tag, '')

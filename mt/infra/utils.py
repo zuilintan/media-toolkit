@@ -14,34 +14,20 @@ from __future__ import annotations
 import os
 import re
 import unicodedata
-from collections.abc import Callable
 from pathlib import Path
+
+import zhconv
 
 from mt.core import patterns as P
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 繁简转换（可选依赖）
+# 繁简转换
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_zhconv_convert: Callable[[str], str] | None = None
-
-try:
-    import zhconv as _zhconv_mod
-    _zhconv_convert = lambda text: _zhconv_mod.convert(text, 'zh-hans')
-except ImportError:
-    try:
-        from opencc import OpenCC as _OpenCC
-        _zhconv_convert = _OpenCC('t2s').convert
-    except ImportError:
-        pass
-
-
 def trad_to_simp(text: str) -> str:
-    """繁体中文转简体（依赖可选库，不可用时原样返回）。"""
-    if _zhconv_convert is not None:
-        text = _zhconv_convert(text)
-    return re.sub(r'姊', '姐', text)
+    """繁体中文转简体。"""
+    return re.sub(r'姊', '姐', zhconv.convert(text, 'zh-hans'))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
