@@ -8,7 +8,7 @@ Number 字段规则（与 CH. 同级且互斥）:
   - chapter 为 None，appendix 在 CH. 级别 → 直接用附录词，如 "番外篇"/"后日谈"
   - 否则              → ''（留空，不显式指定）
 
-依赖: models / patterns / config / parser / console
+依赖: models / patterns / config / parser / console / presentation
 """
 
 from __future__ import annotations
@@ -25,9 +25,8 @@ from mt.core import patterns as P
 from mt.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
-from mt.infra.console import (
-    print_comicinfo_fields, SEP, SEP2, warn, error, ok, info,
-)
+from mt.infra.console import SEP, SEP2, warn, error, ok, info, debug, emit
+from mt.presentation.view import print_comicinfo_fields
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
 WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
@@ -204,7 +203,8 @@ def count_pages(cbz_path: str) -> int:
                 if ext in PAGE_EXTS:
                     count += 1
             return count
-    except Exception:
+    except Exception as e:
+        debug(f'count_pages 失败（按 0 页处理）: {cbz_path} — {e}')
         return 0
 
 
@@ -222,7 +222,8 @@ def read_existing_tags(cbz_path: str) -> str:
             root = fromstring(zf.read(name_map[COMICINFO_FILENAME.lower()]))
             el   = root.find('Tags')
             return (el.text or '').strip() if el is not None else ''
-    except Exception:
+    except Exception as e:
+        debug(f'read_existing_tags 失败（按无 Tags 处理）: {cbz_path} — {e}')
         return ''
 
 
@@ -285,9 +286,9 @@ def process_cbz(cbz_path: str, apply: bool = False) -> str:
     from mt.naming.parser import parse_name  # 在此导入，避免顶层循环
 
     filename = os.path.basename(cbz_path)
-    print(f'\n{SEP}')
-    print(f'  📦  {filename}')
-    print()
+    emit(f'\n{SEP}')
+    emit(f'  📦  {filename}')
+    emit()
 
     author = extract_author(filename)
     stem   = _get_stem(filename)
@@ -306,18 +307,18 @@ def process_cbz(cbz_path: str, apply: bool = False) -> str:
     print_comicinfo_fields(fields, pub_conflict)
 
     if pub_conflict:
-        print(f'\n  ⛔  出版商冲突，跳过本文件，请先解决上述异常。')
+        emit(f'\n  ⛔  出版商冲突，跳过本文件，请先解决上述异常。')
         return 'warn'
 
     if not apply:
-        print(f'\n  ○  预览模式，不写入文件。')
+        emit(f'\n  ○  预览模式，不写入文件。')
         return 'ok'
 
-    print()
+    emit()
     try:
         xml_bytes = build_comicinfo_xml(mi, publisher, tags_val, page_count)
         replaced  = write_comicinfo(cbz_path, xml_bytes)
-        print(f'  ✅  ComicInfo.xml {"已更新" if replaced else "已写入"}')
+        emit(f'  ✅  ComicInfo.xml {"已更新" if replaced else "已写入"}')
     except Exception as e:
         error(f'写入失败: {e}')
         return 'error'

@@ -7,7 +7,7 @@ utils.py — 纯工具函数（无 I/O、无副作用）
   - 路径安全操作
   - 重命名执行
 
-依赖: patterns（PUNCT_MAP）
+依赖: zhconv / core.patterns（PUNCT_MAP）/ infra.console（debug）
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from pathlib import Path
 import zhconv
 
 from mt.core import patterns as P
+from mt.infra.console import debug
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -119,7 +120,8 @@ def strict_exists(path: Path) -> bool:
         return False
     try:
         return path.resolve().name == path.name
-    except Exception:
+    except Exception as e:
+        debug(f'strict_exists 失败（按不存在处理）: {path} — {e}')
         return False
 
 

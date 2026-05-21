@@ -1,26 +1,34 @@
 """
-console.py — 终端输出 & 统一日志
+console.py — 终端输出 & 统一日志（纯基础设施，不耦合领域模型）
 
 提供:
   - ANSI 颜色常量
-  - debug() / info() / warn() / error() 日志函数
+  - emit()             — 面向用户输出的唯一出口（可注入 sink）
+  - set_output() / capture() — 重定向输出（GUI 接管 / 测试与日志捕获）
+  - debug() / info() / warn() / error() / ok() 日志函数
   - setup_logging()    — CLI 调用，设定日志级别
   - highlight_diff()   — 差异高亮
-  - print_preview()    — 重命名预览
-  - print_op_result()  — 操作统计行
+  - print_op_result()  — 通用操作统计行
   - SEP / SEP2         — 分隔线常量
 
-依赖: core.models（RenamePlan）/ core.config（COMICINFO_TAGS）
+输出约定: 所有面向用户的文本一律经 emit() 写入当前 sink（默认 sys.stdout，
+info/warn/error/ok 亦基于 emit）。GUI 可用 set_output() 接管，批量日志/测试
+可用 capture() 临时重定向到内存缓冲。唯独 debug() 经 logging 写入 stderr，
+其捕获由 logging handler 负责，与用户输出通道解耦。
+领域对象的渲染（RenamePlan / ComicInfo 字段）位于 presentation 层。
+
+依赖: 仅标准库
 """
 
 from __future__ import annotations
 import inspect
+import io
 import logging
-import os
+import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from itertools import zip_longest
-
-from mt.core.models import RenamePlan
-from mt.core.config import COMICINFO_TAGS
+from typing import TextIO
 
 # ── ANSI 颜色 ─────────────────────────────────────────────────────────────────
 RESET  = '\033[0m'
@@ -32,6 +40,46 @@ CYAN   = '\033[36m'
 # ── 分隔线 ────────────────────────────────────────────────────────────────────
 SEP  = '─' * 72
 SEP2 = '═' * 72
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 输出通道（可注入 sink）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 当前输出 sink；None 表示动态使用 sys.stdout（兼容终端重定向 / pytest 捕获）。
+_out: TextIO | None = None
+
+
+def set_output(stream: TextIO | None) -> None:
+    """设置全局输出 sink（GUI 传入自定义可写对象；None 恢复为 sys.stdout）。"""
+    global _out
+    _out = stream
+
+
+def _sink() -> TextIO:
+    return sys.stdout if _out is None else _out
+
+
+def emit(*args: object, sep: str = ' ', end: str = '\n', flush: bool = False) -> None:
+    """面向用户输出的唯一出口：行为对齐 print，但写入可注入的 sink。"""
+    s = _sink()
+    s.write(sep.join(str(a) for a in args) + end)
+    if flush:
+        s.flush()
+
+
+@contextmanager
+def capture() -> Iterator[io.StringIO]:
+    """临时把 emit() 输出重定向到内存缓冲，退出时恢复原 sink。"""
+    global _out
+    buf = io.StringIO()
+    prev = _out
+    _out = buf
+    try:
+        yield buf
+    finally:
+        _out = prev
+
 
 # ── 内部 logger ───────────────────────────────────────────────────────────────
 _log = logging.getLogger('mt')
@@ -56,10 +104,10 @@ def debug(msg: str) -> None:
     _log.debug('[%s] → %s', func, msg)
 
 
-def info(msg: str)  -> None: print(msg)
-def warn(msg: str)  -> None: print(f'⚠️  {msg}')
-def error(msg: str) -> None: print(f'❌ {msg}')
-def ok(msg: str)    -> None: print(f'✅ {msg}')
+def info(msg: str)  -> None: emit(msg)
+def warn(msg: str)  -> None: emit(f'⚠️  {msg}')
+def error(msg: str) -> None: emit(f'❌ {msg}')
+def ok(msg: str)    -> None: emit(f'✅ {msg}')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -83,79 +131,4 @@ def print_op_result(ok_n: int, fail: int, skip: int = 0, label: str = '完成') 
     parts = [f'成功 {ok_n}', f'失败 {fail}']
     if skip:
         parts.append(f'跳过 {skip}')
-    print(f'\n{label}: {" | ".join(parts)}')
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 重命名预览
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def print_preview(plans: list[RenamePlan]) -> None:
-    """以可读格式打印重命名计划。"""
-    changed   = [p for p in plans if p.changed]
-    unchanged = [p for p in plans if not p.changed]
-    reviews   = [p for p in plans if p.needs_review]
-
-    print(f'\n{SEP2}')
-    print('📁 漫画重命名预览')
-    print(SEP2)
-
-    if changed:
-        print(f'\n✅ 将重命名 ({len(changed)} 个):\n')
-        last_author = None
-        for idx, p in enumerate(changed, 1):
-            if p.author != last_author:
-                print(f'  📂 {p.author}')
-                last_author = p.author
-            icon = '📄' if p.is_file else '🗂 '
-            note = ' ⚠️  需审核' if p.needs_review else ''
-            print(f'    {icon} [{idx:>3}]')
-            print(f'       旧: {p.old_name}')
-            print(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
-            if p.info:
-                i = p.info
-                flags: list[str] = []
-                if i.language:      flags.append(i.language)
-                if i.is_uncensored: flags.append('uncensored')
-                if i.is_colorized:  flags.append('colorized')
-                if i.is_ongoing:    flags.append('ongoing')
-                if i.series:        flags.append(f'系列:{i.series}')
-                if i.translation:   flags.append(f'译名:{i.translation}')
-                if i.volume:        flags.append(str(i.volume))
-                if i.chapter:       flags.append(str(i.chapter))
-                if i.appendix:      flags.append(f'附录:{i.appendix}')
-                if flags:
-                    print(f'       Flag: {" | ".join(flags)}')
-                print(f'       Path:\n       {p.author_dir}\\{p.old_name}\n')
-            print()
-    else:
-        print('\n没有需要改名的项目。')
-
-    if unchanged:
-        print(f'➡️   无需修改: {len(unchanged)} 个')
-    if reviews:
-        print(f'⚠️   需人工审核: {len(reviews)} 个')
-    print(SEP)
-    print(f'合计: {len(plans)} 项 | 需改名: {len(changed)} | 需审核: {len(reviews)}')
-    print(SEP)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ComicInfo 字段打印
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def print_comicinfo_fields(fields: dict[str, str],
-                           pub_conflict: list[str] | None = None) -> None:
-    """以 'TagName: value' 格式打印 ComicInfo 字段。"""
-    for tag in COMICINFO_TAGS:
-        if tag == 'Publisher' and pub_conflict:
-            print(f'  {tag}: ⚠️  多个社团文件，请手动确认！')
-            for p in pub_conflict:
-                print(f'           • {os.path.basename(p)}')
-        elif tag == 'Tags':
-            val = fields.get(tag, '')
-            suffix = '  (保留)' if val else ''
-            print(f'  {tag}: {val}{suffix}')
-        else:
-            val = fields.get(tag, '')
-            print(f'  {tag}: {val}' if val else f'  {tag}:')
+    emit(f'\n{label}: {" | ".join(parts)}')

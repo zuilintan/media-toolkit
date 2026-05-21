@@ -1,7 +1,7 @@
 """
 rename.py — rename 子命令：漫画文件 / 目录批量重命名
 
-依赖: workflow.scanner / workflow.session / infra.console / cli.examples
+依赖: workflow.scanner / workflow.session / infra.console / presentation / cli.examples
 """
 
 from __future__ import annotations
@@ -9,7 +9,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from mt.infra.console import print_preview
+from mt.infra.console import emit
+from mt.presentation.view import print_preview
 from mt.workflow.scanner import scan_and_plan, apply_renames, run_drag_loop, confirm, move_author_dir
 from mt.workflow.session import list_sessions, rollback
 from mt.cli.examples import run_rename_examples
@@ -31,15 +32,15 @@ def cmd_rename(args: argparse.Namespace) -> int:
 
     # --move-to 未配合 --drag 或 --apply 时给出提示
     if args.move_to and not args.apply:
-        print('❌ --move-to 需配合 --drag 或 --apply 使用')
+        emit('❌ --move-to 需配合 --drag 或 --apply 使用')
         return 2
 
     # 批量模式
     if not args.root:
-        print('❌ 请指定 --root <目录> 或使用 --drag / --examples')
+        emit('❌ 请指定 --root <目录> 或使用 --drag / --examples')
         return 2
 
-    print(f'\n📂 扫描目录: {args.root}')
+    emit(f'\n📂 扫描目录: {args.root}')
     plans = scan_and_plan(args.root)
     print_preview(plans)
 

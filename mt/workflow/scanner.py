@@ -1,7 +1,7 @@
 """
 scanner.py — 目录扫描、重命名计划执行与拖入模式
 
-依赖: models / config / parser / builder / utils / console / session
+依赖: models / config / parser / builder / utils / console / presentation / session
 """
 
 from __future__ import annotations
@@ -14,9 +14,8 @@ from mt.core.config import FILE_EXTS
 from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
 from mt.infra.utils import try_rename, safe_unlink, safe_rmdir
-from mt.infra.console import (
-    print_preview, print_op_result, SEP, warn, error, ok, info,
-)
+from mt.infra.console import print_op_result, SEP, warn, error, ok, info, emit
+from mt.presentation.view import print_preview
 from mt.workflow.session import append_session
 
 
@@ -97,8 +96,8 @@ def apply_renames(plans: list[RenamePlan], dry_run: bool = True) -> int:
                 warn(f'跳过（目标已存在）: {p.new_name}')
                 skip += 1
             else:
-                print(f'  ✅ 旧: {p.old_name}')
-                print(f'     新: {p.new_name}')
+                emit(f'  ✅ 旧: {p.old_name}')
+                emit(f'     新: {p.new_name}')
                 ok_n += 1
                 renamed.append(p)
         except Exception as e:
@@ -127,7 +126,7 @@ def move_author_dir(author_dir: Path, target: str) -> bool:
 
     if not dest.exists():
         shutil.move(str(author_dir), str(dest))
-        print(f'📦 已移动: {author_dir.name}\n   → {dest}')
+        emit(f'📦 已移动: {author_dir.name}\n   → {dest}')
         return True
 
     warn(f'目标目录已存在，逐项移动并覆盖同名文件: {dest}')
@@ -137,10 +136,10 @@ def move_author_dir(author_dir: Path, target: str) -> bool:
         try:
             if item_dest.exists():
                 safe_unlink(item_dest)
-                print(f'  🗑  删除已存在文件: {item_dest.name}')
+                emit(f'  🗑  删除已存在文件: {item_dest.name}')
             shutil.move(str(item), str(item_dest))
             ok_n += 1
-            print(f'  ✅ 移动: {item.name}')
+            emit(f'  ✅ 移动: {item.name}')
         except Exception as e:
             error(f'{item.name} — {e}')
             fail += 1
@@ -148,10 +147,10 @@ def move_author_dir(author_dir: Path, target: str) -> bool:
     remaining = list(author_dir.iterdir())
     if not remaining:
         safe_rmdir(author_dir)
-        print(f'  🗑  源目录已清空并删除: {author_dir}')
+        emit(f'  🗑  源目录已清空并删除: {author_dir}')
     else:
         warn(f'{len(remaining)} 个文件未能移动，源目录保留: {author_dir}')
-    print(f'  合并完成: 成功 {ok_n} | 失败 {fail}')
+    emit(f'  合并完成: 成功 {ok_n} | 失败 {fail}')
     return fail == 0
 
 
@@ -164,7 +163,7 @@ def confirm(prompt: str = '\n⚠️  确认执行重命名？按 Enter 继续: '
     try:
         return input(prompt).strip() == ''
     except KeyboardInterrupt:
-        print('\n\n🛑 用户取消操作，程序已退出')
+        emit('\n\n🛑 用户取消操作，程序已退出')
         return False
 
 
@@ -186,8 +185,8 @@ def _parse_drag_paths(raw: str) -> tuple[list[Path], list[str]]:
 
 
 def _process_author_dir(author_dir: Path, target: str) -> None:
-    print(f'\n{SEP}')
-    print(f'📂 作者目录: {author_dir}')
+    emit(f'\n{SEP}')
+    emit(f'📂 作者目录: {author_dir}')
     plans = scan_author_dir(author_dir)
     print_preview(plans)
     if not confirm():
@@ -206,21 +205,21 @@ def _process_author_dir(author_dir: Path, target: str) -> None:
 def run_drag_loop(target: str) -> None:
     """循环拖入模式：持续等待拖入目录并处理，Ctrl+C 退出。"""
     from mt.infra.console import SEP2
-    print(f'\n{SEP2}')
-    print('🔁  循环拖入模式（支持同时拖入多个目录）')
+    emit(f'\n{SEP2}')
+    emit('🔁  循环拖入模式（支持同时拖入多个目录）')
     if target:
-        print(f'    处理完成后将移动到: {target}')
+        emit(f'    处理完成后将移动到: {target}')
     else:
-        print('    处理完成后不移动（未指定 --move-to）')
-    print('    Ctrl+C 退出')
-    print(SEP2)
+        emit('    处理完成后不移动（未指定 --move-to）')
+    emit('    Ctrl+C 退出')
+    emit(SEP2)
 
     while True:
-        print()
+        emit()
         try:
             raw = input('📂 拖入作者目录，Enter 处理: ').strip()
         except (KeyboardInterrupt, EOFError):
-            print('\n\n👋 已退出循环模式')
+            emit('\n\n👋 已退出循环模式')
             break
         if not raw:
             continue
@@ -230,10 +229,10 @@ def run_drag_loop(target: str) -> None:
         if not dirs:
             continue
         if len(dirs) > 1:
-            print(f'📦 本次共 {len(dirs)} 个目录，逐一处理')
+            emit(f'📦 本次共 {len(dirs)} 个目录，逐一处理')
         try:
             for author_dir in dirs:
                 _process_author_dir(author_dir, target)
         except KeyboardInterrupt:
-            print('\n\n👋 已退出循环模式')
+            emit('\n\n👋 已退出循环模式')
             break

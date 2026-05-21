@@ -9,12 +9,10 @@ comicinfo.py — comicinfo 子命令：向 CBZ 写入 ComicInfo.xml
 from __future__ import annotations
 
 import argparse
-import contextlib
-import io
 from datetime import datetime
 from pathlib import Path
 
-from mt.infra.console import SEP2
+from mt.infra.console import SEP2, emit, capture
 from mt.workflow.comicinfo import process_cbz
 from mt.cli.examples import run_comicinfo_examples
 
@@ -41,9 +39,8 @@ def _run_comicinfo_with_log(
     lines.append(SEP2)
 
     for idx, fp in enumerate(cbz_files, 1):
-        # 捕获 process_cbz 的所有 print 输出
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
+        # 捕获 process_cbz 经 emit 产生的所有输出
+        with capture() as buf:
             result = process_cbz(str(fp), apply=apply)
         counts[result] += 1
         lines.append(buf.getvalue().rstrip('\n'))
@@ -54,12 +51,12 @@ def _run_comicinfo_with_log(
         filled = int(bar_w * done / total)
         bar    = '█' * filled + '░' * (bar_w - filled)
         pct    = done * 100 // total
-        print(
+        emit(
             f'\r  [{bar}] {pct:3d}%  {done}/{total}',
             end='', flush=True,
         )
 
-    print()  # 换行，清除进度条
+    emit()  # 换行，清除进度条
 
     # 追加汇总行
     lines.append(SEP2)
@@ -81,30 +78,30 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
         return 0 if run_comicinfo_examples() == 0 else 1
 
     if not args.root:
-        print('❌ 请指定 --root <目录> 或使用 --examples')
+        emit('❌ 请指定 --root <目录> 或使用 --examples')
         return 2
 
     root = Path(args.root).resolve()
     if not root.exists():
-        print(f'❌ 目录不存在: {root}')
+        emit(f'❌ 目录不存在: {root}')
         return 1
     if not root.is_dir():
-        print(f'❌ 路径不是目录: {root}')
+        emit(f'❌ 路径不是目录: {root}')
         return 1
 
     cbz_files = sorted(root.rglob('*.cbz'))
     total     = len(cbz_files)
     use_log   = (total >= _LARGE_THRESHOLD)
 
-    print(SEP2)
-    print('  manga-toolkit-cli  —  comicinfo (CBZ ComicInfo.xml 批量工具)')
-    print(SEP2)
-    print(f'  根目录:   {root}')
-    print(f'  模式:     {"【写入模式】实际修改文件" if args.apply else "【预览模式】仅展示解析结果，不修改文件"}')
-    print(f'  找到文件: {total} 个 .cbz（含子目录）')
+    emit(SEP2)
+    emit('  manga-toolkit-cli  —  comicinfo (CBZ ComicInfo.xml 批量工具)')
+    emit(SEP2)
+    emit(f'  根目录:   {root}')
+    emit(f'  模式:     {"【写入模式】实际修改文件" if args.apply else "【预览模式】仅展示解析结果，不修改文件"}')
+    emit(f'  找到文件: {total} 个 .cbz（含子目录）')
 
     if not cbz_files:
-        print('\n  没有需要处理的文件。')
+        emit('\n  没有需要处理的文件。')
         return 0
 
     counts: dict[str, int] = {'ok': 0, 'skip': 0, 'error': 0, 'warn': 0}
@@ -114,25 +111,25 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
         ts       = datetime.now().strftime('%Y%m%d_%H%M%S')
         mode_tag = 'apply' if args.apply else 'preview'
         log_path = root.parent / f'comicinfo_{mode_tag}_{ts}.log'
-        print(f'\n  文件数量 {total} ≥ {_LARGE_THRESHOLD}，详细结果将写入:\n  {log_path}\n')
+        emit(f'\n  文件数量 {total} ≥ {_LARGE_THRESHOLD}，详细结果将写入:\n  {log_path}\n')
         _run_comicinfo_with_log(cbz_files, args.apply, counts, log_path)
     else:
         for fp in cbz_files:
             counts[process_cbz(str(fp), apply=args.apply)] += 1
 
     # ── 终端汇总 ────────────────────────────────────────────────────────────
-    print(f'\n{SEP2}')
+    emit(f'\n{SEP2}')
     note  = '' if args.apply else '（预览，未实际修改）'
     parts = [f'✅ {counts["ok"]} 成功']
     if counts['warn']:  parts.append(f'⚠️  {counts["warn"]} 需 review')
     if counts['skip']:  parts.append(f'— {counts["skip"]} 跳过')
     if counts['error']: parts.append(f'❌ {counts["error"]} 失败')
-    print(f'  完成{note}  {"   ".join(parts)}')
+    emit(f'  完成{note}  {"   ".join(parts)}')
     if use_log and log_path is not None:
-        print(f'  📄 详细日志: {log_path}')
+        emit(f'  📄 详细日志: {log_path}')
     if not args.apply and counts['ok'] > 0:
-        print('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
-    print(SEP2)
+        emit('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
+    emit(SEP2)
     return 0
 
 

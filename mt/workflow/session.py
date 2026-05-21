@@ -15,7 +15,7 @@ from pathlib import Path
 from mt.core.models import RenamePlan
 from mt.core.config import SESSIONS_FILE
 from mt.infra.utils import try_rename
-from mt.infra.console import print_op_result, SEP, warn, error, ok, info
+from mt.infra.console import print_op_result, SEP, warn, error, ok, info, emit
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -51,7 +51,7 @@ def append_session(renamed: list[RenamePlan]) -> None:
     sessions = _load()
     sessions.append(session)
     _save(sessions)
-    print(f'🔖 已记录本次操作 [session {session["session_id"]}，共 {len(renamed)} 条]')
+    emit(f'🔖 已记录本次操作 [session {session["session_id"]}，共 {len(renamed)} 条]')
 
 
 def list_sessions() -> None:
@@ -60,12 +60,12 @@ def list_sessions() -> None:
     if not sessions:
         info('📭 没有可回退的操作记录。')
         return
-    print(f'\n{SEP}')
-    print(f'  共 {len(sessions)} 条操作记录（最新在下，--rollback 默认撤销最后一条）')
-    print(SEP)
+    emit(f'\n{SEP}')
+    emit(f'  共 {len(sessions)} 条操作记录（最新在下，--rollback 默认撤销最后一条）')
+    emit(SEP)
     for s in sessions:
-        print(f'  [{s["session_id"]}]  {s["timestamp"]}  ({len(s["entries"])} 项)')
-    print(f'{SEP}\n')
+        emit(f'  [{s["session_id"]}]  {s["timestamp"]}  ({len(s["entries"])} 项)')
+    emit(f'{SEP}\n')
 
 
 def rollback(session_id: str | None = None) -> None:
@@ -90,7 +90,7 @@ def rollback(session_id: str | None = None) -> None:
         target = matches[0]
 
     n = len(target['entries'])
-    print(f'\n🔄 回退 [{target["session_id"]}]  {target["timestamp"]}  ({n} 项)')
+    emit(f'\n🔄 回退 [{target["session_id"]}]  {target["timestamp"]}  ({n} 项)')
     ok_n = fail = 0
 
     for e in target['entries']:
@@ -106,7 +106,7 @@ def rollback(session_id: str | None = None) -> None:
                 warn(f'跳过（回退目标已存在）: {old_path.name}')
                 fail += 1
             else:
-                print(f'  ✅ {e["new_name"]} → {e["old_name"]}')
+                emit(f'  ✅ {e["new_name"]} → {e["old_name"]}')
                 ok_n += 1
         except Exception as ex:
             error(f'{e["new_name"]} — {ex}')
@@ -116,6 +116,6 @@ def rollback(session_id: str | None = None) -> None:
     if fail == 0:
         sessions = [s for s in sessions if s['session_id'] != target['session_id']]
         _save(sessions)
-        print(f'🗑  session [{target["session_id"]}] 已从记录中移除')
+        emit(f'🗑  session [{target["session_id"]}] 已从记录中移除')
     else:
         warn('存在失败项，session 记录保留，请手动检查后重试。')
