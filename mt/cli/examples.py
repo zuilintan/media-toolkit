@@ -31,7 +31,8 @@ _EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
 def load_examples() -> list[tuple[str, str, str]]:
     """加载示例数据，返回 (author, input, expected) 三元组列表。"""
     raw = json.loads(_DATA_PATH.read_text(encoding='utf-8'))
-    return [(e['author'], e['input'], e['expected']) for e in raw]
+    author = raw['author']
+    return [(author, e['input'], e['expected']) for e in raw['cases']]
 
 
 def run_rename_examples() -> int:
