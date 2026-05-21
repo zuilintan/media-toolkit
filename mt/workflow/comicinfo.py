@@ -182,49 +182,46 @@ def find_publisher(cbz_path: str) -> tuple[str | None, list[str] | None]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 页数统计（CBZ 内图片文件数）
+# CBZ 元信息（单次打开：页数 + 现有 Tags）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def count_pages(cbz_path: str) -> int:
-    """统计 CBZ 内的图片文件数量（按 PAGE_EXTS 后缀过滤）。
+def read_cbz_meta(cbz_path: str) -> tuple[int, str]:
+    """单次打开 CBZ，返回 (图片页数, 现有 Tags)。
 
-    目录条目和 ComicInfo.xml 不计入。
+    - 页数：按 PAGE_EXTS 过滤，目录条目与 ComicInfo.xml 不计入。
+    - Tags：读取根级 ComicInfo.xml 的 <Tags>（外部程序维护，本工具只读不改）；
+            无则空串。内嵌 XML 损坏时只丢 Tags，不影响页数。
+    - 整包打不开时按 (0, '') 处理并记 debug。
     """
+    comicinfo_lc = COMICINFO_FILENAME.lower()
+    page_count   = 0
+    tags         = ''
     try:
         with zipfile.ZipFile(cbz_path, 'r') as zf:
-            count = 0
-            for name in zf.namelist():
+            root_comicinfo: str | None = None   # 根级 ComicInfo.xml 原始名
+            for zi in zf.infolist():
+                name = zi.filename
                 if name.endswith('/'):
                     continue
+                if name.lower() == comicinfo_lc:
+                    root_comicinfo = name
                 base = os.path.basename(name)
-                if base.lower() == COMICINFO_FILENAME.lower():
+                if base.lower() == comicinfo_lc:
                     continue
                 ext = os.path.splitext(base)[1].lower()
                 if ext in PAGE_EXTS:
-                    count += 1
-            return count
+                    page_count += 1
+            if root_comicinfo is not None:
+                try:
+                    root = fromstring(zf.read(root_comicinfo))
+                    el   = root.find('Tags')
+                    tags = (el.text or '').strip() if el is not None else ''
+                except Exception as e:
+                    debug(f'解析内嵌 ComicInfo.xml 失败（按无 Tags 处理）: {cbz_path} — {e}')
     except Exception as e:
-        debug(f'count_pages 失败（按 0 页处理）: {cbz_path} — {e}')
-        return 0
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 读取现有 ComicInfo.xml 中的 Tags
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def read_existing_tags(cbz_path: str) -> str:
-    """从 CBZ 内的 ComicInfo.xml 读取 <Tags>（外部程序维护，本工具只读不改）。"""
-    try:
-        with zipfile.ZipFile(cbz_path, 'r') as zf:
-            name_map = {i.filename.lower(): i.filename for i in zf.infolist()}
-            if COMICINFO_FILENAME.lower() not in name_map:
-                return ''
-            root = fromstring(zf.read(name_map[COMICINFO_FILENAME.lower()]))
-            el   = root.find('Tags')
-            return (el.text or '').strip() if el is not None else ''
-    except Exception as e:
-        debug(f'read_existing_tags 失败（按无 Tags 处理）: {cbz_path} — {e}')
-        return ''
+        debug(f'read_cbz_meta 失败（按 0 页 / 无 Tags 处理）: {cbz_path} — {e}')
+        return 0, ''
+    return page_count, tags
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -300,8 +297,7 @@ def process_cbz(cbz_path: str, apply: bool = False) -> str:
     mi = parse_name(author, stem)
 
     publisher, pub_conflict = find_publisher(cbz_path)
-    tags_val   = read_existing_tags(cbz_path)
-    page_count = count_pages(cbz_path)
+    page_count, tags_val = read_cbz_meta(cbz_path)
     fields     = collect_fields(mi, publisher, tags_val, page_count)
 
     print_comicinfo_fields(fields, pub_conflict)
