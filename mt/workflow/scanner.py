@@ -96,7 +96,7 @@ def apply_renames(plans: list[RenamePlan], dry_run: bool = True) -> int:
                 warn(f'跳过（目标已存在）: {p.new_name}')
                 skip += 1
             else:
-                emit(f'  ✅ 旧: {p.old_name}')
+                emit(f'   ✅ 旧: {p.old_name}')
                 emit(f'     新: {p.new_name}')
                 ok_n += 1
                 renamed.append(p)
