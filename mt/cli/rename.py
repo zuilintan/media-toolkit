@@ -44,13 +44,16 @@ def cmd_rename(args: argparse.Namespace) -> int:
     plans = scan_and_plan(args.root)
     print_preview(plans)
 
-    if args.apply and confirm():
-        apply_renames(plans, dry_run=False)
-        if args.move_to:
-            for author_dir in sorted(Path(args.root).iterdir()):
-                if author_dir.is_dir():
-                    move_author_dir(author_dir, args.move_to)
-    elif not args.apply:
+    if args.apply:
+        if not any(p.changed for p in plans):
+            return 0
+        if confirm():
+            apply_renames(plans, dry_run=False)
+            if args.move_to:
+                for author_dir in sorted(Path(args.root).iterdir()):
+                    if author_dir.is_dir():
+                        move_author_dir(author_dir, args.move_to)
+    else:
         apply_renames(plans, dry_run=True)
     return 0
 
