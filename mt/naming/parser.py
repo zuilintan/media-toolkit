@@ -380,7 +380,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
     Returns:
         填充完毕的 MangaInfo。
     """
-    # 0. 预处理管道：标点规范化 → 裸词包裹 → 标签提升 → 话号标识规范化 → 特殊标志
+    # 0. 预处理管道（详见 patterns.py §5）
     stem = norm_punct(name)
     stem = P.wrap_bare_tags(stem)
     stem = P.promote_tags(stem)
@@ -417,7 +417,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
                 f"{m_bonus.group(1)}・{m_bonus.group(2)} ～{m_bonus.group(3)}～"
             )
 
-    # 7. 话标题定界符规范化 → 拆分主标题 & 话标题，推导附录
+    # 7. 提取话标题 & 附录
     clean_title = P.normalize_subtitle_delimiters(clean_title)
     main_title, ch_title = extract_subtitle(clean_title)
     if ch_title:

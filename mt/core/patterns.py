@@ -189,22 +189,17 @@ PUNCT_MAP = str.maketrans({
 # 扩展指南：
 #   - 新增「裸词 → 标签」：往 _BARE_TAG_KEYWORDS 加一个 alternation
 #   - 新增「容器+关键字 → 标准tag」：往 TAG_PROMOTE_RULES 加一行
-#   - 新增「最终形态检测」：往 XX_PATTERNS 加一条（一般只匹配 [tag]）
+#   - 新增「最终形态检测」：往 LANG_TAGS / UNCENSORED_RE / … 加一条（一般只匹配 [tag]）
 
 # ── 5a. 裸词包裹 ───────────────────────────────────────────────────────────────
-# 把"无容器的已知关键字"包裹为 [keyword]，让 promote_tags 后续接管。
-# 顺序敏感：长 alternation 优先，避免「フルカラー化」被切碎。
+# 把"无容器的已知关键字"包裹为 [keyword]，让 promote_tags 后续按类别归一。
+# 顺序敏感：长 alternation 优先，避免「フルカラー化」被切碎为「フルカラー」+「化」。
+# 类别归属由 TAG_PROMOTE_RULES 决定，本表只是扁平关键字集合。
 
 _BARE_TAG_KEYWORDS = (
-    # colorized 类
-    r'フルカラー版?'
-    r'|カラー化|カラー版'
-    # zh 类（裸词形式的"中文版/机翻/個人翻譯"）
+    r'フルカラー版?|カラー化|カラー版'
     r'|中文版|機翻|机翻|個人翻譯'
-    # uncensored 类
-    r'|Uncensored|Decensored'
-    # censored 类
-    r'|Censored'
+    r'|Uncensored|Decensored|Censored'
 )
 _BARE_TAG_RE = _pat(
     rf'(?<![\[\(［【\w])({_BARE_TAG_KEYWORDS})(?![\]\)］】\w])'
@@ -229,7 +224,9 @@ def _tag(inner: str) -> str:
     return rf'{_TAG_OPEN}\s*(?:{inner})\s*{_TAG_CLOSE}'
 
 
-# 注意顺序：复合标签（如「官中无修」同时是 zh + uncensored）需在单标签前处理
+# 顺序敏感：复合标签必须先于其前缀子串规则，否则前缀会先吞掉前半段。
+# 当前已知冲突：「官中无修」必须早于下面的 zh 规则（其含「官中」），
+# 否则 [官中无修] 会被先匹成 [zh] + 残留「无修」。
 TAG_PROMOTE_RULES: list[tuple[re.Pattern, str]] = [
     # 双重标签：官中无修 → [zh][uncensored]
     (_pat(_tag(r'官中无修')), '[zh][uncensored]'),
@@ -303,8 +300,9 @@ def normalize_chapter_tokens(s: str) -> str:
 # 须在 strip_tags 之后、extract_subtitle 之前调用（此时 [...] 标签已移除，
 # $-锚点可以正确命中句尾）。
 
-_SUBTITLE_ALT_RE = re.compile(
-    r'\s*(?:―([^―]+)―?|—([^—]+)—?|-([^-]*(?:[^\x00-\x7f]|\s)[^-]*)-?)\s*$', 0
+_SUBTITLE_ALT_RE = _pat(
+    r'\s*(?:―([^―]+)―?|—([^—]+)—?|-([^-]*(?:[^\x00-\x7f]|\s)[^-]*)-?)\s*$',
+    flags=0,
 )
 
 
