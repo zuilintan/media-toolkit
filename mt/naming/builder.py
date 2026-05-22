@@ -48,7 +48,7 @@ def build_new_name(info: MangaInfo) -> str:
         parts.append(f'({dot(info.series)})')
 
     if info.translation:
-        parts.append(f'¦{info.translation}¦')
+        parts.append(f'¦{dot(info.translation)}¦')
 
     tags = ''.join(filter(None, [
         f'[{info.language}]'  if info.language      else '',

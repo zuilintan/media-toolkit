@@ -57,8 +57,9 @@ def dot(s: str) -> str:
 
 
 def norm_punct(s: str) -> str:
-    """统一全角标点（〜→～、...→…等）。"""
-    return s.translate(P.PUNCT_MAP).replace('...', '…')
+    """统一全角标点（〜→～、...→…、数字间逗号→，等）。"""
+    s = s.translate(P.PUNCT_MAP).replace('...', '…')
+    return re.sub(r'(?<=\d),(?=\d)', '，', s)
 
 
 def extract_flag(stem: str, pattern: re.Pattern) -> tuple[str, bool]:

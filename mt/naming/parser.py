@@ -93,7 +93,8 @@ def _restore_part_plus(text: str) -> str:
 def _chapter_replace_cb(m: re.Match, cached: str) -> str:
     if not _is_unambiguous(m) and _is_whitelisted(cached, m):
         return m.group(0)
-    return ''
+    # 返回空格而非空串，避免「主标题名6過去編」剥离话号后粘连
+    return ' '
 
 
 def strip_tags(text: str) -> str:
@@ -213,10 +214,13 @@ def extract_subtitle(title: str) -> tuple[str, str]:
         ch = '・'.join(appendix_parts + chapter_parts)
         return working.strip(), ch
 
-    # 6. 兜底：末尾任意「XX編/篇」
-    m = re.search(r'\s+(\S+[编編篇])\s*$', working)
+    # 6. 兜底：末尾任意「XX編/篇」，可带罗马数字尾缀
+    m = re.search(
+        r'\s+(\S+[编編篇](?:I{1,3}|IV|VI{0,3}|IX|XI{0,3}|XII)?)\s*$', working
+    )
     if m and m.start() > 0:
-        return working[:m.start()].strip(), P.norm_part_subtitle(m.group(1).strip())
+        raw = m.group(1).strip()
+        return working[:m.start()].strip(), conv_roman_suffix(P.norm_part_subtitle(raw))
 
     return title, ''
 

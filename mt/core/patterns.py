@@ -67,9 +67,13 @@ CN_NUM_MAP: dict[str, int] = {
 # 分编词汇单元（用于话标题识别）
 _PART_UNIT = (
     r'(?:前|後|前|后|上|中|下|総集|总集|完結|完结)[编編篇]'
+    r'|番外[編篇]?'
     r'|後日談|后日谈|After'
 )
 _PART_COMPOUND = rf'(?:{_PART_UNIT})(?:\+(?:{_PART_UNIT}))*'
+
+# 章节 bonus 尾链（紧跟在话号 +bonus 之后的 +xxx 链）
+_BONUS_TAIL = rf'(?:\+(?:{_PART_UNIT}|{_BONUS_KW}[編篇]?))*'
 
 # 附录性质词汇（不视为话标题，附加在主标题末尾）
 _APPENDIX_RAW: frozenset[str] = frozenset({'总集篇'})
@@ -87,6 +91,7 @@ BONUS_SUFFIX_RE = re.compile(r'(?:おまけ|特典|番外)[編篇]?\s*$')
 
 # 分编词汇规范化映射
 SUB_MAP: list[tuple[str, str | Callable]] = [
+    (r'番外[编編]',        '番外篇'),
     (r'前([编編篇])',      '上篇'),
     (r'[後后]([编編篇])',  '下篇'),
     (r'[総总]集[编編篇]',  '总集篇'),
@@ -237,9 +242,9 @@ PART_SUFFIX_RE    = _PART_SUFFIX_RE
 # 保护 ～...～ 内容（strip_tags 内部用）
 SUB_PROTECT_RE = re.compile(r'～([^～]+)～')
 
-# 番外整体剥除
+# 番外整体剥除（支持尾随的 +分编词链）
 BONUS_RANGE_RE = _pat(
-    rf'(?:(?:C[hH]\.?\s*)?{_RANGE}\s*\+\s*{_BONUS_KW}[編篇]?'
+    rf'(?:(?:C[hH]\.?\s*)?{_RANGE}\s*\+\s*{_BONUS_KW}[編篇]?{_BONUS_TAIL}'
     rf'|{_BONUS_KW}[編篇]?\s*\+\s*{_RANGE})'
 )
 BONUS_WORD_RE = _pat(r'(?<![～~])' + _BONUS_KW + r'[編篇]?(?![～~])')
@@ -268,8 +273,15 @@ ROMAN_SUFFIX_RE = _pat(r'(?<![A-Za-z])(I{1,3}|IV|VI{0,3}|IX|XI{0,3}|XII)$', 0)
 def _ch_single(m: re.Match)      -> Chapter: return Chapter(float(m.group(1)))
 def _ch_range(m: re.Match)       -> Chapter: return Chapter(float(m.group(1)), float(m.group(2)))
 def _ch_range_bonus(m: re.Match) -> Chapter:
-    """range + bonus（后置）：group(1)=start, group(2)=end, group(3)=bonus词汇。"""
-    return Chapter(float(m.group(1)), float(m.group(2)), bonus=norm_bonus(m.group(3)))
+    """range + bonus（后置，可带 +part 尾链）。
+    group(1)=start, group(2)=end, group(3)=bonus词汇, group(4)=尾链(可空)。
+    """
+    head = norm_bonus(m.group(3))
+    tail = m.group(4) or ''
+    if tail:
+        segs = [s for s in tail.split('+') if s]
+        head = '+'.join([head, *(norm_part_subtitle(s) for s in segs)])
+    return Chapter(float(m.group(1)), float(m.group(2)), bonus=head)
 def _ch_bonus_range(m: re.Match) -> Chapter:
     """bonus + range（前置，少见）：group(1)=bonus词汇, group(2)=start, group(3)=end。"""
     return Chapter(float(m.group(2)), float(m.group(3)), bonus=norm_bonus(m.group(1)))
@@ -286,8 +298,9 @@ def _ch_plus_range(m: re.Match)  -> Chapter:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
-    # 范围 + 番外（后置）：group(1)=start, group(2)=end, group(3)=bonus词汇
-    (_pat(rf'({_NUM})\s*[-~～]\s*({_NUM})\s*\+\s*{_BONUS_KW_CAP}'), _ch_range_bonus),
+    # 范围 + 番外（后置，可带 +part 尾链）：start, end, bonus词汇, 尾链
+    (_pat(rf'({_NUM})\s*[-~～]\s*({_NUM})\s*\+\s*{_BONUS_KW_CAP}({_BONUS_TAIL})'),
+     _ch_range_bonus),
     # 番外 + 范围（前置，少见）：group(1)=bonus词汇, group(2)=start, group(3)=end
     (_pat(rf'{_BONUS_KW_CAP}\s*\+\s*({_NUM})\s*[-~～]\s*({_NUM})'), _ch_bonus_range),
     # 纯番外（standalone，无话号）
@@ -304,8 +317,8 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     (_pat(rf'(?<!\d)({_NUM}\s*\+\s*)+{_NUM}(?!\d)', 0), _ch_plus_range),
     # 裸数字范围
     (_pat(rf'({_NUM})\s*[-~～]\s*({_NUM})', 0), _ch_range),
-    # 数字 + 编/篇/话等
-    (_pat(rf'(?:(?<=\s)|(?<=\D))({_NUM})(?=\s+\S*[編编篇話话章節节巻卷])', re.IGNORECASE), _ch_single),
+    # 数字 + 编/篇/话等（允许无空白粘连，如「主标题名6過去編」）
+    (_pat(rf'(?:(?<=\s)|(?<=\D))({_NUM})(?=\s*\S*[編编篇話话章節节巻卷])', re.IGNORECASE), _ch_single),
     # 单个中文数字
     (_pat(
         rf'(?:(?<=\s)|(?<=\D))(?<![\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff])'
