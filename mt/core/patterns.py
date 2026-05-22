@@ -391,7 +391,9 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     ), _ch_single),
 
     # 数字 + 章节后缀（空白分隔）：如「2 挑戦編」
-    (_pat(rf'{_WORD_BOUNDARY_LB}({_NUM})(?=\s+\S*{_CHAP_SUFFIX_CC})'),
+    # 前置不可为「.」「・」（避免「no.10 ～咕咕嘎嘎編」等字段链误判）
+    (_pat(rf'{_NOT_FIELD_SEP_LB}{_WORD_BOUNDARY_LB}({_NUM})'
+          rf'(?=\s+\S*{_CHAP_SUFFIX_CC})'),
      _ch_single),
 
     # 单个中文数字（前置非 CJK/假名，右侧为空白/EOL/标签开界）
@@ -401,9 +403,10 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
         0,
     ), _ch_cnnum),
 
-    # 裸单数字（1-3 位 + 可选小数），右侧为标签/译名/括号/话标题/EOL，防止年号误判
+    # 裸单数字（1-3 位 + 可选小数），右侧为标签/译名/括号/话标题/EOL，
+    # 前置不可为「.」「・」（避免「no.10 ～…」等字段链误判），防止年号误判
     (_pat(
-        rf'{_WORD_BOUNDARY_LB}'
+        rf'{_NOT_FIELD_SEP_LB}{_WORD_BOUNDARY_LB}'
         rf'(\d{{1,3}}(?:\.\d+)?)(?=\s*(?:{_RIGHT_OPEN_CC}|$))',
         0,
     ), _ch_single),

@@ -247,7 +247,9 @@ def _extract_translation(bare: str) -> tuple[str, str]:
     )
     m = P.TRANS_INLINE_RE.search(stem_trans)
     translation = m.group(1).strip() if m else ''
-    translation = re.sub(r'(?<=\S)(～[^～]+～)', r' \1', translation)
+    # 在 ～xxx～ 前补空格，但若前置已是字段分隔符（・）则跳过，
+    # 避免 dot() 把多余空格再次转回 ・，导致重复
+    translation = re.sub(r'(?<=[^\s・])(～[^～]+～)', r' \1', translation)
     bare        = P.TRANS_INLINE_RE.sub('', stem_trans).strip()
     translation = trad_to_simp(translation)
     translation = _norm_part_in_translation(translation)
