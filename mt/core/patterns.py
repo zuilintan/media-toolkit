@@ -444,11 +444,6 @@ def _ch_bonus_range(m: re.Match) -> Chapter:
     return Chapter(float(m.group(2)), float(m.group(3)), bonus=normalize_part(m.group(1)))
 
 
-def _ch_range_plus_zero(m: re.Match) -> Chapter:
-    """CH.X-Y+0 旧格式 → 降级为 bonus='番外篇'。"""
-    return Chapter(float(m.group(1)), float(m.group(2)), bonus='番外篇')
-
-
 def _ch_bonus(_: re.Match) -> Chapter:
     return Chapter(0.0)
 
@@ -480,9 +475,7 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     (_pat(rf'(?<=[\s+]){_BONUS_KW}[編篇]?(?=\s|\[|$|～)'),
      _ch_bonus),
 
-    # CH. 前缀（含 +0 旧格式 → bonus='番外篇'；第N話 已由 normalize_chapter_tokens 预规范化为 CH.N）
-    (_pat(rf'{_CH_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})\s*\+\s*0+(?!\d)'),
-     _ch_range_plus_zero),
+    # CH. 前缀（第N話 已由 normalize_chapter_tokens 预规范化为 CH.N）
     (_pat(rf'{_CH_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})'), _ch_range),
     (_pat(rf'{_CH_PREFIX}({_NUM})'),                    _ch_single),
 
