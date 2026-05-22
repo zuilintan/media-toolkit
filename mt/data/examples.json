@@ -275,6 +275,51 @@
       "_comment": "【标签·裸词包裹】无容器的 'カラー化' 经 wrap_bare_tags → [colorized]",
       "i":"[作者名] 主标题名 カラー化",
       "e":"[作者名] 主标题名 [colorized]"
+    },
+    {
+      "_comment": "【标签·语言】'(English)' → '[en]'（半角括号容器同样适用）",
+      "i":"[作者名] 主标题名 (English)",
+      "e":"[作者名] 主标题名 [en]"
+    },
+    {
+      "_comment": "【标签·语言】'【日语】' → '[ja]'",
+      "i":"[作者名] 主标题名 【日语】",
+      "e":"[作者名] 主标题名 [ja]"
+    },
+    {
+      "_comment": "【标签·语言】裸词 '中文版' 经 wrap_bare_tags → [中文版] → [zh]",
+      "i":"[作者名] 主标题名 中文版",
+      "e":"[作者名] 主标题名 [zh]"
+    },
+    {
+      "_comment": "【标签·语言】裸词 'Uncensored' 经 wrap_bare_tags → [Uncensored] → [uncensored]",
+      "i":"[作者名] 主标题名 Uncensored",
+      "e":"[作者名] 主标题名 [uncensored]"
+    },
+    {
+      "_comment": "【标签·复合】'[官中无修]' → '[zh][uncensored]'（双标签拆分）",
+      "i":"[作者名] 主标题名 [官中无修]",
+      "e":"[作者名] 主标题名 [zh][uncensored]"
+    },
+    {
+      "_comment": "【标签·提升】'(ongoing)' → '[ongoing]'",
+      "i":"[作者名] 主标题名 (ongoing) [zh]",
+      "e":"[作者名] 主标题名 [zh][ongoing]"
+    },
+    {
+      "_comment": "【标签·互斥】[zh][en][zxx] 语言互斥：zxx 优先级最高，独占语言位",
+      "i":"[作者名] 主标题名 [en][zh][zxx]",
+      "e":"[作者名] 主标题名 [zxx]"
+    },
+    {
+      "_comment": "【标签·互斥】[zh][en] 语言互斥：zh 优先于 en",
+      "i":"[作者名] 主标题名 [en][zh]",
+      "e":"[作者名] 主标题名 [zh]"
+    },
+    {
+      "_comment": "【标签·顺序】固定输出顺序：[language][uncensored][colorized][ongoing]",
+      "i":"[作者名] 主标题名 [ongoing][フルカラー][無修正][漢化]",
+      "e":"[作者名] 主标题名 [zh][uncensored][colorized][ongoing]"
     }
   ]
 }

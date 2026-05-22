@@ -169,79 +169,38 @@ PUNCT_MAP = str.maketrans({
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. 标签检测模式
-# ═══════════════════════════════════════════════════════════════════════════════
-
-ZH_PATTERNS = _pats(
-    _bracket(r'中[国國]翻[译訳]'),  _bracket(r'中文翻[译訳]'),
-    _bracket(r'[^\]]*[汉漢]化[^\]]*'), _bracket(r'[^\]]*[扫掃][圖图][^\]]*'),
-    _bracket(r'[^\]]*嵌字[^\]]*'),  _bracket(r'[^\]]*重嵌[^\]]*'),
-    _bracket(r'[^\]]*日语社[^\]]*'), _bracket(r'[^\]]*考生[組组][^\]]*'),
-    _bracket(r'[风風]的工房'),       _bracket(r'如月工房'),
-    _bracket(r'洨五[組组]'),
-    _bracket(r'中[国國][语語]'),     _bracket(r'中文'),
-    _bracket(r'Chinese'),            _bracket(r'zh'),
-    _bracket(r'简中'),  _bracket(r'简体中文'),
-    _bracket(r'繁中'),  _bracket(r'繁体中文'),
-    _bracket(r'官中'),  _bracket(r'官方中文'),
-    _bracket(r'官中无修'),           _bracket(r'AI貓貓翻譯'),
-    r'中文版', r'[机機]翻', r'個人翻譯',
-)
-
-JA_PATTERNS = _pats(
-    _bracket(r'ja'), _bracket(r'Japanese'),
-    _bracket(r'日语'), _bracket(r'日文'),
-)
-
-KO_PATTERNS = _pats(
-    _bracket(r'ko'), _bracket(r'Korean'),
-    _bracket(r'韩语'), _bracket(r'韩文'),
-)
-
-EN_PATTERNS = _pats(
-    _bracket(r'en'), _bracket(r'English'),
-    _bracket(r'英语'), _bracket(r'英文'),
-)
-
-UNCENSORED_PATTERNS = _pats(
-    _bracket(r'[无無]修正?'), _bracket(r'官[方中][无無]修?'),
-    _bracket(r'Uncensored'),  _bracket(r'Decensored'),
-    _bracket(r'无修'),
-    r'\bUncensored\b', r'\bDecensored\b',
-)
-
-CENSORED_PATTERNS = _pats(
-    _bracket(r'有修正'), _bracket(r'修正あり'), r'\bCensored\b',
-)
-
-TEXTLESS_TAG_RE    = _pat(_bracket(r'zxx'))
-ONGOING_TAG_RE     = _pat(_bracket(r'ongoing'))
-
-# colorized 检测：经 wrap_bare_tags() + promote_tags() 处理后，
-# 所有变体均已规范化为 [colorized]，下游只需检测此一种形态。
-COLORIZED_TAG_PATTERNS = [_pat(_bracket(r'colorized'))]
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 5a. 裸词包裹（pre-promote）
+# 5. 标签预处理管道（wrap → promote → detect）
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# 把"无容器的已知关键字"包裹为 [keyword]，让后续 promote_tags 能统一处理。
-# 与 promote_tags 配合形成"裸词 → [裸词] → [标准tag]"的两段式管道，
-# 取代散落各处的「直接清除裸词」逻辑。
+# 三段式管道，逐步把所有标签变体收敛到唯一标准形态：
 #
-# 关键字必须满足：
-#   - 形态稳定（不会在合法标题中出现，如「フルカラー」「カラー化」）
-#   - 已确认应被识别为某个标签
+#   原始 ──► wrap_bare_tags ──► promote_tags ──► XX_PATTERNS（仅检测最终形态）
+#           裸词→[裸词]        [任意容器+关键字]→[标准tag]
+#
+# 标准 tag：[zh] [ja] [ko] [en] [zxx] [uncensored] [colorized] [ongoing]
+#
+# 扩展指南：
+#   - 新增「裸词 → 标签」：往 _BARE_TAG_KEYWORDS 加一个 alternation
+#   - 新增「容器+关键字 → 标准tag」：往 TAG_PROMOTE_RULES 加一行
+#   - 新增「最终形态检测」：往 XX_PATTERNS 加一条（一般只匹配 [tag]）
 
-# 顺序敏感：长 alternation 优先，避免「フルカラー化」被切碎
+# ── 5a. 裸词包裹 ───────────────────────────────────────────────────────────────
+# 把"无容器的已知关键字"包裹为 [keyword]，让 promote_tags 后续接管。
+# 顺序敏感：长 alternation 优先，避免「フルカラー化」被切碎。
+
 _BARE_TAG_KEYWORDS = (
+    # colorized 类
     r'フルカラー版?'
-    r'|カラー化'
-    r'|カラー版'
+    r'|カラー化|カラー版'
+    # zh 类（裸词形式的"中文版/机翻/個人翻譯"）
+    r'|中文版|機翻|机翻|個人翻譯'
+    # uncensored 类
+    r'|Uncensored|Decensored'
+    # censored 类
+    r'|Censored'
 )
 _BARE_TAG_RE = _pat(
-    rf'(?<![\[\(［【])({_BARE_TAG_KEYWORDS})(?![\]\)］】])'
+    rf'(?<![\[\(［【\w])({_BARE_TAG_KEYWORDS})(?![\]\)］】\w])'
 )
 
 
@@ -250,33 +209,62 @@ def wrap_bare_tags(s: str) -> str:
     return _BARE_TAG_RE.sub(r'[\1]', s)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 5b. 标签提升（tag promotion）
-# ═══════════════════════════════════════════════════════════════════════════════
-#
-# 把"任意容器（[]/()/【】）+ 已知关键字"统一规范化为标准 [tag] 形式。
-# 配合 wrap_bare_tags() 形成 "裸词 → [裸词] → [标准tag]" 管道。
-#
-# 注意:
-#   - 仅对"内容是已知关键字"的容器做提升，避免误改 (系列名) / 【前編】 等
-#   - 此规则不替代 BRACKET_TAG_RE 等标签剥除，只统一形态
+# ── 5b. 标签提升 ───────────────────────────────────────────────────────────────
+# 把"任意容器（[]/()/【】/［］）+ 已知关键字"统一规范化为标准 [tag] 形式。
+# 仅对"内容是已知关键字"的容器做提升，避免误改 (系列名) / 【前編】 等。
 
 _TAG_OPEN  = r'[\[\(［【]'
 _TAG_CLOSE = r'[\]\)］】]'
 
+
+def _tag(inner: str) -> str:
+    """生成「任意容器 + 内容」的匹配片段。"""
+    return rf'{_TAG_OPEN}\s*(?:{inner})\s*{_TAG_CLOSE}'
+
+
+# 注意顺序：复合标签（如「官中无修」同时是 zh + uncensored）需在单标签前处理
 TAG_PROMOTE_RULES: list[tuple[re.Pattern, str]] = [
-    # colorized：フルカラー(版) / カラー(版/化) / 全彩(色) / 彩色(版)
-    (_pat(
-        rf'{_TAG_OPEN}\s*'
-        r'(?:フルカラー|カラー化|カラー|全彩色?|彩色)版?'
-        rf'\s*{_TAG_CLOSE}'
-    ), '[colorized]'),
-    # uncensored：无修(正) / 官中无修 / Uncensored / Decensored
-    (_pat(
-        rf'{_TAG_OPEN}\s*'
-        r'(?:[无無]修(?:正)?|官[方中][无無]修?|Uncensored|Decensored)'
-        rf'\s*{_TAG_CLOSE}'
-    ), '[uncensored]'),
+    # 双重标签：官中无修 → [zh][uncensored]
+    (_pat(_tag(r'官中无修')), '[zh][uncensored]'),
+
+    # ── colorized ──────────────────────────────────────────────────────────────
+    (_pat(_tag(r'(?:フルカラー|カラー化|カラー|全彩色?|彩色)版?')), '[colorized]'),
+
+    # ── uncensored ─────────────────────────────────────────────────────────────
+    (_pat(_tag(
+        r'[无無]修(?:正)?|官[方中][无無]修?|无修|Uncensored|Decensored'
+    )), '[uncensored]'),
+
+    # ── censored ───────────────────────────────────────────────────────────────
+    (_pat(_tag(r'有修正|修正あり|Censored')), '[censored]'),
+
+    # ── zh ─────────────────────────────────────────────────────────────────────
+    # 整段含「汉化/掃图/嵌字/重嵌/日语社/考生組」的方括号 → [zh]（吞掉社团名）
+    (_pat(_bracket(
+        r'[^\]]*(?:[汉漢]化|[扫掃][圖图]|嵌字|重嵌|日语社|考生[組组])[^\]]*'
+    )), '[zh]'),
+    # 已知社团/工坊
+    (_pat(_tag(
+        r'[风風]的工房|如月工房|淫书馆|洨五[組组]|AI貓貓翻譯'
+    )), '[zh]'),
+    # 中文相关关键字
+    (_pat(_tag(
+        r'中[国國]翻[译訳]|中文翻[译訳]'
+        r'|中[国國][语語]|中文'
+        r'|Chinese|zh'
+        r'|简中|简体中文|繁中|繁体中文'
+        r'|官中|官方中文'
+        r'|中文版|機翻|机翻|個人翻譯'
+    )), '[zh]'),
+
+    # ── ja / ko / en ───────────────────────────────────────────────────────────
+    (_pat(_tag(r'ja|Japanese|日语|日文')),  '[ja]'),
+    (_pat(_tag(r'ko|Korean|韩语|韩文')),    '[ko]'),
+    (_pat(_tag(r'en|English|英语|英文')),   '[en]'),
+
+    # ── 其它原子标签（形态本身已规范，只做容器统一） ─────────────────────────
+    (_pat(_tag(r'zxx')),       '[zxx]'),
+    (_pat(_tag(r'ongoing')),   '[ongoing]'),
 ]
 
 
@@ -285,6 +273,18 @@ def promote_tags(s: str) -> str:
     for pat, std in TAG_PROMOTE_RULES:
         s = pat.sub(std, s)
     return s
+
+
+# ── 5c. 最终形态检测（管道后只需检测唯一标准形态） ───────────────────────────
+ZH_PATTERNS         = _pats(_bracket(r'zh'))
+JA_PATTERNS         = _pats(_bracket(r'ja'))
+KO_PATTERNS         = _pats(_bracket(r'ko'))
+EN_PATTERNS         = _pats(_bracket(r'en'))
+UNCENSORED_PATTERNS = _pats(_bracket(r'uncensored'))
+CENSORED_PATTERNS   = _pats(_bracket(r'censored'))
+COLORIZED_TAG_PATTERNS = [_pat(_bracket(r'colorized'))]
+TEXTLESS_TAG_RE     = _pat(_bracket(r'zxx'))
+ONGOING_TAG_RE      = _pat(_bracket(r'ongoing'))
 
 # 纯噪音方括号标签（直接丢弃）
 NOISE_TAG_RE = _pat(
@@ -306,11 +306,10 @@ NOISE_TAG_RE = _pat(
 # 版本标记（v2 / v1.5 等），在话数提取前清除
 VERSION_RE = _pat(r'\s*\bv\d+(?:\.\d+)?\b', flags=0)
 
-# 聚合：需依次剥除的标签列表
-STRIP_PATTERNS: list[re.Pattern] = (
-    ZH_PATTERNS + UNCENSORED_PATTERNS + CENSORED_PATTERNS
-    + [NOISE_TAG_RE, VERSION_RE]
-)
+# 聚合：strip_tags 中的额外剥除规则
+# 标准方括号标签（[zh]/[uncensored]/…）已由 BRACKET_TAG_RE 兜底剥除，
+# 此处只需处理「不在方括号内」的噪音（NOISE_TAG_RE 自带方括号，VERSION_RE 是裸词）
+STRIP_PATTERNS: list[re.Pattern] = [NOISE_TAG_RE, VERSION_RE]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
