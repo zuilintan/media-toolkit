@@ -317,8 +317,14 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     (_pat(rf'(?<!\d)({_NUM}\s*\+\s*)+{_NUM}(?!\d)', 0), _ch_plus_range),
     # 裸数字范围
     (_pat(rf'({_NUM})\s*[-~～]\s*({_NUM})', 0), _ch_range),
-    # 数字 + 编/篇/话等（允许无空白粘连，如「主标题名6過去編」）
-    (_pat(rf'(?:(?<=\s)|(?<=\D))({_NUM})(?=\s*\S*[編编篇話话章節节巻卷])', re.IGNORECASE), _ch_single),
+    # 数字 + 编/篇/话等（紧贴：至多 3 个非空白非・字符，且前后不可为 . / ・，
+    # 如「主标题名6過去編」匹配；「no.10・自編」「1号2号…話」不匹配）
+    (_pat(
+        rf'(?<![\d.・])(?<=\S)({_NUM})(?=[^\s・]{{0,3}}[編编篇話话章節节巻卷])',
+        re.IGNORECASE,
+    ), _ch_single),
+    # 数字 + 编/篇/话等（空白分隔，如「2 挑戦編」）
+    (_pat(rf'(?:(?<=\s)|(?<=\D))({_NUM})(?=\s+\S*[編编篇話话章節节巻卷])', re.IGNORECASE), _ch_single),
     # 单个中文数字
     (_pat(
         rf'(?:(?<=\s)|(?<=\D))(?<![\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff])'
