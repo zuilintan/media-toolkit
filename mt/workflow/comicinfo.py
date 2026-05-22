@@ -5,7 +5,7 @@ comicinfo.py — ComicInfo.xml 生成、读取与写入
 
 Number 字段规则（与 CH. 同级且互斥）:
   - chapter 不为 None  → 数字格式，如 "01-05+番外篇"
-  - chapter 为 None，appendix 在 CH. 级别 → 直接用附录词，如 "番外篇"/"后日谈"
+  - chapter 为 None，part_tag 在 CH. 级别 → 直接用分编词，如 "番外篇"/"后日谈"
   - 否则              → ''（留空，不显式指定）
 
 依赖: models / patterns / config / parser / console / presentation
@@ -72,17 +72,17 @@ def build_title(info: MangaInfo) -> str:
 
 
 def build_number(info: MangaInfo) -> str:
-    """<Number>：话号或独立附录词，与 CH. 同级且互斥。
+    """<Number>：话号或独立分编词，与 CH. 同级且互斥。
 
     - chapter 不为 None → 数字格式（不含 'CH.' 前缀），如 "01-05+番外篇"
-    - chapter 为 None，appendix 在 CH. 级别（非 PRE_VOL）→ 附录词原文
+    - chapter 为 None，part_tag 在 CH. 级别（非 PRE_VOL）→ 分编词原文
     - 否则 → ''（留空，不显式指定）
     """
     if info.chapter is not None:
         return info.chapter.number_str()
-    if info.appendix and info.appendix not in P.PRE_VOL_APPENDIX:
+    if info.part_tag and info.part_tag not in P.PRE_VOL_PARTS:
         # 番外篇 / 后日谈 / 上篇 / 中篇 / 下篇 均在此
-        return info.appendix
+        return info.part_tag
     return ''
 
 

@@ -109,10 +109,10 @@ class MangaInfo:
         is_uncensored: 是否无修正。
         is_colorized:  是否彩色化。
         is_ongoing:    是否连载中。
-        appendix:      独立附录标记；与 CH. 同级且互斥的有：
-                           番外篇 / 后日谈 / 上篇 / 中篇 / 下篇
-                       在 VOL. 之前输出的有：
-                           总集篇
+        part_tag:      分编标记（非数字章节分类词）。三类：
+                         附录类（与 CH. 同级且互斥）：番外篇 / 后日谈
+                         结构类（与 CH. 同级且互斥）：上篇 / 中篇 / 下篇
+                         合集类（在 VOL. 之前输出）：    总集篇
         original:      解析前的原始输入字符串。
     """
     author:        str
@@ -126,7 +126,7 @@ class MangaInfo:
     is_uncensored: bool           = False
     is_colorized:  bool           = False
     is_ongoing:    bool           = False
-    appendix:      str            = ""
+    part_tag:      str            = ""
     original:      str            = ""
 
 

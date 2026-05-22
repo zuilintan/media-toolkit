@@ -11,7 +11,7 @@ builder.py — 新文件名构建
 
 规则:
   1. 标题/系列/译名中，空格以 ・ 替代
-  2. 总集篇 在 VOL. 之前；其余附录词与 CH. 同级（VOL. 之后）
+  2. 总集篇 在 VOL. 之前；其余分编词与 CH. 同级（VOL. 之后）
   3. 后日谈 / 番外篇 / 上篇 / 中篇 / 下篇 与 CH. 互斥
 
 依赖: models / patterns / utils
@@ -29,17 +29,17 @@ def build_new_name(info: MangaInfo) -> str:
     parts: list[str] = [f'[{info.author}]', dot(info.main_title)]
 
     # 总集篇 在 VOL. 之前
-    if info.appendix in P.PRE_VOL_APPENDIX:
-        parts.append(info.appendix)
+    if info.part_tag in P.PRE_VOL_PARTS:
+        parts.append(info.part_tag)
 
     if info.volume is not None:
         parts.append(str(info.volume))
 
-    # CH. 话数 或 独立附录词（与 CH. 同级且互斥，在 VOL. 之后）
+    # CH. 话数 或 独立分编词（与 CH. 同级且互斥，在 VOL. 之后）
     if info.chapter is not None:
         parts.append(str(info.chapter))
-    elif info.appendix and info.appendix not in P.PRE_VOL_APPENDIX:
-        parts.append(info.appendix)
+    elif info.part_tag and info.part_tag not in P.PRE_VOL_PARTS:
+        parts.append(info.part_tag)
 
     if info.chapter_title:
         parts.append(f'～{dot(info.chapter_title)}～')

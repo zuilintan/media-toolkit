@@ -151,7 +151,7 @@ def strip_tags(text: str) -> str:
 def extract_subtitle(title: str) -> tuple[str, str]:
     """从标题中分离话标题，返回 (主标题, 话标题)。
 
-    话标题不含外围定界符。附录词汇（如总集篇）直接归入附录，不视为话标题。
+    话标题不含外围定界符。合集词（如总集篇）直接归入 part_tag，不视为话标题。
 
     优先级:
       1. ～xxx～ / ―xxx― / —xxx—
@@ -164,45 +164,45 @@ def extract_subtitle(title: str) -> tuple[str, str]:
     m = P.SUBTITLE_RE.search(title)
     if m:
         sub = m.group(1)
-        if P.is_appendix(sub):
-            return title[:m.start()].strip(), P.norm_part_subtitle(sub)
+        if P.is_compilation(sub):
+            return title[:m.start()].strip(), P.normalize_part(sub)
         return title[:m.start()].strip(), sub.strip()
 
     # 2. 「」+ 后缀词
     m = P.KAGI_PART_RE.search(title)
     if m:
-        suffix   = P.norm_part_subtitle(conv_roman_suffix(m.group(2)))
+        suffix   = P.normalize_part(conv_roman_suffix(m.group(2)))
         combined = f"{m.group(1)}・{suffix}"
-        if P.is_appendix(combined):
-            return title[:m.start()].strip(), P.norm_part_subtitle(combined)
+        if P.is_compilation(combined):
+            return title[:m.start()].strip(), P.normalize_part(combined)
         return title[:m.start()].strip(), combined
 
     # 3. 「」单独
     m = P.KAGI_SUB_RE.search(title)
     if m:
         sub = m.group(1).strip()
-        if P.is_appendix(sub):
-            return title[:m.start()].strip(), P.norm_part_subtitle(sub)
+        if P.is_compilation(sub):
+            return title[:m.start()].strip(), P.normalize_part(sub)
         return title[:m.start()].strip(), sub
 
     # 4. 【部分词汇】
     m = P.KAKKO_PART_RE.search(title)
     if m:
-        part = P.norm_part_subtitle(m.group(1).strip())
+        part = P.normalize_part(m.group(1).strip())
         return title[:m.start()].strip(), part
 
-    # 5. 末尾分编词汇循环剥离
-    appendix_parts: list[str] = []
-    chapter_parts:  list[str] = []
+    # 5. 末尾分编词汇循环剥离（合集类排前，其它排后）
+    compilation_parts: list[str] = []
+    chapter_parts:     list[str] = []
     working = title
     while True:
         found = False
         for pat in (P.PART_COMPOUND_RE, P.PART_SUFFIX_RE):
             m = pat.search(working)
             if m and m.start() > 0:
-                part = P.norm_part_subtitle(m.group(1).strip())
-                if P.is_appendix(part):
-                    appendix_parts.insert(0, part)
+                part = P.normalize_part(m.group(1).strip())
+                if P.is_compilation(part):
+                    compilation_parts.insert(0, part)
                 else:
                     chapter_parts.insert(0, part)
                 working = working[:m.start()].strip()
@@ -210,8 +210,8 @@ def extract_subtitle(title: str) -> tuple[str, str]:
                 break
         if not found:
             break
-    if appendix_parts or chapter_parts:
-        ch = '・'.join(appendix_parts + chapter_parts)
+    if compilation_parts or chapter_parts:
+        ch = '・'.join(compilation_parts + chapter_parts)
         return working.strip(), ch
 
     # 6. 兜底：末尾任意「XX編/篇」，可带罗马数字尾缀
@@ -220,7 +220,7 @@ def extract_subtitle(title: str) -> tuple[str, str]:
     )
     if m and m.start() > 0:
         raw = m.group(1).strip()
-        return working[:m.start()].strip(), conv_roman_suffix(P.norm_part_subtitle(raw))
+        return working[:m.start()].strip(), conv_roman_suffix(P.normalize_part(raw))
 
     return title, ''
 
@@ -245,15 +245,13 @@ def _extract_translation(bare: str) -> tuple[str, str]:
 
     译名常不严格遵循原名格式（可能只翻译一部分，或自带「主标题 ～话标题～」
     结构），因此不再把空格转为 ・，也不再识别尾部分编词。
+    单侧 ¦ 形态已由 normalize_translation_delim() 在管道阶段补全。
     """
-    stem_trans = re.sub(
-        r'^([^¦]+?)\s*¦\s*([^¦]+?)\s*(?=\[|$)', r'\1 ¦\2¦', bare
-    )
-    m = P.TRANS_INLINE_RE.search(stem_trans)
+    m = P.TRANS_INLINE_RE.search(bare)
     translation = m.group(1).strip() if m else ''
     # 多空格 → 单空格
     translation = re.sub(r'\s+', ' ', translation)
-    bare        = P.TRANS_INLINE_RE.sub('', stem_trans).strip()
+    bare        = P.TRANS_INLINE_RE.sub('', bare).strip()
     translation = trad_to_simp(translation)
     return bare, translation
 
@@ -292,7 +290,7 @@ def _detect_language_uncensored(bare: str, language: str) -> tuple[str, bool]:
 def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bool]:
     """检测卷/话数，返回 (volume, chapter, is_bonus)。
 
-    is_bonus=True 表示话数是纯番外标记（CH.00），应提升为 appendix 字段。
+    is_bonus=True 表示话数是纯番外标记（CH.00），应提升为 part_tag 字段。
     """
     bare_pub  = P.PUBLICATION_PAREN_RE.sub('', bare)
     volume    = detect_volume(bare_pub)
@@ -312,53 +310,53 @@ def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bo
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 附录字段推导
+# part_tag 字段推导
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _resolve_appendix(
+def _resolve_part_tag(
     main_title: str, ch_title: str, is_bonus: bool
 ) -> tuple[str, str, str]:
-    """从标题部件和番外标志推导附录字段，返回 (main_title, ch_title, appendix)。"""
-    appendix = ''
+    """从标题部件和番外标志推导 part_tag 字段，返回 (main_title, ch_title, part_tag)。"""
+    part_tag = ''
 
     if is_bonus:
-        appendix = '番外篇'
+        part_tag = '番外篇'
     else:
         m = P.BONUS_SUFFIX_RE.search(main_title)
         if m:
             main_title = main_title[: m.start()].strip()
-            appendix   = '番外篇'
+            part_tag   = '番外篇'
 
-    if not appendix:
-        for word in sorted(P.STANDALONE_APPENDIX, key=len, reverse=True):
+    if not part_tag:
+        for word in sorted(P.STANDALONE_PARTS, key=len, reverse=True):
             if main_title.endswith(' ' + word):
                 main_title = main_title[: -len(word) - 1].strip()
-                appendix   = word
+                part_tag   = word
                 break
         else:
             parts = main_title.rsplit(' ', 1)
             if len(parts) == 2:
-                normed = P.norm_part_subtitle(parts[1])
-                if normed in P.STANDALONE_APPENDIX:
+                normed = P.normalize_part(parts[1])
+                if normed in P.STANDALONE_PARTS:
                     main_title = parts[0].strip()
-                    appendix   = normed
+                    part_tag   = normed
 
-    if not appendix:
-        if ch_title in P.STANDALONE_APPENDIX:
-            appendix  = ch_title
+    if not part_tag:
+        if ch_title in P.STANDALONE_PARTS:
+            part_tag  = ch_title
             ch_title  = ''
         elif '+' in ch_title and all(
-            p in P.STANDALONE_APPENDIX for p in ch_title.split('+')
+            p in P.STANDALONE_PARTS for p in ch_title.split('+')
         ):
-            appendix  = ch_title
+            part_tag  = ch_title
             ch_title  = ''
         elif '・' in ch_title:
             parts = ch_title.split('・')
-            if all(p in P.STANDALONE_APPENDIX for p in parts):
-                appendix = ' '.join(parts)
+            if all(p in P.STANDALONE_PARTS for p in parts):
+                part_tag = ' '.join(parts)
                 ch_title = ''
 
-    return main_title, ch_title, appendix
+    return main_title, ch_title, part_tag
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -385,6 +383,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
     stem = P.wrap_bare_tags(stem)
     stem = P.promote_tags(stem)
     stem = P.normalize_chapter_tokens(stem)
+    stem = P.normalize_translation_delim(stem)
     stem, language, is_colorized, is_ongoing = _extract_special_flags(stem)
 
     # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
@@ -417,20 +416,20 @@ def parse_name(author: str, name: str) -> MangaInfo:
                 f"{m_bonus.group(1)}・{m_bonus.group(2)} ～{m_bonus.group(3)}～"
             )
 
-    # 7. 提取话标题 & 附录
+    # 7. 提取话标题 & part_tag
     clean_title = P.normalize_subtitle_delimiters(clean_title)
     main_title, ch_title = extract_subtitle(clean_title)
     if ch_title:
         ch_title = _normalize_chapter_title(ch_title)
-        ch_title = P.norm_part_subtitle(ch_title)
-    main_title, ch_title, appendix = _resolve_appendix(main_title, ch_title, is_bonus)
+        ch_title = P.normalize_part(ch_title)
+    main_title, ch_title, part_tag = _resolve_part_tag(main_title, ch_title, is_bonus)
 
     debug(
         f"main='{CYAN}{main_title}{RESET}' "
         f"vol='{CYAN}{volume}{RESET}' "
         f"ch='{CYAN}{chapter}{RESET}' "
         f"ch_title='{CYAN}{ch_title}{RESET}' "
-        f"appendix='{CYAN}{appendix}{RESET}' "
+        f"part_tag='{CYAN}{part_tag}{RESET}' "
         f"series='{CYAN}{series}{RESET}' "
         f"lang='{CYAN}{language}{RESET}'"
     )
@@ -447,6 +446,6 @@ def parse_name(author: str, name: str) -> MangaInfo:
         is_uncensored = is_uncensored,
         is_colorized  = is_colorized,
         is_ongoing    = is_ongoing,
-        appendix      = appendix,
+        part_tag      = part_tag,
         original      = name,
     )

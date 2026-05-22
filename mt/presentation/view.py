@@ -53,7 +53,7 @@ def print_preview(plans: list[RenamePlan]) -> None:
                 if i.translation:   flags.append(f'译名:{i.translation}')
                 if i.volume:        flags.append(str(i.volume))
                 if i.chapter:       flags.append(str(i.chapter))
-                if i.appendix:      flags.append(f'附录:{i.appendix}')
+                if i.part_tag:      flags.append(f'分编:{i.part_tag}')
                 if flags:
                     emit(f'       Flag: {" | ".join(flags)}')
                 emit(f'       Path:\n       {p.author_dir}\\{p.old_name}\n')
