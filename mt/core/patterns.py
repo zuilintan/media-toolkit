@@ -53,7 +53,7 @@ _RANGE = rf'{_NUM}\s*[-~～]\s*{_NUM}'            # 连续范围 N-M
 _CHAP_SUFFIX_CC   = r'[編编篇話话章節节巻卷]'    # 话/章/节 后缀字符
 _VOL_SUFFIX_CC    = r'[巻卷]'                    # 卷字
 _TALE_CC          = r'[話话]'                    # 话字
-_RIGHT_OPEN_CC    = r'[\[¦～\(（「]'              # 话号右侧合法开界字符
+_RIGHT_OPEN_CC    = r'[\[¦～(「]'                # 话号右侧合法开界字符
 _NOT_FIELD_SEP_CC = r'[^\s・]'                   # 非空白且非「・」（字段分隔符）
 
 # ── 前置断言（lookbehind/word boundary） ──────────────────────────────────────
@@ -158,8 +158,13 @@ def is_appendix(part: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PUNCT_MAP = str.maketrans({
-    '!': '！', '?': '？', '~': '～', '〜': '～',
+    '!': '！', '?': '？',
+    '~': '～', '〜': '～', '〰': '～',
     '·': '・', '｜': '¦', '︱': '¦',
+    '（': '(', '）': ')',                       # 全角括号 → 半角，简化下游正则
+    '　': ' ',                                  # 全角空格 → 半角
+    '\u200b': '', '\u200c': '',                # 零宽字符直接清除
+    '\u200d': '', '\ufeff': '',
 })
 
 
@@ -211,16 +216,52 @@ CENSORED_PATTERNS = _pats(
 
 TEXTLESS_TAG_RE    = _pat(_bracket(r'zxx'))
 ONGOING_TAG_RE     = _pat(_bracket(r'ongoing'))
+
+# colorized 检测：经 promote_tags() 处理后，所有变体已被规范化为 [colorized]。
+# 仍保留无容器的裸词兜底（カラー化 / フルカラー）。
 COLORIZED_TAG_PATTERNS = [
     _pat(_bracket(r'colorized')),
-    _pat(r'【\s*フルカラー(?:版)?\s*】'),
-    _pat(r'【\s*カラー(?:版)?\s*】'),
-    _pat(r'【\s*全彩(?:色)?\s*】'),
-    _pat(r'【\s*彩色(?:版)?\s*】'),
-    _pat(r'[\[［]\s*フルカラー(?:版)?\s*[\]］]'),
     _pat(r'\s*カラー化\s*'),
     _pat(r'\s*フルカラー\s*'),
 ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5b. 标签提升（tag promotion）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 把"任意容器（[]/()/【】）+ 已知关键字"统一规范化为标准 [tag] 形式。
+# 在 parse_name() 的早期调用，让下游只关注 [colorized] / [uncensored] 等
+# 规范形式，避免 (フルカラー) 被误判为系列名等问题。
+#
+# 注意:
+#   - 仅对"内容是已知关键字"的容器做提升，避免误改 (系列名) / 【前編】 等
+#   - 此规则不替代 BRACKET_TAG_RE 等标签剥除，只统一形态
+
+_TAG_OPEN  = r'[\[\(［【]'
+_TAG_CLOSE = r'[\]\)］】]'
+
+TAG_PROMOTE_RULES: list[tuple[re.Pattern, str]] = [
+    # colorized：フルカラー(版) / カラー(版/化) / 全彩(色) / 彩色(版)
+    (_pat(
+        rf'{_TAG_OPEN}\s*'
+        r'(?:フルカラー|カラー化|カラー|全彩色?|彩色)版?'
+        rf'\s*{_TAG_CLOSE}'
+    ), '[colorized]'),
+    # uncensored：无修(正) / 官中无修 / Uncensored / Decensored
+    (_pat(
+        rf'{_TAG_OPEN}\s*'
+        r'(?:[无無]修(?:正)?|官[方中][无無]修?|Uncensored|Decensored)'
+        rf'\s*{_TAG_CLOSE}'
+    ), '[uncensored]'),
+]
+
+
+def promote_tags(s: str) -> str:
+    """把任意容器内的已知标签关键字规范化为 [tag] 形式。"""
+    for pat, std in TAG_PROMOTE_RULES:
+        s = pat.sub(std, s)
+    return s
 
 # 纯噪音方括号标签（直接丢弃）
 NOISE_TAG_RE = _pat(
@@ -255,13 +296,13 @@ STRIP_PATTERNS: list[re.Pattern] = (
 
 AUTHOR_TAG_RE       = _pat(_bracket(r'([^\]］]+)'), 0)   # 第一个 [xxx] → 作者
 BRACKET_TAG_RE      = _pat(_bracket(r'[^\]］]*'), 0)      # 所有方括号标签
-SERIES_PAREN_RE     = _pat(                               # 系列名 (xxx) / （xxx）
-    r'(?:^|(?<=[\s～】」\]）]))[\(（]([^\)）]+)[\)）]', 0)
+SERIES_PAREN_RE     = _pat(                               # 系列名 (xxx)
+    r'(?:^|(?<=[\s～】」\])]))\(([^)]+)\)', 0)
 TRANS_INLINE_RE     = _pat(r'¦([^¦]+)¦', 0)              # 内嵌译名 ¦译名¦
 PUBLICATION_PAREN_RE= _pat(                               # 杂志来源括号
-    r'[\(（][^\)）]*(?:COMIC|別冊|よろず|雑誌|月号|週刊|Vol\.|C\d{2,})[^\)）]*[\)）]')
+    r'\([^)]*(?:COMIC|別冊|よろず|雑誌|月号|週刊|Vol\.|C\d{2,})[^)]*\)')
 LEADING_PREFIX_RE   = _pat(                               # 开头噪音前缀
-    r'^\s*(?:[\(（][^\)）]{1,10}[\)）]\s*)+', 0)
+    r'^\s*(?:\([^)]{1,10}\)\s*)+', 0)
 
 # 话标题分隔符（支持单侧波浪线）
 SUBTITLE_RE = _pat(
@@ -399,7 +440,7 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     # 单个中文数字（前置非 CJK/假名，右侧为空白/EOL/标签开界）
     (_pat(
         rf'{_WORD_BOUNDARY_LB}{_CJK_KANA_NEG_LB}'
-        rf'({_CN_NUM_CC})(?=\s|$|[\[（(～])',
+        rf'({_CN_NUM_CC})(?=\s|$|[\[(～])',
         0,
     ), _ch_cnnum),
 

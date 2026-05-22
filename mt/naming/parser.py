@@ -110,8 +110,8 @@ def strip_tags(text: str) -> str:
         text = pat.sub('', text)
     text = P.BRACKET_TAG_RE.sub('', text).rstrip()
 
-    # 3. 去除系列名括号
-    text = re.sub(r'(?:^|(?<=\s))[\(（][^\)）]*[\)）]', '', text)
+    # 3. 去除系列名括号（依赖 norm_punct 已将全角括号转半角）
+    text = re.sub(r'(?:^|(?<=\s))\([^)]*\)', '', text)
 
     # 4. 处理番外关键词
     text = P.BONUS_RANGE_RE.sub('', text)
@@ -236,7 +236,7 @@ def _extract_series(bare: str) -> tuple[str, str]:
         return bare, ''
     series  = m.group(1).strip()
     escaped = re.escape(series)
-    bare    = re.sub(rf'[\(（]\s*{escaped}\s*[\)）]', '', bare)
+    bare    = re.sub(rf'\(\s*{escaped}\s*\)', '', bare)
     return bare, series
 
 
@@ -385,8 +385,9 @@ def parse_name(author: str, name: str) -> MangaInfo:
     Returns:
         填充完毕的 MangaInfo。
     """
-    # 0. 标点规范化 & 特殊标志
+    # 0. 标点规范化 → 标签提升 → 特殊标志
     stem = norm_punct(name)
+    stem = P.promote_tags(stem)
     stem, language, is_colorized, is_ongoing = _extract_special_flags(stem)
 
     # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
