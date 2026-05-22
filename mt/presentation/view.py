@@ -39,7 +39,7 @@ def print_preview(plans: list[RenamePlan]) -> None:
                 last_author = p.author
             icon = '📄' if p.is_file else '🗂 '
             note = ' ⚠️  需审核' if p.needs_review else ''
-            emit(f'    {icon} [{idx:>3}]')
+            emit(f'     {icon} [{idx:>3}]')
             emit(f'       旧: {p.old_name}')
             emit(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
             if p.info:
