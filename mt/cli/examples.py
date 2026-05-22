@@ -52,7 +52,7 @@ def run_rename_examples() -> int:
         if not passed:
             fail += 1
         mark = '✅' if passed else '❌'
-        emit(f'  {mark} 旧: {name}')
+        emit(f'   {mark} 旧: {name}')
         emit(f'     新: {highlight_diff(name, result, RED)}')
         if not passed:
             emit(f'   预期: {highlight_diff(result, expected, GREEN)}')
