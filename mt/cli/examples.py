@@ -2,10 +2,10 @@
 examples.py — 内置示例数据加载与展示
 
 示例数据集中存放于 ``mt/data/examples.json``，每条为
-``{"author", "input", "expected"}``，由 rename 与 comicinfo 两个子命令共用:
+``{"author", "i", "e"}``（i=input, e=expected），由 rename 与 comicinfo 两个子命令共用:
 
-  - rename    使用 (author, input, expected)，验证「输入 → 规范化输出」转换；
-  - comicinfo 使用 (author, expected)，将规范化文件名解析为 ComicInfo 字段并展示。
+  - rename    使用 (author, i, e)，验证「输入 → 规范化输出」转换；
+  - comicinfo 使用 (author, e)，将规范化文件名解析为 ComicInfo 字段并展示。
 
 依赖: naming.parser / naming.builder / workflow.comicinfo / infra.console / presentation
 """
@@ -32,7 +32,7 @@ def load_examples() -> list[tuple[str, str, str]]:
     """加载示例数据，返回 (author, input, expected) 三元组列表。"""
     raw = json.loads(_DATA_PATH.read_text(encoding='utf-8'))
     author = raw['author']
-    return [(author, e['input'], e['expected']) for e in raw['cases']]
+    return [(author, e['i'], e['e']) for e in raw['cases']]
 
 
 def run_rename_examples() -> int:
