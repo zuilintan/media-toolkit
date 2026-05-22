@@ -46,11 +46,6 @@ def similar(a: str, b: str) -> bool:
     return na == nb or na in nb or nb in na
 
 
-def any_match(text: str, patterns: list[re.Pattern]) -> bool:
-    """任意一个正则匹配即返回 True。"""
-    return any(p.search(text) for p in patterns)
-
-
 def dot(s: str) -> str:
     """将字段内空格替换为 ・（片假名中点）。"""
     return s.strip().replace(' ', '・')
@@ -66,15 +61,6 @@ def extract_flag(stem: str, pattern: re.Pattern) -> tuple[str, bool]:
     """若匹配 pattern，移除并返回 (新stem, True)；否则返回 (stem, False)。"""
     if pattern.search(stem):
         return pattern.sub('', stem), True
-    return stem, False
-
-
-def extract_flag_from_list(stem: str, patterns: list[re.Pattern]) -> tuple[str, bool]:
-    """尝试列表各模式，移除第一个命中，全不命中返回 (stem, False)。"""
-    for pat in patterns:
-        stem, hit = extract_flag(stem, pat)
-        if hit:
-            return stem, True
     return stem, False
 
 

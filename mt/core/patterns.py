@@ -286,15 +286,16 @@ def promote_tags(s: str) -> str:
 # 把 '第N-M話' / '第N話' 规范化为 'CH.N-M' / 'CH.N'，
 # 后续 CHAPTER_PATTERNS 只需保留 CH. 前缀规则，无需再设 第…話 分支。
 
-_DAI_TALE_RANGE_RE = _pat(rf'{_DAI_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})\s*{_TALE_CC}')
-_DAI_TALE_SINGLE_RE = _pat(rf'{_DAI_PREFIX}({_NUM})\s*{_TALE_CC}')
+_DAI_TALE_RE = _pat(
+    rf'{_DAI_PREFIX}({_NUM})(?:\s*[-~～]\s*({_NUM}))?\s*{_TALE_CC}'
+)
 
 
 def normalize_chapter_tokens(s: str) -> str:
     """将 '第N-M話' / '第N話' 规范化为 'CH.N-M' / 'CH.N'。"""
-    s = _DAI_TALE_RANGE_RE.sub(lambda m: f'CH.{m.group(1)}-{m.group(2)}', s)
-    s = _DAI_TALE_SINGLE_RE.sub(lambda m: f'CH.{m.group(1)}', s)
-    return s
+    def _repl(m: re.Match) -> str:
+        return f'CH.{m.group(1)}-{m.group(2)}' if m.group(2) else f'CH.{m.group(1)}'
+    return _DAI_TALE_RE.sub(_repl, s)
 
 
 # ── 5d. 话标题定界符规范化 ─────────────────────────────────────────────────────
@@ -316,14 +317,15 @@ def normalize_subtitle_delimiters(s: str) -> str:
 
 
 # ── 5e. 最终形态检测（管道后只需检测唯一标准形态） ───────────────────────────
-ZH_PATTERNS         = _pats(_bracket(r'zh'))
-JA_PATTERNS         = _pats(_bracket(r'ja'))
-KO_PATTERNS         = _pats(_bracket(r'ko'))
-EN_PATTERNS         = _pats(_bracket(r'en'))
-UNCENSORED_PATTERNS = _pats(_bracket(r'uncensored'))
-CENSORED_PATTERNS   = _pats(_bracket(r'censored'))
-COLORIZED_TAG_PATTERNS = [_pat(_bracket(r'colorized'))]
+LANG_TAGS: dict[str, re.Pattern] = {
+    'zh': _pat(_bracket(r'zh')),
+    'ja': _pat(_bracket(r'ja')),
+    'ko': _pat(_bracket(r'ko')),
+    'en': _pat(_bracket(r'en')),
+}
 TEXTLESS_TAG_RE     = _pat(_bracket(r'zxx'))
+UNCENSORED_RE       = _pat(_bracket(r'uncensored'))
+COLORIZED_TAG_RE    = _pat(_bracket(r'colorized'))
 ONGOING_TAG_RE      = _pat(_bracket(r'ongoing'))
 
 # 纯噪音方括号标签（直接丢弃）
@@ -345,11 +347,6 @@ NOISE_TAG_RE = _pat(
 
 # 版本标记（v2 / v1.5 等），在话数提取前清除
 VERSION_RE = _pat(r'\s*\bv\d+(?:\.\d+)?\b', flags=0)
-
-# 聚合：strip_tags 中的额外剥除规则
-# 标准方括号标签（[zh]/[uncensored]/…）已由 BRACKET_TAG_RE 兜底剥除，
-# 此处只需处理「不在方括号内」的噪音（NOISE_TAG_RE 自带方括号，VERSION_RE 是裸词）
-STRIP_PATTERNS: list[re.Pattern] = [NOISE_TAG_RE, VERSION_RE]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

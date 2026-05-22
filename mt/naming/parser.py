@@ -14,8 +14,8 @@ from typing import TypeVar
 from mt.core.models import Chapter, Volume, MangaInfo
 from mt.core import patterns as P
 from mt.infra.utils import (
-    any_match, norm_punct, trad_to_simp,
-    extract_flag, extract_flag_from_list, to_circle, conv_roman_suffix,
+    norm_punct, trad_to_simp,
+    extract_flag, to_circle, conv_roman_suffix,
     similar,
 )
 from mt.infra.console import debug, CYAN, RESET
@@ -105,9 +105,9 @@ def strip_tags(text: str) -> str:
     # 1. 去除杂志来源括号
     text = P.PUBLICATION_PAREN_RE.sub('', text)
 
-    # 2. 依次剥除语言/无修正/噪音标签，再兜底去除所有方括号标签
-    for pat in P.STRIP_PATTERNS:
-        text = pat.sub('', text)
+    # 2. 剥除噪音标签 + 版本标记，再兜底去除所有方括号标签
+    text = P.NOISE_TAG_RE.sub('', text)
+    text = P.VERSION_RE.sub('', text)
     text = P.BRACKET_TAG_RE.sub('', text).rstrip()
 
     # 3. 去除系列名括号（依赖 norm_punct 已将全角括号转半角）
@@ -270,28 +270,23 @@ def _normalize_chapter_title(s: str) -> str:
 def _extract_special_flags(stem: str) -> tuple[str, str, bool, bool]:
     stem, is_zxx = extract_flag(stem, P.TEXTLESS_TAG_RE)
     language     = 'zxx' if is_zxx else ''
-    stem, is_colorized = extract_flag_from_list(stem, P.COLORIZED_TAG_PATTERNS)
+    stem, is_colorized = extract_flag(stem, P.COLORIZED_TAG_RE)
     stem, is_ongoing   = extract_flag(stem, P.ONGOING_TAG_RE)
     return stem, language, is_colorized, is_ongoing
 
 
-def _detect_language_uncensored(
-    bare: str, original: str, language: str
-) -> tuple[str, bool]:
+def _detect_language_uncensored(bare: str, language: str) -> tuple[str, bool]:
+    """检测语言与无修正标志。
+
+    promote_tags 已把所有变体收敛到 [zh]/[ja]/.../[uncensored]，
+    故只需在 bare 中扫一次标准形态即可（原始 name 无需重复扫描）。
+    """
     if language != 'zxx':
-        if any_match(bare, P.ZH_PATTERNS) or any_match(original, P.ZH_PATTERNS):
-            language = 'zh'
-        elif any_match(bare, P.JA_PATTERNS) or any_match(original, P.JA_PATTERNS):
-            language = 'ja'
-        elif any_match(bare, P.KO_PATTERNS) or any_match(original, P.KO_PATTERNS):
-            language = 'ko'
-        elif any_match(bare, P.EN_PATTERNS) or any_match(original, P.EN_PATTERNS):
-            language = 'en'
-    is_uncensored = (
-        any_match(bare, P.UNCENSORED_PATTERNS)
-        or any_match(original, P.UNCENSORED_PATTERNS)
-    )
-    return language, is_uncensored
+        for lang, pat in P.LANG_TAGS.items():
+            if pat.search(bare):
+                language = lang
+                break
+    return language, bool(P.UNCENSORED_RE.search(bare))
 
 
 def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bool]:
@@ -406,7 +401,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
     bare, translation = _extract_translation(bare)
 
     # 4. 检测语言、无修正、卷数、话数
-    language, is_uncensored = _detect_language_uncensored(bare, name, language)
+    language, is_uncensored = _detect_language_uncensored(bare, language)
     volume, chapter, is_bonus = _detect_volume_chapter(bare)
 
     # 5. 提取系列名
