@@ -385,8 +385,9 @@ def parse_name(author: str, name: str) -> MangaInfo:
     Returns:
         填充完毕的 MangaInfo。
     """
-    # 0. 标点规范化 → 标签提升 → 特殊标志
+    # 0. 标点规范化 → 裸词包裹 → 标签提升 → 特殊标志
     stem = norm_punct(name)
+    stem = P.wrap_bare_tags(stem)
     stem = P.promote_tags(stem)
     stem, language, is_colorized, is_ongoing = _extract_special_flags(stem)
 

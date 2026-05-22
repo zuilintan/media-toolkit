@@ -217,13 +217,37 @@ CENSORED_PATTERNS = _pats(
 TEXTLESS_TAG_RE    = _pat(_bracket(r'zxx'))
 ONGOING_TAG_RE     = _pat(_bracket(r'ongoing'))
 
-# colorized 检测：经 promote_tags() 处理后，所有变体已被规范化为 [colorized]。
-# 仍保留无容器的裸词兜底（カラー化 / フルカラー）。
-COLORIZED_TAG_PATTERNS = [
-    _pat(_bracket(r'colorized')),
-    _pat(r'\s*カラー化\s*'),
-    _pat(r'\s*フルカラー\s*'),
-]
+# colorized 检测：经 wrap_bare_tags() + promote_tags() 处理后，
+# 所有变体均已规范化为 [colorized]，下游只需检测此一种形态。
+COLORIZED_TAG_PATTERNS = [_pat(_bracket(r'colorized'))]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5a. 裸词包裹（pre-promote）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 把"无容器的已知关键字"包裹为 [keyword]，让后续 promote_tags 能统一处理。
+# 与 promote_tags 配合形成"裸词 → [裸词] → [标准tag]"的两段式管道，
+# 取代散落各处的「直接清除裸词」逻辑。
+#
+# 关键字必须满足：
+#   - 形态稳定（不会在合法标题中出现，如「フルカラー」「カラー化」）
+#   - 已确认应被识别为某个标签
+
+# 顺序敏感：长 alternation 优先，避免「フルカラー化」被切碎
+_BARE_TAG_KEYWORDS = (
+    r'フルカラー版?'
+    r'|カラー化'
+    r'|カラー版'
+)
+_BARE_TAG_RE = _pat(
+    rf'(?<![\[\(［【])({_BARE_TAG_KEYWORDS})(?![\]\)］】])'
+)
+
+
+def wrap_bare_tags(s: str) -> str:
+    """把孤立（无容器）的已知标签关键字包裹为 [keyword]，供 promote_tags 处理。"""
+    return _BARE_TAG_RE.sub(r'[\1]', s)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -231,8 +255,7 @@ COLORIZED_TAG_PATTERNS = [
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # 把"任意容器（[]/()/【】）+ 已知关键字"统一规范化为标准 [tag] 形式。
-# 在 parse_name() 的早期调用，让下游只关注 [colorized] / [uncensored] 等
-# 规范形式，避免 (フルカラー) 被误判为系列名等问题。
+# 配合 wrap_bare_tags() 形成 "裸词 → [裸词] → [标准tag]" 管道。
 #
 # 注意:
 #   - 仅对"内容是已知关键字"的容器做提升，避免误改 (系列名) / 【前編】 等
