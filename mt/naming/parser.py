@@ -241,29 +241,21 @@ def _extract_series(bare: str) -> tuple[str, str]:
 
 
 def _extract_translation(bare: str) -> tuple[str, str]:
-    """提取 ¦译名¦，并处理分编词汇。"""
+    """提取 ¦译名¦。译名内只做多空格合并，不做其它形态规范化。
+
+    译名常不严格遵循原名格式（可能只翻译一部分，或自带「主标题 ～话标题～」
+    结构），因此不再把空格转为 ・，也不再识别尾部分编词。
+    """
     stem_trans = re.sub(
         r'^([^¦]+?)\s*¦\s*([^¦]+?)\s*(?=\[|$)', r'\1 ¦\2¦', bare
     )
     m = P.TRANS_INLINE_RE.search(stem_trans)
     translation = m.group(1).strip() if m else ''
-    # 在 ～xxx～ 前补空格，但若前置已是字段分隔符（・）则跳过，
-    # 避免 dot() 把多余空格再次转回 ・，导致重复
-    translation = re.sub(r'(?<=[^\s・])(～[^～]+～)', r' \1', translation)
+    # 多空格 → 单空格
+    translation = re.sub(r'\s+', ' ', translation)
     bare        = P.TRANS_INLINE_RE.sub('', stem_trans).strip()
     translation = trad_to_simp(translation)
-    translation = _norm_part_in_translation(translation)
     return bare, translation
-
-
-def _norm_part_in_translation(trans: str) -> str:
-    """将译名末尾的分编词汇转换为 ～...～ 格式。"""
-    m = P.PART_COMPOUND_RE.search(trans)
-    if m and m.start() > 0:
-        main = trans[: m.start()].strip()
-        part = P.norm_part_subtitle(m.group(1))
-        return f"{main} ～{part}～"
-    return trans
 
 
 def _normalize_chapter_title(s: str) -> str:
