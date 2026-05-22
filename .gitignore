@@ -5,3 +5,6 @@ __pycache__/
 # 忽略 JetBrains IDE 项目配置
 .idea/
 *.iml
+
+# 项目产物
+/rename_sessions.json
