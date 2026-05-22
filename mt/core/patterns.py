@@ -9,7 +9,8 @@ patterns.py — 正则表达式常量与规则表
   2. 字符类与原子构件   — 数字 / CJK 字符类 / 常用前置断言
   3. 番外·分编词汇      — _BONUS_KW / _PART_UNIT / SUB_MAP / CN_NUM_MAP
   4. 标点规范化         — PUNCT_MAP
-  5. 标签检测模式       — ZH/JA/KO/EN/UNCENSORED/NOISE 等
+  5. 预处理管道         — wrap_bare_tags → promote_tags → normalize_chapter_tokens
+                           → normalize_subtitle_delimiters → detect
   6. 结构提取模式       — 作者 / 系列 / 译名 / 话标题 / 番外整体剥除
   7. 话号提取回调       — _ch_* 函数
   8. 话号匹配规则表     — CHAPTER_PATTERNS
@@ -169,15 +170,21 @@ PUNCT_MAP = str.maketrans({
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. 标签预处理管道（wrap → promote → detect）
+# 5. 预处理管道（normalize → detect）
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# 三段式管道，逐步把所有标签变体收敛到唯一标准形态：
+# 多段式管道，把各字段的所有变体收敛到唯一标准形态，下游只需处理一种形态：
 #
-#   原始 ──► wrap_bare_tags ──► promote_tags ──► XX_PATTERNS（仅检测最终形态）
-#           裸词→[裸词]        [任意容器+关键字]→[标准tag]
+#   原始
+#    │ wrap_bare_tags          裸词 → [裸词]
+#    │ promote_tags            [任意容器+关键字] → [标准tag]
+#    │ normalize_chapter_tokens  第N話/第N-M話 → CH.N / CH.N-M
+#    ▼ normalize_subtitle_delimiters  -t-/―t―/—t— → ～t～（在 strip_tags 之后调用）
+#   检测（标签 / 话号 / 话标题 各自只需匹配唯一标准形态）
 #
 # 标准 tag：[zh] [ja] [ko] [en] [zxx] [uncensored] [colorized] [ongoing]
+# 标准话号：CH.N / CH.N-M
+# 标准话标题：～title～
 #
 # 扩展指南：
 #   - 新增「裸词 → 标签」：往 _BARE_TAG_KEYWORDS 加一个 alternation
@@ -275,7 +282,40 @@ def promote_tags(s: str) -> str:
     return s
 
 
-# ── 5c. 最终形态检测（管道后只需检测唯一标准形态） ───────────────────────────
+# ── 5c. 话号标识规范化 ─────────────────────────────────────────────────────────
+# 把 '第N-M話' / '第N話' 规范化为 'CH.N-M' / 'CH.N'，
+# 后续 CHAPTER_PATTERNS 只需保留 CH. 前缀规则，无需再设 第…話 分支。
+
+_DAI_TALE_RANGE_RE = _pat(rf'{_DAI_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})\s*{_TALE_CC}')
+_DAI_TALE_SINGLE_RE = _pat(rf'{_DAI_PREFIX}({_NUM})\s*{_TALE_CC}')
+
+
+def normalize_chapter_tokens(s: str) -> str:
+    """将 '第N-M話' / '第N話' 规范化为 'CH.N-M' / 'CH.N'。"""
+    s = _DAI_TALE_RANGE_RE.sub(lambda m: f'CH.{m.group(1)}-{m.group(2)}', s)
+    s = _DAI_TALE_SINGLE_RE.sub(lambda m: f'CH.{m.group(1)}', s)
+    return s
+
+
+# ── 5d. 话标题定界符规范化 ─────────────────────────────────────────────────────
+# 把 '-title-' / '―title―' / '—title—' 统一规范化为 '～title～'。
+# 须在 strip_tags 之后、extract_subtitle 之前调用（此时 [...] 标签已移除，
+# $-锚点可以正确命中句尾）。
+
+_SUBTITLE_ALT_RE = re.compile(
+    r'\s*(?:―([^―]+)―?|—([^—]+)—?|-([^-]*(?:[^\x00-\x7f]|\s)[^-]*)-?)\s*$', 0
+)
+
+
+def normalize_subtitle_delimiters(s: str) -> str:
+    """将话标题非标准定界符 (-/―/—) 规范化为 ～～。"""
+    def _repl(m: re.Match) -> str:
+        content = next(g for g in m.groups() if g is not None)
+        return f' ～{content.strip()}～'
+    return _SUBTITLE_ALT_RE.sub(_repl, s)
+
+
+# ── 5e. 最终形态检测（管道后只需检测唯一标准形态） ───────────────────────────
 ZH_PATTERNS         = _pats(_bracket(r'zh'))
 JA_PATTERNS         = _pats(_bracket(r'ja'))
 KO_PATTERNS         = _pats(_bracket(r'ko'))
@@ -326,10 +366,8 @@ PUBLICATION_PAREN_RE= _pat(                               # 杂志来源括号
 LEADING_PREFIX_RE   = _pat(                               # 开头噪音前缀
     r'^\s*(?:\([^)]{1,10}\)\s*)+', 0)
 
-# 话标题分隔符（支持单侧波浪线）
-SUBTITLE_RE = _pat(
-    r'\s*(?:～([^～]+)～?|―([^―]+)―?|—([^—]+)—?|-([^-]*(?:[^\x00-\x7f]|\s)[^-]*)-?)\s*$', 0
-)
+# 话标题分隔符（定界符已由 normalize_subtitle_delimiters 预规范化为 ～～）
+SUBTITLE_RE = _pat(r'\s*～([^～]+)～?\s*$', 0)
 
 # 分编词汇 / 「」/【】 话标题
 PART_COMPOUND_RE = _pat(rf'\s+({_PART_COMPOUND})$', 0)
@@ -430,11 +468,7 @@ CHAPTER_PATTERNS: list[tuple[re.Pattern, Callable[[re.Match], Chapter]]] = [
     (_pat(rf'(?<=[\s+]){_BONUS_KW}[編篇]?(?=\s|\[|$|～)'),
      _ch_bonus),
 
-    # 「第N-M話」/「第N話」
-    (_pat(rf'{_DAI_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})\s*{_TALE_CC}'), _ch_range),
-    (_pat(rf'{_DAI_PREFIX}({_NUM})\s*{_TALE_CC}'),                    _ch_single),
-
-    # CH. 前缀（含 +0 旧格式 → bonus='番外篇'）
+    # CH. 前缀（含 +0 旧格式 → bonus='番外篇'；第N話 已由 normalize_chapter_tokens 预规范化为 CH.N）
     (_pat(rf'{_CH_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})\s*\+\s*0+(?!\d)'),
      _ch_range_plus_zero),
     (_pat(rf'{_CH_PREFIX}({_NUM})\s*[-~～]\s*({_NUM})'), _ch_range),

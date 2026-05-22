@@ -160,10 +160,10 @@ def extract_subtitle(title: str) -> tuple[str, str]:
       4. 末尾分编词汇循环剥离
       5. 兜底：末尾含「編/篇」的词汇
     """
-    # 1. 波浪线/破折号
+    # 1. 波浪线（其它定界符已由 normalize_subtitle_delimiters 预规范化）
     m = P.SUBTITLE_RE.search(title)
     if m:
-        sub = next(g for g in m.groups() if g is not None)
+        sub = m.group(1)
         if P.is_appendix(sub):
             return title[:m.start()].strip(), P.norm_part_subtitle(sub)
         return title[:m.start()].strip(), sub.strip()
@@ -385,10 +385,11 @@ def parse_name(author: str, name: str) -> MangaInfo:
     Returns:
         填充完毕的 MangaInfo。
     """
-    # 0. 标点规范化 → 裸词包裹 → 标签提升 → 特殊标志
+    # 0. 预处理管道：标点规范化 → 裸词包裹 → 标签提升 → 话号标识规范化 → 特殊标志
     stem = norm_punct(name)
     stem = P.wrap_bare_tags(stem)
     stem = P.promote_tags(stem)
+    stem = P.normalize_chapter_tokens(stem)
     stem, language, is_colorized, is_ongoing = _extract_special_flags(stem)
 
     # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
@@ -421,7 +422,8 @@ def parse_name(author: str, name: str) -> MangaInfo:
                 f"{m_bonus.group(1)}・{m_bonus.group(2)} ～{m_bonus.group(3)}～"
             )
 
-    # 7. 拆分主标题 & 话标题，推导附录
+    # 7. 话标题定界符规范化 → 拆分主标题 & 话标题，推导附录
+    clean_title = P.normalize_subtitle_delimiters(clean_title)
     main_title, ch_title = extract_subtitle(clean_title)
     if ch_title:
         ch_title = _normalize_chapter_title(ch_title)
