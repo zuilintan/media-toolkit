@@ -97,8 +97,8 @@ manga-toolkit-cli comicinfo --examples
 ComicInfo.xml 中字段输出顺序：
 
 ```
-Publisher → Writer → Title → Volume → Number → Series →
-LanguageISO → Genre → PageCount → Tags → Notes
+Publisher → Writer → Title → Volume → Number → Series → Format →
+LanguageISO → Genre → Tags → PageCount → Notes
 ```
 
 | ComicInfo 字段 | 来源 |
@@ -112,8 +112,8 @@ LanguageISO → Genre → PageCount → Tags → Notes
 | `Format` | 合集类分编词（`总集篇`）；其它情况留空 |
 | `LanguageISO` | `[zh]` / `[ja]` / `[ko]` / `[en]` / `[zxx]` |
 | `Genre` | uncensored / colorized / ongoing |
-| `PageCount` | 压缩包内图片文件数（jpg / jpeg / png / bmp / gif / psd / webp / avif / jxl） |
 | `Tags` | 保留 CBZ 内已有值（不覆盖） |
+| `PageCount` | 压缩包内图片文件数（jpg / jpeg / png / bmp / gif / psd / webp / avif / jxl） |
 | `Notes` | `"metadata creator": "manga-toolkit-cli 0.1.0"` |
 
 ---
