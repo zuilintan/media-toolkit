@@ -31,19 +31,19 @@ poetry install
 ## 目标命名格式
 
 ```
-[作者] 漫画标题( 总集篇)?( VOL.XX)?
+[作者] 漫画标题( VOL.XX)?
 ( CH.XX(-YY)?(+番外篇)? | 番外篇 | 后日谈 | 上篇 | 中篇 | 下篇)?
 ( ～话标题～)?( (系列))?( ¦译名¦)?
-( [zh])?( [uncensored])?( [colorized])?( [ongoing])?
+( [总集篇])?( [zh])?( [uncensored])?( [colorized])?( [ongoing])?
 ```
 
 ### 分编词规则
 
-| 类别 | 词汇 | 所在位置 | 与 CH. 的关系 |
+| 类别 | 词汇 | 输出位置 | 与 CH. 的关系 |
 |---|---|---|---|
-| 合集类 | `总集篇` | VOL. **之前** | — |
-| 附录类 | `番外篇` / `后日谈` | VOL. **之后**，CH. **位置** | **互斥**（二选一）|
-| 结构类 | `上篇` / `中篇` / `下篇` | VOL. **之后**，CH. **位置** | **互斥**（二选一）|
+| 合集类 | `总集篇` | `[总集篇]` tag（与 `[zh]` 同位，在其前） | — |
+| 附录类 | `番外篇` / `后日谈` | CH. **位置** | **互斥**（二选一）|
+| 结构类 | `上篇` / `中篇` / `下篇` | CH. **位置** | **互斥**（二选一）|
 
 ---
 
@@ -109,6 +109,7 @@ LanguageISO → Genre → PageCount → Tags → Notes
 | `Volume` | `VOL.XX` |
 | `Number` | `CH.XX` 数字部分，**或** 独立分编词（番外篇 / 后日谈 / …） |
 | `Series` | `(系列名)` |
+| `Format` | 合集类分编词（`总集篇`）；其它情况留空 |
 | `LanguageISO` | `[zh]` / `[ja]` / `[ko]` / `[en]` / `[zxx]` |
 | `Genre` | uncensored / colorized / ongoing |
 | `PageCount` | 压缩包内图片文件数（jpg / jpeg / png / bmp / gif / psd / webp / avif / jxl） |

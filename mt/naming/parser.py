@@ -265,12 +265,19 @@ def _normalize_chapter_title(s: str) -> str:
 # 特殊标志提取
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _extract_special_flags(stem: str) -> tuple[str, str, bool, bool]:
-    stem, is_zxx = extract_flag(stem, P.TEXTLESS_TAG_RE)
-    language     = 'zxx' if is_zxx else ''
+def _extract_special_flags(stem: str) -> tuple[str, str, str, bool, bool]:
+    """提取并剥离独立 tag，返回 (stem, language, pre_part_tag, is_colorized, is_ongoing)。
+
+    pre_part_tag：显式 [总集篇] tag 命中则为 '总集篇'，否则空串；
+                  作为 _resolve_part_tag 的最高优先来源（裸词位置启发式保留向后兼容）。
+    """
+    stem, is_zxx       = extract_flag(stem, P.TEXTLESS_TAG_RE)
+    language           = 'zxx' if is_zxx else ''
     stem, is_colorized = extract_flag(stem, P.COLORIZED_TAG_RE)
     stem, is_ongoing   = extract_flag(stem, P.ONGOING_TAG_RE)
-    return stem, language, is_colorized, is_ongoing
+    stem, has_compilation = extract_flag(stem, P.COMPILATION_TAG_RE)
+    pre_part_tag       = '总集篇' if has_compilation else ''
+    return stem, language, pre_part_tag, is_colorized, is_ongoing
 
 
 def _detect_language_uncensored(bare: str, language: str) -> tuple[str, bool]:
@@ -314,12 +321,17 @@ def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bo
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _resolve_part_tag(
-    main_title: str, ch_title: str, is_bonus: bool
+    main_title: str, ch_title: str, is_bonus: bool, pre_part_tag: str = ''
 ) -> tuple[str, str, str]:
-    """从标题部件和番外标志推导 part_tag 字段，返回 (main_title, ch_title, part_tag)。"""
-    part_tag = ''
+    """从标题部件和番外标志推导 part_tag 字段，返回 (main_title, ch_title, part_tag)。
 
-    if is_bonus:
+    优先级: pre_part_tag（显式 [总集篇] tag）> is_bonus > 末尾裸词启发式。
+    """
+    part_tag = pre_part_tag
+
+    if part_tag:
+        pass
+    elif is_bonus:
         part_tag = '番外篇'
     else:
         m = P.BONUS_SUFFIX_RE.search(main_title)
@@ -384,7 +396,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
     stem = P.promote_tags(stem)
     stem = P.normalize_chapter_tokens(stem)
     stem = P.normalize_translation_delim(stem)
-    stem, language, is_colorized, is_ongoing = _extract_special_flags(stem)
+    stem, language, pre_part_tag, is_colorized, is_ongoing = _extract_special_flags(stem)
 
     # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
     stem = P.LEADING_PREFIX_RE.sub('', stem)
@@ -422,7 +434,9 @@ def parse_name(author: str, name: str) -> MangaInfo:
     if ch_title:
         ch_title = _normalize_chapter_title(ch_title)
         ch_title = P.normalize_part(ch_title)
-    main_title, ch_title, part_tag = _resolve_part_tag(main_title, ch_title, is_bonus)
+    main_title, ch_title, part_tag = _resolve_part_tag(
+        main_title, ch_title, is_bonus, pre_part_tag
+    )
 
     debug(
         f"main='{CYAN}{main_title}{RESET}' "

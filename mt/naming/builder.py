@@ -4,15 +4,15 @@ builder.py — 新文件名构建
 核心入口: build_new_name(info: MangaInfo) → str
 
 目标命名格式:
-  [作者] 漫画标题( 总集篇)?( VOL.XX)?
+  [作者] 漫画标题( VOL.XX)?
   ( CH.XX(-YY)?(+番外篇)? | 番外篇 | 后日谈 | 上篇 | 中篇 | 下篇)?
   ( ～话标题～)?( (系列))? ( ¦译名¦)?
-  ([zh])? ([uncensored])? ([colorized])? ([ongoing])?
+  ([总集篇])? ([zh])? ([uncensored])? ([colorized])? ([ongoing])?
 
 规则:
   1. 标题/系列/译名中，空格以 ・ 替代
-  2. 总集篇 在 VOL. 之前；其余分编词与 CH. 同级（VOL. 之后）
-  3. 后日谈 / 番外篇 / 上篇 / 中篇 / 下篇 与 CH. 互斥
+  2. 合集类（总集篇）作为 [总集篇] tag 输出，与 [zh] 同位（在语言标签前）
+  3. 番外篇 / 后日谈 / 上篇 / 中篇 / 下篇 与 CH. 同级且互斥
 
 依赖: models / patterns / utils
 """
@@ -28,17 +28,13 @@ def build_new_name(info: MangaInfo) -> str:
     """根据 MangaInfo 拼合目标名称（不含文件后缀）。"""
     parts: list[str] = [f'[{info.author}]', dot(info.main_title)]
 
-    # 总集篇 在 VOL. 之前
-    if info.part_tag in P.PRE_VOL_PARTS:
-        parts.append(info.part_tag)
-
     if info.volume is not None:
         parts.append(str(info.volume))
 
-    # CH. 话数 或 独立分编词（与 CH. 同级且互斥，在 VOL. 之后）
+    # CH. 话数 或 独立分编词（与 CH. 同级且互斥）；合集类走下方 tag 块
     if info.chapter is not None:
         parts.append(str(info.chapter))
-    elif info.part_tag and info.part_tag not in P.PRE_VOL_PARTS:
+    elif info.part_tag and info.part_tag not in P.COMPILATION_PARTS:
         parts.append(info.part_tag)
 
     if info.chapter_title:
@@ -51,6 +47,7 @@ def build_new_name(info: MangaInfo) -> str:
         parts.append(f'¦{info.translation}¦')
 
     tags = ''.join(filter(None, [
+        f'[{info.part_tag}]'  if info.part_tag in P.COMPILATION_PARTS else '',
         f'[{info.language}]'  if info.language      else '',
         '[uncensored]'         if info.is_uncensored  else '',
         '[colorized]'          if info.is_colorized   else '',

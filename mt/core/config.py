@@ -28,7 +28,7 @@ COMICINFO_FILENAME: str = "ComicInfo.xml"
 # ComicInfo 字段顺序（XML 写入与终端打印共用，单一来源）
 COMICINFO_TAGS: list[str] = [
     "Publisher", "Writer", "Title", "Volume", "Number",
-    "Series", "LanguageISO", "Genre", "PageCount", "Tags", "Notes",
+    "Series", "Format", "LanguageISO", "Genre", "PageCount", "Tags", "Notes",
 ]
 
 # 用于统计 <PageCount> 的图片文件后缀（小写，含点号）

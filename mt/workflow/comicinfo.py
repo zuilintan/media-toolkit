@@ -5,8 +5,10 @@ comicinfo.py — ComicInfo.xml 生成、读取与写入
 
 Number 字段规则（与 CH. 同级且互斥）:
   - chapter 不为 None  → 数字格式，如 "01-05+番外篇"
-  - chapter 为 None，part_tag 在 CH. 级别 → 直接用分编词，如 "番外篇"/"后日谈"
+  - chapter 为 None，part_tag 是附录/结构类 → 分编词原文，如 "番外篇"/"后日谈"/"上篇"
   - 否则              → ''（留空，不显式指定）
+
+Format 字段：part_tag 是合集类（总集篇等）时写入；否则空。
 
 依赖: models / patterns / config / parser / console / presentation
 """
@@ -72,18 +74,23 @@ def build_title(info: MangaInfo) -> str:
 
 
 def build_number(info: MangaInfo) -> str:
-    """<Number>：话号或独立分编词，与 CH. 同级且互斥。
+    """<Number>：话号或独立分编词（附录/结构类），与 CH. 同级且互斥。
 
     - chapter 不为 None → 数字格式（不含 'CH.' 前缀），如 "01-05+番外篇"
-    - chapter 为 None，part_tag 在 CH. 级别（非 PRE_VOL）→ 分编词原文
-    - 否则 → ''（留空，不显式指定）
+    - chapter 为 None，part_tag 是附录/结构类 → 分编词原文
+    - 否则 → ''（留空，不显式指定；合集类走 build_format）
     """
     if info.chapter is not None:
         return info.chapter.number_str()
-    if info.part_tag and info.part_tag not in P.PRE_VOL_PARTS:
+    if info.part_tag and info.part_tag not in P.COMPILATION_PARTS:
         # 番外篇 / 后日谈 / 上篇 / 中篇 / 下篇 均在此
         return info.part_tag
     return ''
+
+
+def build_format(info: MangaInfo) -> str:
+    """<Format>：合集类分编词（总集篇等）的归宿；否则空。"""
+    return info.part_tag if info.part_tag in P.COMPILATION_PARTS else ''
 
 
 def build_volume(info: MangaInfo) -> str:
@@ -116,6 +123,7 @@ def collect_fields(
         'Volume':      build_volume(info),
         'Number':      build_number(info),
         'Series':      _undot(info.series) or '',
+        'Format':      build_format(info),
         'LanguageISO': info.language or '',
         'Genre':       build_genre(info),
         'PageCount':   str(page_count) if page_count else '',
