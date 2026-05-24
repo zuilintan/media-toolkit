@@ -10,7 +10,7 @@ import argparse
 from pathlib import Path
 
 from mt.infra.console import emit, confirm
-from mt.presentation.view import print_preview
+from mt.presentation.view import print_preview, print_run_banner
 from mt.workflow.scanner import scan_and_plan, apply_renames, run_drag_loop, move_author_dir
 from mt.workflow.session import list_sessions, rollback
 from mt.cli.examples import run_rename_examples
@@ -40,8 +40,9 @@ def cmd_rename(args: argparse.Namespace) -> int:
         emit('❌ 请指定 --root <目录> 或使用 --drag / --examples')
         return 2
 
-    emit(f'\n📂 扫描目录: {args.root}')
+    print_run_banner('rename', '漫画文件 / 目录批量重命名', args.root, args.apply)
     plans = scan_and_plan(args.root)
+    emit(f'  找到条目: {len(plans)} 项')
     print_preview(plans)
 
     if args.apply:

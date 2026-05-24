@@ -301,11 +301,15 @@ class CbzPlan:
 
 
 def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
-    """构建单个 CBZ 的写入计划。
+    """构建单个 CBZ 的写入计划，并在解析前先输出卡片 banner。
+
+    banner（SEP + 📦 文件名）有意提前到 parse_name 之前输出，
+    使 ``--debug`` 模式下 ``parse_name`` 的 DEBUG 行落在当前卡片内，
+    而不是漏到上一张卡片的 SEP 之外。
 
     Returns:
         (plan, status):
-            status='skip' (无作者)        → plan=None
+            status='skip' (无作者)        → plan=None（不输出 banner）
             status='warn' (出版商冲突)    → plan 返回（用于显示，但不可写）
             status='ok'                    → plan 可写
     """
@@ -315,6 +319,10 @@ def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
     author   = extract_author(filename)
     if not author:
         return None, 'skip'
+
+    # banner 提前到 parse_name 之前 → DEBUG 输出在卡片内
+    emit(f'\n{SEP}')
+    emit(f'  📦  {filename}')
 
     stem                    = _get_stem(filename)
     mi                      = parse_name(author, stem)
@@ -326,10 +334,7 @@ def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
 
 
 def print_cbz_plan(plan: CbzPlan) -> None:
-    """打印单个 CBZ 计划的预览（banner + ComicInfo 字段 + 警告 + 冲突提示）。"""
-    filename = os.path.basename(plan.cbz_path)
-    emit(f'\n{SEP}')
-    emit(f'  📦  {filename}')
+    """打印单个 CBZ 计划的字段、警告与冲突提示（banner 已由 plan_cbz 输出）。"""
     emit()
     print_comicinfo_fields(plan.fields, plan.pub_conflict)
     for w in plan.mi.warnings:

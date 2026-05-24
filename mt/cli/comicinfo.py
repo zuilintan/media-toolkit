@@ -17,6 +17,7 @@ from mt.infra.console import SEP2, emit, capture, confirm
 from mt.workflow.comicinfo import (
     CbzPlan, plan_cbz, print_cbz_plan, apply_cbz_plan,
 )
+from mt.presentation.view import print_run_banner
 from mt.cli.examples import run_comicinfo_examples
 
 # 文件数量 ≥ 此阈值时，详细日志写入 .log 文件，终端仅显示进度条与汇总
@@ -135,11 +136,7 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
     total     = len(cbz_files)
     use_log   = (total >= _LARGE_THRESHOLD)
 
-    emit(SEP2)
-    emit('  manga-toolkit-cli  —  comicinfo (CBZ ComicInfo.xml 批量工具)')
-    emit(SEP2)
-    emit(f'  根目录:   {root}')
-    emit(f'  模式:     {"【写入模式】实际修改文件" if args.apply else "【预览模式】仅展示解析结果，不修改文件"}')
+    print_run_banner('comicinfo', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
     emit(f'  找到文件: {total} 个 .cbz（含子目录）')
 
     if not cbz_files:
