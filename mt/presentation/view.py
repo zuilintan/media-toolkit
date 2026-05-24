@@ -76,16 +76,19 @@ def print_preview(plans: list[RenamePlan]) -> None:
 
 def print_comicinfo_fields(fields: dict[str, str],
                            pub_conflict: list[str] | None = None) -> None:
-    """以 'TagName: value' 格式打印 ComicInfo 字段。"""
+    """以 'TagName: value' 格式打印 ComicInfo 字段（标签与 DEBUG 同栏对齐）。"""
+    indent  = '     '                                     # 与 console.debug 同
+    col_w   = max(len(t) for t in COMICINFO_TAGS) + 2     # 'Tag: ' 列宽（含冒号 + 空格）
     for tag in COMICINFO_TAGS:
+        label = f'{indent}{(tag + ":"):<{col_w}}'
         if tag == 'Publisher' and pub_conflict:
-            emit(f'  {tag}: ⚠️  多个社团文件，请手动确认！')
+            emit(f'{label}⚠️  多个社团文件，请手动确认！')
             for p in pub_conflict:
-                emit(f'           • {os.path.basename(p)}')
+                emit(f'{" " * len(label)}• {os.path.basename(p)}')
         elif tag == 'Tags':
             val = fields.get(tag, '')
             suffix = '  (保留)' if val else ''
-            emit(f'  {tag}: {val}{suffix}')
+            emit(f'{label}{val}{suffix}'.rstrip())
         else:
             val = fields.get(tag, '')
-            emit(f'  {tag}: {val}' if val else f'  {tag}:')
+            emit(f'{label}{val}'.rstrip())
