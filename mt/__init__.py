@@ -22,4 +22,4 @@ console 命令:
     comicinfo  — 向 CBZ 写入 ComicInfo.xml
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
