@@ -1,6 +1,7 @@
 """
 comicinfo.py — comicinfo 子命令：向 CBZ 写入 ComicInfo.xml
 
+流程与 rename 对齐：全量预览 → 汇总 → 二次确认 → 批量写入。
 文件数量较多时，详细日志写入 .log 文件，终端仅显示进度条与汇总。
 
 依赖: workflow.comicinfo / infra.console / cli.examples
@@ -12,65 +13,106 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from mt.infra.console import SEP2, emit, capture
-from mt.workflow.comicinfo import process_cbz
+from mt.infra.console import SEP2, emit, capture, confirm
+from mt.workflow.comicinfo import (
+    CbzPlan, plan_cbz, print_cbz_plan, apply_cbz_plan,
+)
 from mt.cli.examples import run_comicinfo_examples
 
 # 文件数量 ≥ 此阈值时，详细日志写入 .log 文件，终端仅显示进度条与汇总
 _LARGE_THRESHOLD = 100
 
 
-def _run_comicinfo_with_log(
+# ═══════════════════════════════════════════════════════════════════════════════
+# 进度条
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _progress(done: int, total: int) -> None:
+    bar_w  = 30
+    filled = int(bar_w * done / total)
+    bar    = '█' * filled + '░' * (bar_w - filled)
+    pct    = done * 100 // total
+    emit(f'\r  [{bar}] {pct:3d}%  {done}/{total}', end='', flush=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 预览阶段：全量 plan + 打印
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _preview_all(
     cbz_files: list[Path],
-    apply: bool,
-    counts: dict[str, int],
-    log_path: Path,
-) -> None:
-    """处理所有文件，将每条目详细输出重定向到 log_path（UTF-8）。
-
-    终端仅显示实时进度条，完成后写入日志。
-    """
-    total  = len(cbz_files)
-    lines: list[str] = []
-
-    ts_header = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    lines.append(f'manga-toolkit-cli comicinfo 批量日志  {ts_header}')
-    lines.append(f'模式: {"写入" if apply else "预览"}   总文件数: {total}')
-    lines.append(SEP2)
-
+    plan_counts: dict[str, int],
+    log_lines: list[str] | None,
+) -> list[CbzPlan]:
+    """逐文件 plan + print，按需把每条输出落到 log_lines（用于大批量模式）。"""
+    plans: list[CbzPlan] = []
+    total = len(cbz_files)
     for idx, fp in enumerate(cbz_files, 1):
-        # 捕获 process_cbz 经 emit 产生的所有输出
-        with capture() as buf:
-            result = process_cbz(str(fp), apply=apply)
-        counts[result] += 1
-        lines.append(buf.getvalue().rstrip('\n'))
+        if log_lines is not None:
+            with capture() as buf:
+                plan, status = plan_cbz(str(fp))
+                if plan:
+                    print_cbz_plan(plan)
+            log_lines.append(buf.getvalue().rstrip('\n'))
+            _progress(idx, total)
+        else:
+            plan, status = plan_cbz(str(fp))
+            if plan:
+                print_cbz_plan(plan)
+        plan_counts[status] += 1
+        if plan:
+            plans.append(plan)
+    if log_lines is not None:
+        emit()  # 进度条换行
+    return plans
 
-        # 终端进度（覆盖同一行）
-        done   = idx
-        bar_w  = 30
-        filled = int(bar_w * done / total)
-        bar    = '█' * filled + '░' * (bar_w - filled)
-        pct    = done * 100 // total
-        emit(
-            f'\r  [{bar}] {pct:3d}%  {done}/{total}',
-            end='', flush=True,
-        )
 
-    emit()  # 换行，清除进度条
+# ═══════════════════════════════════════════════════════════════════════════════
+# 写入阶段
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    # 追加汇总行
-    lines.append(SEP2)
-    ok_n = counts['ok']; warn = counts['warn']
-    skip = counts['skip']; err = counts['error']
-    lines.append(
-        f'完成  ✅ {ok_n} 成功'
-        + (f'  🟡 {warn} 需 review' if warn else '')
-        + (f'  — {skip} 跳过'        if skip else '')
-        + (f'  ❌ {err} 失败'         if err  else '')
-    )
+def _apply_all(
+    plans: list[CbzPlan],
+    write_counts: dict[str, int],
+    log_lines: list[str] | None,
+) -> None:
+    """对所有可写计划执行写入，按需把每条输出落到 log_lines。"""
+    total = len(plans)
+    for idx, plan in enumerate(plans, 1):
+        if log_lines is not None:
+            with capture() as buf:
+                result = apply_cbz_plan(plan)
+            log_lines.append(buf.getvalue().rstrip('\n'))
+            _progress(idx, total)
+        else:
+            result = apply_cbz_plan(plan)
+        write_counts[result] = write_counts.get(result, 0) + 1
+    if log_lines is not None:
+        emit()  # 进度条换行
 
-    log_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 汇总
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _print_preview_summary(plan_counts: dict[str, int], apply: bool) -> None:
+    emit(f'\n{SEP2}')
+    note  = '' if apply else '（预览，未实际修改）'
+    parts = [f'✅ {plan_counts["ok"]} 可写']
+    if plan_counts['warn']: parts.append(f'🟡 {plan_counts["warn"]} 需 review')
+    if plan_counts['skip']: parts.append(f'— {plan_counts["skip"]} 跳过')
+    emit(f'  解析完成{note}  {"   ".join(parts)}')
+
+
+def _print_apply_summary(write_counts: dict[str, int]) -> None:
+    parts = [f'✅ {write_counts.get("ok", 0)} 成功']
+    if write_counts.get('error'): parts.append(f'❌ {write_counts["error"]} 失败')
+    emit(f'  写入完成  {"   ".join(parts)}')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 入口
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def cmd_comicinfo(args: argparse.Namespace) -> int:
     """comicinfo 子命令调度。"""
@@ -104,31 +146,61 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
         emit('\n  没有需要处理的文件。')
         return 0
 
-    counts: dict[str, int] = {'ok': 0, 'skip': 0, 'error': 0, 'warn': 0}
-    log_path: Path | None  = None
-
+    log_path:  Path | None       = None
+    log_lines: list[str] | None  = None
     if use_log:
         ts       = datetime.now().strftime('%Y%m%d_%H%M%S')
         mode_tag = 'apply' if args.apply else 'preview'
         log_path = root.parent / f'comicinfo_{mode_tag}_{ts}.log'
         emit(f'\n  文件数量 {total} ≥ {_LARGE_THRESHOLD}，详细结果将写入:\n  {log_path}\n')
-        _run_comicinfo_with_log(cbz_files, args.apply, counts, log_path)
-    else:
-        for fp in cbz_files:
-            counts[process_cbz(str(fp), apply=args.apply)] += 1
+        log_lines = [
+            f'manga-toolkit-cli comicinfo 批量日志  {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+            f'模式: {"写入" if args.apply else "预览"}   总文件数: {total}',
+            SEP2,
+        ]
 
-    # ── 终端汇总 ────────────────────────────────────────────────────────────
-    emit(f'\n{SEP2}')
-    note  = '' if args.apply else '（预览，未实际修改）'
-    parts = [f'✅ {counts["ok"]} 成功']
-    if counts['warn']:  parts.append(f'🟡 {counts["warn"]} 需 review')
-    if counts['skip']:  parts.append(f'— {counts["skip"]} 跳过')
-    if counts['error']: parts.append(f'❌ {counts["error"]} 失败')
-    emit(f'  完成{note}  {"   ".join(parts)}')
-    if use_log and log_path is not None:
+    # ── Phase 1: 预览 ──────────────────────────────────────────────────────────
+    plan_counts: dict[str, int] = {'ok': 0, 'skip': 0, 'warn': 0}
+    plans = _preview_all(cbz_files, plan_counts, log_lines)
+    _print_preview_summary(plan_counts, args.apply)
+
+    if not args.apply:
+        if plan_counts['ok'] > 0:
+            emit('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
+        if log_path is not None:
+            log_lines.append(SEP2)
+            log_lines.append(f'解析完成   ok={plan_counts["ok"]}   warn={plan_counts["warn"]}   skip={plan_counts["skip"]}')
+            log_path.write_text('\n'.join(log_lines) + '\n', encoding='utf-8')
+            emit(f'  📄 详细日志: {log_path}')
+        emit(SEP2)
+        return 0
+
+    # ── Phase 2: 确认 ──────────────────────────────────────────────────────────
+    writable = [p for p in plans if p.writable]
+    if not writable:
+        emit('  没有可写入的文件。')
+        emit(SEP2)
+        return 0
+
+    if not confirm(
+        f'\n🟡 确认向 {len(writable)} 个 CBZ 写入 ComicInfo.xml？按 Enter 继续: '
+    ):
+        emit('  操作已取消。')
+        return 0
+
+    # ── Phase 3: 写入 ──────────────────────────────────────────────────────────
+    write_counts: dict[str, int] = {'ok': 0, 'error': 0}
+    if log_lines is not None:
+        log_lines.append(SEP2)
+        log_lines.append('── 写入阶段 ──')
+    _apply_all(writable, write_counts, log_lines)
+    _print_apply_summary(write_counts)
+
+    if log_path is not None:
+        log_lines.append(SEP2)
+        log_lines.append(f'写入完成   ok={write_counts["ok"]}   error={write_counts["error"]}')
+        log_path.write_text('\n'.join(log_lines) + '\n', encoding='utf-8')
         emit(f'  📄 详细日志: {log_path}')
-    if not args.apply and counts['ok'] > 0:
-        emit('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
     emit(SEP2)
     return 0
 

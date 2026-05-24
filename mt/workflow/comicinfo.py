@@ -18,6 +18,7 @@ import os
 import re
 import time
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
@@ -27,7 +28,7 @@ from mt.core import patterns as P
 from mt.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
-from mt.infra.console import SEP, SEP2, warn, error, ok, info, debug, emit
+from mt.infra.console import SEP, SEP2, error, debug, emit
 from mt.presentation.view import print_comicinfo_fields
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
@@ -279,55 +280,78 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 单文件处理
+# 单文件处理（两阶段：plan → apply，与 rename 的 scan_and_plan / apply_renames 对称）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def process_cbz(cbz_path: str, apply: bool = False) -> str:
-    """处理单个 CBZ 文件：解析文件名 → 打印摘要 → 写入（apply=True 时）。
+@dataclass
+class CbzPlan:
+    """单个 CBZ 的 ComicInfo 写入计划（解析阶段产出，写入阶段消费）。"""
+    cbz_path:     str
+    mi:           MangaInfo
+    publisher:    str | None
+    pub_conflict: list[str] | None
+    page_count:   int
+    tags_val:     str
+    fields:       dict[str, str]
+
+    @property
+    def writable(self) -> bool:
+        """是否可写入：无出版商冲突即可。"""
+        return not self.pub_conflict
+
+
+def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
+    """构建单个 CBZ 的写入计划。
 
     Returns:
-        ``'ok'`` / ``'skip'`` / ``'error'`` / ``'warn'``
+        (plan, status):
+            status='skip' (无作者)        → plan=None
+            status='warn' (出版商冲突)    → plan 返回（用于显示，但不可写）
+            status='ok'                    → plan 可写
     """
     from mt.naming.parser import parse_name  # 在此导入，避免顶层循环
 
     filename = os.path.basename(cbz_path)
+    author   = extract_author(filename)
+    if not author:
+        return None, 'skip'
+
+    stem                    = _get_stem(filename)
+    mi                      = parse_name(author, stem)
+    publisher, pub_conflict = find_publisher(cbz_path)
+    page_count, tags_val    = read_cbz_meta(cbz_path)
+    fields                  = collect_fields(mi, publisher, tags_val, page_count)
+    plan = CbzPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
+    return plan, ('warn' if pub_conflict else 'ok')
+
+
+def print_cbz_plan(plan: CbzPlan) -> None:
+    """打印单个 CBZ 计划的预览（banner + ComicInfo 字段 + 警告 + 冲突提示）。"""
+    filename = os.path.basename(plan.cbz_path)
     emit(f'\n{SEP}')
     emit(f'  📦  {filename}')
     emit()
-
-    author = extract_author(filename)
-    stem   = _get_stem(filename)
-
-    if not author:
-        warn('无法从文件名中提取作者（缺少 [作者] 括号），已跳过。')
-        return 'skip'
-
-    mi = parse_name(author, stem)
-
-    publisher, pub_conflict = find_publisher(cbz_path)
-    page_count, tags_val = read_cbz_meta(cbz_path)
-    fields     = collect_fields(mi, publisher, tags_val, page_count)
-
-    print_comicinfo_fields(fields, pub_conflict)
-
-    for w in mi.warnings:
+    print_comicinfo_fields(plan.fields, plan.pub_conflict)
+    for w in plan.mi.warnings:
         emit(f'     🟡 {w}')
-
-    if pub_conflict:
+    if plan.pub_conflict:
         emit(f'\n  ⛔  出版商冲突，跳过本文件，请先解决上述异常。')
-        return 'warn'
 
-    if not apply:
-        emit(f'\n  ○  预览模式，不写入文件。')
-        return 'ok'
 
-    emit()
+def apply_cbz_plan(plan: CbzPlan) -> str:
+    """执行单个 CBZ 的 ComicInfo.xml 写入。
+
+    Returns:
+        ``'ok'`` / ``'error'``（不可写计划由调用方过滤，此处不再判定）
+    """
+    filename = os.path.basename(plan.cbz_path)
     try:
-        xml_bytes = build_comicinfo_xml(mi, publisher, tags_val, page_count)
-        replaced  = write_comicinfo(cbz_path, xml_bytes)
-        emit(f'  ✅  ComicInfo.xml {"已更新" if replaced else "已写入"}')
+        xml_bytes = build_comicinfo_xml(
+            plan.mi, plan.publisher, plan.tags_val, plan.page_count,
+        )
+        replaced  = write_comicinfo(plan.cbz_path, xml_bytes)
+        emit(f'   ✅ {filename} — ComicInfo.xml {"已更新" if replaced else "已写入"}')
+        return 'ok'
     except Exception as e:
-        error(f'写入失败: {e}')
+        error(f'{filename} — {e}')
         return 'error'
-
-    return 'ok'

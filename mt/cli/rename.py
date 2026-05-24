@@ -9,9 +9,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from mt.infra.console import emit
+from mt.infra.console import emit, confirm
 from mt.presentation.view import print_preview
-from mt.workflow.scanner import scan_and_plan, apply_renames, run_drag_loop, confirm, move_author_dir
+from mt.workflow.scanner import scan_and_plan, apply_renames, run_drag_loop, move_author_dir
 from mt.workflow.session import list_sessions, rollback
 from mt.cli.examples import run_rename_examples
 
@@ -47,7 +47,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
     if args.apply:
         if not any(p.changed for p in plans):
             return 0
-        if confirm():
+        if confirm('\n🟡 确认执行重命名？按 Enter 继续: '):
             apply_renames(plans, dry_run=False)
             if args.move_to:
                 for author_dir in sorted(Path(args.root).iterdir()):

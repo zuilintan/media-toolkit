@@ -14,7 +14,7 @@ from mt.core.config import FILE_EXTS
 from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
 from mt.infra.utils import try_rename, safe_unlink, safe_rmdir
-from mt.infra.console import print_op_result, SEP, warn, error, ok, info, emit
+from mt.infra.console import print_op_result, SEP, warn, error, ok, info, emit, confirm
 from mt.presentation.view import print_preview
 from mt.workflow.session import append_session
 
@@ -154,19 +154,6 @@ def move_author_dir(author_dir: Path, target: str) -> bool:
     return fail == 0
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 交互辅助
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def confirm(prompt: str = '\n🟡 确认执行重命名？按 Enter 继续: ') -> bool:
-    """询问用户确认，Ctrl-C 视为取消。"""
-    try:
-        return input(prompt).strip() == ''
-    except KeyboardInterrupt:
-        emit('\n\n🛑 用户取消操作，程序已退出')
-        return False
-
-
 def _parse_drag_paths(raw: str) -> tuple[list[Path], list[str]]:
     """解析拖入字符串，支持引号包裹的含空格路径。"""
     raw = raw.strip()
@@ -189,7 +176,7 @@ def _process_author_dir(author_dir: Path, target: str) -> None:
     emit(f'📂 作者目录: {author_dir}')
     plans = scan_author_dir(author_dir)
     print_preview(plans)
-    if not confirm():
+    if not confirm('\n🟡 确认执行重命名？按 Enter 继续: '):
         return
     fail = apply_renames(plans, dry_run=False)
     if fail == 0 and target:

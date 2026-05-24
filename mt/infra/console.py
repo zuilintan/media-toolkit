@@ -110,6 +110,15 @@ def error(msg: str) -> None: emit(f'❌ {msg}')
 def ok(msg: str)    -> None: emit(f'✅ {msg}')
 
 
+def confirm(prompt: str) -> bool:
+    """询问用户确认，按 Enter 视为同意；Ctrl-C 或非空输入视为取消。"""
+    try:
+        return input(prompt).strip() == ''
+    except KeyboardInterrupt:
+        emit('\n\n🛑 用户取消操作，程序已退出')
+        return False
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 差异高亮
 # ═══════════════════════════════════════════════════════════════════════════════
