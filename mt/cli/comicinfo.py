@@ -64,7 +64,7 @@ def _run_comicinfo_with_log(
     skip = counts['skip']; err = counts['error']
     lines.append(
         f'完成  ✅ {ok_n} 成功'
-        + (f'  ⚠️  {warn} 需 review' if warn else '')
+        + (f'  🟡 {warn} 需 review' if warn else '')
         + (f'  — {skip} 跳过'        if skip else '')
         + (f'  ❌ {err} 失败'         if err  else '')
     )
@@ -121,7 +121,7 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
     emit(f'\n{SEP2}')
     note  = '' if args.apply else '（预览，未实际修改）'
     parts = [f'✅ {counts["ok"]} 成功']
-    if counts['warn']:  parts.append(f'⚠️  {counts["warn"]} 需 review')
+    if counts['warn']:  parts.append(f'🟡 {counts["warn"]} 需 review')
     if counts['skip']:  parts.append(f'— {counts["skip"]} 跳过')
     if counts['error']: parts.append(f'❌ {counts["error"]} 失败')
     emit(f'  完成{note}  {"   ".join(parts)}')

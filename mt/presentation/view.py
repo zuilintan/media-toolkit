@@ -25,6 +25,7 @@ def print_preview(plans: list[RenamePlan]) -> None:
     changed   = [p for p in plans if p.changed]
     unchanged = [p for p in plans if not p.changed]
     reviews   = [p for p in plans if p.needs_review]
+    warns     = [p for p in plans if p.info and p.info.warnings]
 
     emit(f'\n{SEP2}')
     emit('📁 漫画重命名预览')
@@ -38,7 +39,7 @@ def print_preview(plans: list[RenamePlan]) -> None:
                 emit(f'  📂 {p.author}')
                 last_author = p.author
             icon = '📄' if p.is_file else '🗂 '
-            note = ' ⚠️  需审核' if p.needs_review else ''
+            note = ' 🟡 需审核' if p.needs_review else ''
             emit(f'     {icon} [{idx:>3}]')
             emit(f'       旧: {p.old_name}')
             emit(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
@@ -56,6 +57,8 @@ def print_preview(plans: list[RenamePlan]) -> None:
                 if i.part_tag:      flags.append(f'分编:{i.part_tag}')
                 if flags:
                     emit(f'       Flag: {" | ".join(flags)}')
+                for w in i.warnings:
+                    emit(f'       🟡 {w}')
                 emit(f'       Path:\n       {p.author_dir}\\{p.old_name}\n')
             emit()
     else:
@@ -64,9 +67,18 @@ def print_preview(plans: list[RenamePlan]) -> None:
     if unchanged:
         emit(f'➡️   无需修改: {len(unchanged)} 个')
     if reviews:
-        emit(f'⚠️   需人工审核: {len(reviews)} 个')
+        emit(f'🟡  需人工审核: {len(reviews)} 个')
+    if warns:
+        emit(f'🟡  有警告:    {len(warns)} 个')
     emit(SEP)
-    emit(f'合计: {len(plans)} 项 | 需改名: {len(changed)} | 需审核: {len(reviews)}')
+    parts = [
+        f'合计: {len(plans)} 项',
+        f'需改名: {len(changed)}',
+        f'需审核: {len(reviews)}',
+    ]
+    if warns:
+        parts.append(f'警告: {len(warns)}')
+    emit(' | '.join(parts))
     emit(SEP)
 
 
@@ -82,7 +94,7 @@ def print_comicinfo_fields(fields: dict[str, str],
     for tag in COMICINFO_TAGS:
         label = f'{indent}{(tag + ":"):<{col_w}}'
         if tag == 'Publisher' and pub_conflict:
-            emit(f'{label}⚠️  多个社团文件，请手动确认！')
+            emit(f'{label}🟡 多个社团文件，请手动确认！')
             for p in pub_conflict:
                 emit(f'{" " * len(label)}• {os.path.basename(p)}')
         elif tag == 'Tags':

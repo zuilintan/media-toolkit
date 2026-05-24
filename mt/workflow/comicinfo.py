@@ -310,6 +310,9 @@ def process_cbz(cbz_path: str, apply: bool = False) -> str:
 
     print_comicinfo_fields(fields, pub_conflict)
 
+    for w in mi.warnings:
+        emit(f'     🟡 {w}')
+
     if pub_conflict:
         emit(f'\n  ⛔  出版商冲突，跳过本文件，请先解决上述异常。')
         return 'warn'

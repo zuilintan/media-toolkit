@@ -158,7 +158,7 @@ def move_author_dir(author_dir: Path, target: str) -> bool:
 # 交互辅助
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def confirm(prompt: str = '\n⚠️  确认执行重命名？按 Enter 继续: ') -> bool:
+def confirm(prompt: str = '\n🟡 确认执行重命名？按 Enter 继续: ') -> bool:
     """询问用户确认，Ctrl-C 视为取消。"""
     try:
         return input(prompt).strip() == ''

@@ -129,6 +129,14 @@ class MangaInfo:
     part_tag:      str            = ""
     original:      str            = ""
 
+    @property
+    def warnings(self) -> list[str]:
+        """解析后发现的非阻断性问题，用于在预览/处理流程中提示用户。"""
+        warns: list[str] = []
+        if not self.language:
+            warns.append('缺少语言标签')
+        return warns
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RenamePlan

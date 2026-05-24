@@ -44,20 +44,27 @@ def run_rename_examples() -> int:
     emit(f'\n{SEP2}')
     emit('🧪 解析示例')
     emit(SEP2)
-    fail = 0
+    fail = warn_n = 0
     for author, name, expected in load_examples():
         info   = parse_name(author, name)
         result = build_new_name(info)
         passed = result == expected
         if not passed:
             fail += 1
+        if info.warnings:
+            warn_n += 1
         mark = '✅' if passed else '❌'
         emit(f'   {mark} 旧: {name}')
         emit(f'     新: {highlight_diff(name, result, RED)}')
         if not passed:
             emit(f'   预期: {highlight_diff(result, expected, GREEN)}')
+        for w in info.warnings:
+            emit(f'     🟡 {w}')
         emit()
-    emit(f'{"  全部通过 ✅" if not fail else f"  {fail} 个失败 ❌"}')
+    parts = ['  全部通过 ✅' if not fail else f'  {fail} 个失败 ❌']
+    if warn_n:
+        parts.append(f'🟡 {warn_n} 个有警告')
+    emit('   '.join(parts))
     emit()
     return fail
 
@@ -78,7 +85,7 @@ def run_comicinfo_examples() -> int:
     emit(f'  模拟出版商文件: {_EXAMPLES_PUBLISHER_FILE}  →  Publisher: {sim_pub}')
     emit(SEP2)
 
-    ok_n = fail = 0
+    ok_n = fail = warn_n = 0
     for author, _input, expected in examples:
         emit(f'\n{SEP}')
         emit(f'  📝  {expected}')
@@ -90,9 +97,16 @@ def run_comicinfo_examples() -> int:
         mi     = parse_name(author, expected)
         fields = collect_fields(mi, sim_pub)
         print_comicinfo_fields(fields)
+        for w in mi.warnings:
+            emit(f'     🟡 {w}')
+        if mi.warnings:
+            warn_n += 1
         ok_n += 1
 
     emit(f'\n{SEP2}')
-    emit(f'  示例解析完成  ✅ {ok_n} 成功   ❌ {fail} 失败')
+    parts = [f'✅ {ok_n} 成功']
+    if warn_n: parts.append(f'🟡 {warn_n} 警告')
+    if fail:   parts.append(f'❌ {fail} 失败')
+    emit(f'  示例解析完成   {"   ".join(parts)}')
     emit(SEP2)
     return fail

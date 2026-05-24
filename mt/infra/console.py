@@ -105,7 +105,7 @@ def debug(msg: str) -> None:
 
 
 def info(msg: str)  -> None: emit(msg)
-def warn(msg: str)  -> None: emit(f'⚠️  {msg}')
+def warn(msg: str)  -> None: emit(f'🟡 {msg}')
 def error(msg: str) -> None: emit(f'❌ {msg}')
 def ok(msg: str)    -> None: emit(f'✅ {msg}')
 
