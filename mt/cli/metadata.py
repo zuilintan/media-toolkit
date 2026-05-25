@@ -68,34 +68,36 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     print_metadata_preview(plans)
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
-    n_writable = sum(1 for p in plans if p.writable)
-    n_conflict = sum(1 for p in plans if not p.writable)
-    n_warn     = sum(1 for p in plans if p.mi.warnings)
+    n_changed   = sum(1 for p in plans if p.writable and p.changed)
+    n_unchanged = sum(1 for p in plans if p.writable and not p.changed)
+    n_conflict  = sum(1 for p in plans if not p.writable)
+    n_warn      = sum(1 for p in plans if p.mi.warnings)
     emit(f'\n{SEP2}')
     print_summary(
         '解析完成',
         [
-            ('✅', n_writable, '可写'),
-            ('⛔', n_conflict, '出版商冲突'),
-            ('🟡', n_warn,     '有警告'),
+            ('✅', n_changed,   '待写入'),
+            ('—',  n_unchanged, '已是最新'),
+            ('⛔', n_conflict,  '出版商冲突'),
+            ('🟡', n_warn,      '有警告'),
         ],
         note='' if args.apply else '（预览，未实际修改）',
     )
 
     if not args.apply:
-        if n_writable:
+        if n_changed:
             emit('  → 确认无误后，加上 --apply 参数重新运行以实际执行。')
         emit(SEP2)
         return 0
 
     # ── 写入分支 ──────────────────────────────────────────────────────────────
-    if not n_writable:
-        emit('  没有可写入的文件。')
+    if not n_changed:
+        emit('  没有需要写入的文件（全部已是最新或全部冲突）。')
         emit(SEP2)
         return 0
 
     if not confirm(
-        f'\n🟡 确认对 {n_writable} 个 CBZ 写入 ComicInfo.xml？按 Enter 继续: '
+        f'\n🟡 确认对 {n_changed} 个 CBZ 写入 ComicInfo.xml？按 Enter 继续: '
     ):
         emit('  操作已取消。')
         return 0

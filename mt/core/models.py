@@ -6,7 +6,20 @@ models.py — 核心数据模型
 
 from __future__ import annotations
 import os
+import re
 from dataclasses import dataclass
+
+
+# ── 内部工具 ────────────────────────────────────────────────────────────────
+_XML_ENCODING_RE = re.compile(rb'<\?xml[^?]*?encoding=[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
+
+
+def _detect_xml_encoding(xml_bytes: bytes | None) -> str:
+    """从 ``<?xml … encoding="…"?>`` 提取编码名；无声明按 XML 规范默认 'utf-8'。"""
+    if not xml_bytes:
+        return ''
+    m = _XML_ENCODING_RE.search(xml_bytes[:200])
+    return m.group(1).decode('ascii', errors='replace') if m else 'utf-8'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -180,6 +193,9 @@ class MetadataPlan:
     """单个 CBZ 的 ComicInfo.xml 写入计划（解析阶段产出，写入阶段消费）。
 
     与 SourcefilePlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
+
+    plan 阶段即构建 new_xml（确定性），写入阶段直接复用，并据 ``changed``
+    实现幂等：已有 ComicInfo.xml 完全一致则跳过。
     """
     cbz_path:     str
     mi:           MangaInfo
@@ -188,11 +204,28 @@ class MetadataPlan:
     page_count:   int
     tags_val:     str
     fields:       dict[str, str]
+    existing_xml: bytes | None     # 现有 ComicInfo.xml 原始字节（无则 None）
+    new_xml:      bytes            # 本次构建的目标字节
 
     @property
     def writable(self) -> bool:
         """是否可写入：无出版商冲突即可。"""
         return not self.pub_conflict
+
+    @property
+    def changed(self) -> bool:
+        """是否需要实际写入：无现有版本，或现有版本与目标不一致。"""
+        return self.existing_xml is None or self.existing_xml != self.new_xml
+
+    @property
+    def existing_encoding(self) -> str:
+        """现有 ComicInfo.xml 的声明编码；无现有版本返回 ''。"""
+        return _detect_xml_encoding(self.existing_xml)
+
+    @property
+    def new_encoding(self) -> str:
+        """目标 ComicInfo.xml 的声明编码（恒为 'utf-8'）。"""
+        return _detect_xml_encoding(self.new_xml)
 
     @property
     def author(self) -> str:

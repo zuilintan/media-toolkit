@@ -66,22 +66,6 @@ def _iter_authored_cards(items: Iterable[object]) -> Iterator[tuple[int, object,
         yield idx, item, is_new
 
 
-def _emit_flag_line(mi: MangaInfo) -> None:
-    """sourcefile 卡片体专用：把 MangaInfo 的关键字段折成一行 Flag。"""
-    flags: list[str] = []
-    if mi.language:      flags.append(mi.language)
-    if mi.is_uncensored: flags.append('uncensored')
-    if mi.is_colorized:  flags.append('colorized')
-    if mi.is_ongoing:    flags.append('ongoing')
-    if mi.series:        flags.append(f'系列:{mi.series}')
-    if mi.translation:   flags.append(f'译名:{mi.translation}')
-    if mi.volume:        flags.append(str(mi.volume))
-    if mi.chapter:       flags.append(str(mi.chapter))
-    if mi.part_tag:      flags.append(f'分编:{mi.part_tag}')
-    if flags:
-        emit(f'       Flag: {" | ".join(flags)}')
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +91,6 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
             emit(f'       旧: {p.old_name}')
             emit(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
             if p.info:
-                _emit_flag_line(p.info)
                 for w in p.info.warnings:
                     emit(f'       🟡 {w}')
                 emit(f'       Path:\n       {p.author_dir}\\{p.old_name}\n')
@@ -134,10 +117,16 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
 
     结构对齐 print_sourcefile_preview：相同的 header / 作者分组 / 卡片
     布局 / footer，仅卡片体换成 ComicInfo 字段块。
+
+    每张卡片头部标注本次状态：
+      - 出版商冲突
+      - 已是最新（existing == new，幂等跳过）
+      - 待写入
     """
-    writable = [p for p in plans if p.writable]
-    conflict = [p for p in plans if not p.writable]
-    warns    = [p for p in plans if p.mi.warnings]
+    changed   = [p for p in plans if p.writable and p.changed]
+    unchanged = [p for p in plans if p.writable and not p.changed]
+    conflict  = [p for p in plans if not p.writable]
+    warns     = [p for p in plans if p.mi.warnings]
 
     _print_preview_header('ComicInfo 写入预览')
 
@@ -146,23 +135,36 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
         for idx, p, is_new in _iter_authored_cards(plans):
             if is_new:
                 emit(f'  📂 {p.author}')
-            note = ' 🟡 出版商冲突' if not p.writable else ''
+            if not p.writable:
+                note = ' 🟡 出版商冲突'
+            elif not p.changed:
+                note = ' — 已是最新'
+            else:
+                note = ''
             emit(f'     📄 [{idx:>3}] {p.filename}{note}')
             emit_parse_debug(p.mi)
-            print_metadata_fields(p.fields, p.pub_conflict, indent='       ')
+            # ComicInfo 字段比 Path 多一级缩进，区分"数据块" vs "元信息行"
+            print_metadata_fields(p.fields, p.pub_conflict, indent='         ')
             for w in p.mi.warnings:
                 emit(f'       🟡 {w}')
+            cur_enc = p.existing_encoding or '—'
+            new_enc = p.new_encoding
+            enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
+                        else cur_enc)
+            emit(f'       Encoding: {enc_line}')
             emit(f'       Path:\n       {p.cbz_path}\n')
             emit()
     else:
         emit('\n没有需要处理的 CBZ 文件。')
 
-    if conflict: emit(f'⛔  出版商冲突: {len(conflict)} 个')
-    if warns:    emit(f'🟡  有警告:    {len(warns)} 个')
+    if unchanged: emit(f'➡️   已是最新: {len(unchanged)} 个')
+    if conflict:  emit(f'⛔  出版商冲突: {len(conflict)} 个')
+    if warns:     emit(f'🟡  有警告:    {len(warns)} 个')
 
     _print_preview_footer(
         len(plans),
-        [('可写', len(writable)), ('冲突', len(conflict)), ('警告', len(warns))],
+        [('待写入', len(changed)), ('已是最新', len(unchanged)),
+         ('冲突',   len(conflict)), ('警告',     len(warns))],
     )
 
 

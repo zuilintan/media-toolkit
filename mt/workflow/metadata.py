@@ -185,20 +185,23 @@ def find_publisher(cbz_path: str) -> tuple[str | None, list[str] | None]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CBZ 元信息（单次打开：页数 + 现有 Tags）
+# CBZ 元信息（单次打开：页数 + 现有 Tags + 现有 ComicInfo.xml 原始 bytes）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def read_cbz_meta(cbz_path: str) -> tuple[int, str]:
-    """单次打开 CBZ，返回 (图片页数, 现有 Tags)。
+def read_cbz_meta(cbz_path: str) -> tuple[int, str, bytes | None]:
+    """单次打开 CBZ，返回 (图片页数, 现有 Tags, 现有 ComicInfo.xml 原始 bytes)。
 
     - 页数：按 PAGE_EXTS 过滤，目录条目与 ComicInfo.xml 不计入。
     - Tags：读取根级 ComicInfo.xml 的 <Tags>（外部程序维护，本工具只读不改）；
             无则空串。内嵌 XML 损坏时只丢 Tags，不影响页数。
-    - 整包打不开时按 (0, '') 处理并记 debug。
+    - 现有 bytes：根级 ComicInfo.xml 的原始字节，用于 plan 阶段 diff 判定。
+                  没有内嵌或整包损坏时为 None。
+    - 整包打不开时按 (0, '', None) 处理并记 debug。
     """
     comicinfo_lc = COMICINFO_FILENAME.lower()
     page_count   = 0
     tags         = ''
+    existing     : bytes | None = None
     try:
         with zipfile.ZipFile(cbz_path, 'r') as zf:
             root_comicinfo: str | None = None   # 根级 ComicInfo.xml 原始名
@@ -216,15 +219,16 @@ def read_cbz_meta(cbz_path: str) -> tuple[int, str]:
                     page_count += 1
             if root_comicinfo is not None:
                 try:
-                    root = fromstring(zf.read(root_comicinfo))
-                    el   = root.find('Tags')
-                    tags = (el.text or '').strip() if el is not None else ''
+                    existing = zf.read(root_comicinfo)
+                    root     = fromstring(existing)
+                    el       = root.find('Tags')
+                    tags     = (el.text or '').strip() if el is not None else ''
                 except Exception as e:
                     debug(f'解析内嵌 ComicInfo.xml 失败（按无 Tags 处理）: {cbz_path} — {e}')
     except Exception as e:
         debug(f'read_cbz_meta 失败（按 0 页 / 无 Tags 处理）: {cbz_path} — {e}')
-        return 0, ''
-    return page_count, tags
+        return 0, '', None
+    return page_count, tags, existing
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -282,32 +286,41 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
 
     Returns:
         ``None`` — 文件名无法提取作者（跳过）；
-        否则返回 MetadataPlan；``plan.writable`` 标识能否写入。
+        否则返回 MetadataPlan；``plan.writable`` 标识能否写入、
+        ``plan.changed`` 标识是否需要实际写入。
     """
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
     if not author:
         return None
 
-    mi                      = parse_name(author, Path(filename).stem)
-    publisher, pub_conflict = find_publisher(cbz_path)
-    page_count, tags_val    = read_cbz_meta(cbz_path)
-    fields                  = collect_fields(mi, publisher, tags_val, page_count)
-    return MetadataPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
+    mi                          = parse_name(author, Path(filename).stem)
+    publisher, pub_conflict     = find_publisher(cbz_path)
+    page_count, tags_val, existing_xml = read_cbz_meta(cbz_path)
+    fields                      = collect_fields(mi, publisher, tags_val, page_count)
+    new_xml                     = build_comicinfo_xml(mi, publisher, tags_val, page_count)
+    return MetadataPlan(
+        cbz_path     = cbz_path,
+        mi           = mi,
+        publisher    = publisher,
+        pub_conflict = pub_conflict,
+        page_count   = page_count,
+        tags_val     = tags_val,
+        fields       = fields,
+        existing_xml = existing_xml,
+        new_xml      = new_xml,
+    )
 
 
 def apply_metadata_plan(plan: MetadataPlan) -> str:
-    """执行单个 CBZ 的 ComicInfo.xml 写入。
+    """执行单个 CBZ 的 ComicInfo.xml 写入（plan.new_xml 已在 plan 阶段构建）。
 
     Returns:
-        ``'ok'`` / ``'error'``（不可写计划由调用方过滤，此处不再判定）
+        ``'ok'`` / ``'error'``（不可写 / 无变化由调用方过滤，此处不再判定）
     """
     filename = os.path.basename(plan.cbz_path)
     try:
-        xml_bytes = build_comicinfo_xml(
-            plan.mi, plan.publisher, plan.tags_val, plan.page_count,
-        )
-        replaced  = write_comicinfo(plan.cbz_path, xml_bytes)
+        replaced = write_comicinfo(plan.cbz_path, plan.new_xml)
         emit(f'   ✅ {filename} — ComicInfo.xml {"已更新" if replaced else "已写入"}')
         return 'ok'
     except Exception as e:
@@ -356,6 +369,9 @@ def apply_metadata_plans(plans: list[MetadataPlan], dry_run: bool = True) -> int
             warn(f'跳过（出版商冲突）: {os.path.basename(plan.cbz_path)}')
             skip += 1
             continue
+        if not plan.changed:
+            skip += 1   # ComicInfo.xml 已存在且与目标完全一致：幂等跳过
+            continue
         result = apply_metadata_plan(plan)
         if result == 'ok':
             ok_n += 1
@@ -376,7 +392,7 @@ def process_metadata_dir(target_dir: Path, move_to: str) -> None:
     emit(f'📂 目录: {target_dir}')
     plans = plan_metadatas(str(target_dir))
     print_metadata_preview(plans)
-    if not any(p.writable for p in plans):
+    if not any(p.writable and p.changed for p in plans):
         return
     if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
         return

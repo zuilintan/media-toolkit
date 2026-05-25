@@ -463,14 +463,25 @@ def emit_parse_debug(mi: MangaInfo) -> None:
       - examples：每条示例渲染时。
 
     funcname 锁定为 ``parse_name``，与原先 parse_name 内部 debug() 的输出一致。
+    覆盖 MangaInfo 全部可观测字段，DEBUG 行即可替代旧 'Flag:' 摘要。
     """
+    flags = '/'.join(
+        f for f, on in [
+            ('uncensored', mi.is_uncensored),
+            ('colorized',  mi.is_colorized),
+            ('ongoing',    mi.is_ongoing),
+        ] if on
+    )
     debug(
+        f"author='{CYAN}{mi.author}{RESET}' "
         f"main='{CYAN}{mi.main_title}{RESET}' "
         f"vol='{CYAN}{mi.volume}{RESET}' "
         f"ch='{CYAN}{mi.chapter}{RESET}' "
         f"ch_title='{CYAN}{mi.chapter_title}{RESET}' "
         f"part_tag='{CYAN}{mi.part_tag}{RESET}' "
         f"series='{CYAN}{mi.series}{RESET}' "
-        f"lang='{CYAN}{mi.language}{RESET}'",
+        f"trans='{CYAN}{mi.translation}{RESET}' "
+        f"lang='{CYAN}{mi.language}{RESET}' "
+        f"flags='{CYAN}{flags}{RESET}'",
         funcname='parse_name',
     )
