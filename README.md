@@ -1,11 +1,12 @@
 # manga-toolkit
 
-漫画文件整理工具集，提供统一 CLI `manga-toolkit-cli`，含两个子命令：
+漫画文件整理工具集，提供统一 CLI `manga-toolkit-cli`，含三个子命令：
 
 | 子命令 | 功能 |
 |---|---|
 | `sourcefile` | 批量重命名源文件（.zip / .cbz），统一格式 |
 | `metadata` | 向 CBZ 写入 ComicInfo.xml 元数据 |
+| `cover` | 为 CBZ 追加 `0000.webp` 封面（绕开 grimmory 像素上限） |
 
 ---
 
@@ -25,6 +26,8 @@ poetry install
 | 包 | 用途 |
 |---|---|
 | `zhconv` | 译名繁体→简体转换（必选） |
+| `Pillow` | `cover` 子命令的图像解码 / 裁剪 / WebP 编码 |
+| `smartcrop` | `cover --smart` 的显著性裁剪（横图主体保留更稳） |
 
 ---
 
@@ -119,6 +122,52 @@ LanguageISO → Genre → Tags → PageCount → Notes
 
 ---
 
+## cover 子命令
+
+为 CBZ 追加一张 `0000.webp` 封面（按字典序排在所有页面之前）。
+
+**背景**：[grimmory](https://github.com/grimmory-tools/grimmory) 在生成 cover 时若源图超过 2000 万像素会拒绝处理：
+
+```
+Rejected image: dimensions 4000x5400 (21600000 pixels) exceed limit 20000000 — possible decompression bomb
+```
+
+本子命令产出的 WebP 严格命中 1000×1500（与 grimmory 内部 cover 目标尺寸 2:3 对齐），并以追加方式写入原 CBZ，不重建压缩包。源图小于 1000×1500 时保持原尺寸（不放大）。
+
+```bash
+# 预览
+manga-toolkit-cli cover --root /path/to/cbz
+
+# 实际写入
+manga-toolkit-cli cover --root /path/to/cbz --apply
+
+# smartcrop 显著性裁剪（横图保留主体更稳）
+manga-toolkit-cli cover --root /path/to/cbz --apply --smart
+
+# 循环拖入
+manga-toolkit-cli cover --drag --move-to /path/to/sorted
+```
+
+### 行为约定
+
+| 项 | 值 |
+|---|---|
+| 写入文件名 | `0000.webp`（固定） |
+| 源图查找 | ZIP 根目录按优先级 `cover.*` → `0001.*`（不递归子目录） |
+| 输出比例 | 2:3（宽:高） |
+| 输出尺寸 | 1000×1500（源更小则保留原尺寸，不放大） |
+| 写入方式 | ZIP 追加；已有 `0000.webp` 则替换（旧条目成为死空间，与 ComicInfo.xml 同策略） |
+| 处理范围 | `--root` 下所有 .cbz（递归子目录） |
+
+### 裁剪模式
+
+| 模式 | 触发 | 说明 |
+|---|---|---|
+| `center`（默认） | 不加 `--smart` | 居中裁剪到 2:3，最简单、可预测；横图（如跨页扉页）可能丢主体 |
+| `smart` | `--smart` | smartcrop 基于边缘 / 饱和度 / 肤色综合打分挑选最佳子矩形 |
+
+---
+
 ## 项目结构
 
 ```
@@ -129,7 +178,8 @@ mt/
 ├── cli/                         — 子命令调度层
 │   ├── sourcefile.py            — sourcefile 子命令
 │   ├── metadata.py              — metadata 子命令
-│   └── examples.py              — 内置示例（双子命令共用）
+│   ├── cover.py                 — cover 子命令
+│   └── examples.py              — 内置示例（sourcefile / metadata 共用）
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
 │   ├── config.py                — 全局默认配置
 │   ├── models.py                — Chapter / Volume / MangaInfo
@@ -146,6 +196,7 @@ mt/
 └── workflow/                    — 高层工作流
     ├── sourcefile.py            — 源文件扫描、重命名执行
     ├── metadata.py              — ComicInfo.xml 生成 & 写入
+    ├── cover.py                 — 封面查找、裁剪、WebP 编码、CBZ 追加写入
     ├── drag.py                  — 通用拖入循环 + 目录搬移（共用）
     └── session.py               — 操作记录 & 回退（仅 sourcefile 读取使用）
 ```

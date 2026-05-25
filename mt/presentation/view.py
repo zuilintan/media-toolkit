@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import unicodedata
 
-from mt.core.models import MangaInfo, MetadataPlan, SourcefilePlan
+from mt.core.models import CoverPlan, MangaInfo, MetadataPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
 from mt.infra.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
@@ -211,3 +211,51 @@ def print_metadata_diff_table(
         emit(f'{indent}🟡 Publisher: 多个社团文件，请手动确认！')
         for p in pub_conflict:
             emit(f'{indent}  • {os.path.basename(p)}')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Cover 预览（结构对齐 sourcefile / metadata）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def print_cover_preview(plans: list[CoverPlan]) -> None:
+    """打印 0000.webp 封面写入计划，逐卡片渲染。
+
+    卡片骨架：
+      ``   📄 [N] {filename}{ 🔁 替换}``  (3 空格)
+      ``     源:   {src_name} {W}×{H}``   (5 空格)
+      ``     目标: 0000.webp {W}×{H} [mode]``
+
+    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 跳过）仅计数提示。
+    """
+    changed   = [p for p in plans if p.writable and p.changed]
+    unchanged = [p for p in plans if p.writable and not p.changed]
+    failed    = [p for p in plans if not p.writable]
+    replaced  = [p for p in changed if p.replaced]
+
+    _print_preview_header('封面写入预览（0000.webp）')
+
+    if changed:
+        emit(f'\n✅ 将写入 ({len(changed)} 个):\n')
+        for idx, p in enumerate(changed, 1):
+            note = ' 🔁 替换现有' if p.replaced else ''
+            emit(f'   📄 [{idx}] {p.filename}{note}')
+            sw, sh = p.src_size or (0, 0)
+            dw, dh = p.dst_size or (0, 0)
+            emit(f'     源:   {p.src_name}  {sw}×{sh}')
+            emit(f'     目标: 0000.webp  {dw}×{dh}  [{p.mode}]')
+            emit()
+    else:
+        emit('\n没有需要写入的封面。')
+
+    if unchanged:
+        emit(f'➡️   已是最新: {len(unchanged)} 个')
+    if failed:
+        emit(f'⛔ 跳过 ({len(failed)} 个):')
+        for p in failed:
+            emit(f'   • {p.filename} — {p.error or "无源图"}')
+
+    _print_preview_footer(
+        len(plans),
+        [('待写入', len(changed)), ('替换现有', len(replaced)),
+         ('已是最新', len(unchanged)), ('跳过', len(failed))],
+    )

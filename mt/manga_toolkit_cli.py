@@ -1,9 +1,10 @@
 """
 manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 
-整合两个子命令:
+整合三个子命令:
   - sourcefile → 源文件（.zip / .cbz）批量重命名（原 rename）
   - metadata   → 向 CBZ 写入 ComicInfo.xml 元数据（原 comicinfo）
+  - cover      → 为 CBZ 追加 0000.webp 封面（绕开 grimmory 像素上限）
 
 模块名遵循 PEP 8（下划线），对外暴露的 console 命令则使用连字符
 ``manga-toolkit-cli``（CLI 惯例）。两者解耦，互不影响。
@@ -23,6 +24,10 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
   manga-toolkit-cli metadata --root /path/to/cbz --apply       # 写入 ComicInfo.xml
   manga-toolkit-cli metadata --examples                        # 内置示例
 
+  manga-toolkit-cli cover --root /path/to/cbz                  # 预览
+  manga-toolkit-cli cover --root /path/to/cbz --apply          # 追加 0000.webp
+  manga-toolkit-cli cover --root /path/to/cbz --apply --smart  # smartcrop 模式
+
 兼容性: 也可使用 `python -m mt <subcommand> ...`。
 """
 
@@ -34,6 +39,7 @@ import sys
 from mt.infra.console import setup_logging
 from mt.cli.sourcefile import cmd_sourcefile, add_sourcefile_args
 from mt.cli.metadata   import cmd_metadata,   add_metadata_args
+from mt.cli.cover      import cmd_cover,      add_cover_args
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-toolkit-cli metadata --root /path/to/cbz\n'
             '  manga-toolkit-cli metadata --root /path/to/cbz --apply\n'
             '  manga-toolkit-cli metadata --examples\n'
+            '  manga-toolkit-cli cover --root /path/to/cbz --apply\n'
+            '  manga-toolkit-cli cover --root /path/to/cbz --apply --smart\n'
         ),
     )
     parser.add_argument('--debug', action='store_true',
@@ -95,6 +103,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_metadata_args(p_metadata)
     p_metadata.set_defaults(func=cmd_metadata)
+
+    # cover
+    p_cover = sub.add_parser(
+        'cover',
+        help='为 CBZ 追加 0000.webp 封面（绕开 grimmory 像素上限）',
+        description='CBZ 封面追加写入工具（生成 2:3 / ≤ 1000×1500 的 WebP 封面）',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
+            '裁剪模式:\n'
+            '  默认  居中裁剪到 2:3（最简单、可预测；横图可能丢主体）\n'
+            '  --smart  smartcrop 显著性裁剪（横图更稳，依赖 smartcrop 库）\n\n'
+            '示例:\n'
+            '  manga-toolkit-cli cover --root ./manga\n'
+            '  manga-toolkit-cli cover --root ./manga --apply\n'
+            '  manga-toolkit-cli cover --root ./manga --apply --smart\n'
+            '  manga-toolkit-cli cover --drag --move-to /sorted\n'
+        ),
+    )
+    add_cover_args(p_cover)
+    p_cover.set_defaults(func=cmd_cover)
 
     return parser
 

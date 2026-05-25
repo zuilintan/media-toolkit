@@ -235,3 +235,54 @@ class MetadataPlan:
     @property
     def filename(self) -> str:
         return os.path.basename(self.cbz_path)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CoverPlan（cover 子命令：CBZ 封面生成/替换计划）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class CoverPlan:
+    """单个 CBZ 的封面写入计划（plan 阶段产出，apply 阶段消费）。
+
+    plan 阶段会真正解码源图、裁剪、转为 WebP 字节，apply 阶段只追加写入；
+    这样确保预览展示的尺寸与最终写入完全一致。``existing_bytes`` 用于
+    幂等判定：与目标完全一致则跳过写入。
+
+    Attributes:
+        cbz_path:       目标 CBZ 路径。
+        src_name:       源图像在 ZIP 根目录中的文件名（无可用源图时为 None）。
+        src_size:       源图像 (W, H)；无源图时 None。
+        dst_size:       输出 (W, H)；无源图或失败时 None。
+        mode:           'center' | 'smart'，本次使用的裁剪算法。
+        webp_bytes:     待写入的 WebP 二进制；无源图或失败时 None。
+        existing_bytes: CBZ 内已有 0000.webp 的原始字节；不存在时 None。
+        error:          plan 阶段发生的错误（如源图损坏 / 解码失败）；正常时 ''。
+    """
+    cbz_path:       str
+    src_name:       str | None
+    src_size:       tuple[int, int] | None
+    dst_size:       tuple[int, int] | None
+    mode:           str
+    webp_bytes:     bytes | None
+    existing_bytes: bytes | None
+    error:          str = ""
+
+    @property
+    def filename(self) -> str:
+        return os.path.basename(self.cbz_path)
+
+    @property
+    def writable(self) -> bool:
+        """是否可写入：有源图、有输出字节、无错误。"""
+        return self.src_name is not None and self.webp_bytes is not None and not self.error
+
+    @property
+    def replaced(self) -> bool:
+        """CBZ 内已存在 0000.webp（无论字节是否一致）。"""
+        return self.existing_bytes is not None
+
+    @property
+    def changed(self) -> bool:
+        """是否需要实际写入：无现有版本，或现有字节与目标不一致。"""
+        return self.existing_bytes is None or self.existing_bytes != self.webp_bytes
