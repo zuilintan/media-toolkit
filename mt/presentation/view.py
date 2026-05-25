@@ -14,7 +14,6 @@ view.py — 领域对象的终端渲染
 from __future__ import annotations
 import os
 import unicodedata
-from collections.abc import Iterable, Iterator
 
 from mt.core.models import MangaInfo, MetadataPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
@@ -68,16 +67,6 @@ def _print_preview_footer(total: int, parts: list[tuple[str, int]]) -> None:
     emit(SEP)
 
 
-def _iter_authored_cards(items: Iterable[object]) -> Iterator[tuple[int, object, bool]]:
-    """逐项 yield (idx_from_1, item, is_new_author)。author 切换时返回 True。"""
-    last = None
-    for idx, item in enumerate(items, 1):
-        author    = getattr(item, 'author', '')
-        is_new    = (author != last)
-        last      = author
-        yield idx, item, is_new
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -129,10 +118,16 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_metadata_preview(plans: list[MetadataPlan]) -> None:
-    """打印 ComicInfo 写入计划，按作者分组、逐卡片渲染。
+    """打印 ComicInfo 写入计划，逐卡片渲染。
 
-    结构对齐 print_sourcefile_preview：只渲染 ``writable && changed``
-    的卡片，其余（已是最新 / 出版商冲突 / 有警告）仅作计数提示。
+    卡片骨架与 print_sourcefile_preview / run_*_examples 对齐：
+      ``   📄 [N] {filename}``   (3 空格)
+      ``     DEBUG: …``          (5 空格)
+      ``     {diff_table}``      (5 空格)
+      ``     Encoding: …``       (5 空格)
+
+    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 出版商冲突
+    / 有警告）仅作计数提示。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -143,24 +138,20 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
 
     if changed:
         emit(f'\n✅ 将写入 ({len(changed)} 个):\n')
-        for idx, p, is_new in _iter_authored_cards(changed):
-            if is_new:
-                emit(f'  📂 {p.author}')
-            emit(f'     📄 [{idx:>3}] {p.filename}')
+        for idx, p in enumerate(changed, 1):
+            emit(f'   📄 [{idx}] {p.filename}')
             emit_parse_debug(p.mi)
-            # 旧/新两列表格，比 Path 多一级缩进
             print_metadata_diff_table(
                 p.existing_fields, p.fields, p.pub_conflict,
-                indent='         ',
+                indent='     ',
             )
             for w in p.mi.warnings:
-                emit(f'       🟡 {w}')
+                emit(f'     🟡 {w}')
             cur_enc = p.existing_encoding or '—'
             new_enc = p.new_encoding
             enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
                         else cur_enc)
-            emit(f'       Encoding: {enc_line}')
-            emit(f'       Path:\n       {p.cbz_path}\n')
+            emit(f'     Encoding: {enc_line}')
             emit()
     else:
         emit('\n没有需要写入的 ComicInfo.xml。')

@@ -20,7 +20,7 @@ from mt.core.config import COMICINFO_TAGS
 from mt.naming.parser import parse_name, emit_parse_debug
 from mt.naming.builder import build_new_name
 from mt.workflow.metadata import collect_fields, _extract_publisher_name
-from mt.infra.console import highlight_diff, SEP, SEP2, RED, GREEN, emit, print_summary
+from mt.infra.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from mt.presentation.view import print_metadata_diff_table
 
 # 示例数据文件（随包分发）
@@ -90,24 +90,22 @@ def run_metadata_examples() -> int:
     emit(SEP2)
 
     ok_n = fail = warn_n = 0
-    for author, _input, expected in examples:
-        emit(f'\n{SEP}')
-        emit(f'  📝  {expected}')
-        emit()
+    empty_old = {tag: '' for tag in COMICINFO_TAGS}
+    for idx, (author, _input, expected) in enumerate(examples, 1):
         if not author:
-            emit('  ❌  无法提取作者，跳过。')
+            emit(f'   📄 [{idx}] ❌ 无法提取作者，跳过: {expected}')
+            emit()
             fail += 1
             continue
-        mi     = parse_name(author, expected)
+        emit(f'   📄 [{idx}] {expected}')
+        mi = parse_name(author, expected)
         emit_parse_debug(mi)
         fields = collect_fields(mi, sim_pub)
         # 旧列恒空（examples 模拟"首次写入"语义），新列即 build 结果
-        print_metadata_diff_table(
-            {tag: '' for tag in COMICINFO_TAGS}, fields,
-            indent='     ',
-        )
+        print_metadata_diff_table(empty_old, fields, indent='     ')
         for w in mi.warnings:
             emit(f'     🟡 {w}')
+        emit()
         if mi.warnings:
             warn_n += 1
         ok_n += 1
