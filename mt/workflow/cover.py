@@ -3,15 +3,19 @@ cover.py — CBZ 封面生成（cover 子命令工作流层）
 
 目的: grimmory 在生成 cover 时若第一张图超过 2000 万像素会触发
 ``Rejected image: dimensions ... — possible decompression bomb`` 报错。
-本工作流在 CBZ 内追加一张 ``0000.webp``（字典序排在最前），grimmory
-即可直接采用，且尺寸/比例与其内部 cover (2:3, 1000×1500) 对齐。
+本工作流在 CBZ 内写入一张 2:3 / ≤ 1000×1500 的 WebP，grimmory 即可直接采用。
+
+目标文件名取决于源图：
+  - 源 ``0001.*`` → 写入 ``0000.webp``（字典序在最前，作为新增封面）
+  - 源 ``cover.*`` → 写入 ``cover.webp``（替换原 cover.*，统一为 WebP）
 
 流程:
   1. 在 CBZ 根目录依次寻找 ``cover.*`` / ``0001.*`` 作为源图
   2. 居中裁剪到 2:3（默认）或 smartcrop 显著性裁剪
   3. 缩放至 ≤ 1000×1500（保持比例）
   4. 编码为 WebP
-  5. ZIP 追加写入 ``0000.webp``（参考 ComicInfo.xml 的追加替换方式，
+  5. ZIP 追加写入目标文件；写入前清理根目录同 stem（如 cover.png）的
+     旧文件，避免与新目标共存（参考 ComicInfo.xml 的追加替换方式，
      不重建整个压缩包）
 
 依赖: Pillow / smartcrop（可选） / models / config / console / drag
@@ -37,11 +41,15 @@ from mt.workflow.drag import move_dir
 
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
-COVER_FILENAME: str            = '0000.webp'
 TARGET_RATIO:   float          = 2 / 3            # W / H (竖图 2:3)
 MAX_SIZE:       tuple[int, int] = (1000, 1500)    # 与 grimmory cover 对齐
 DEFAULT_QUALITY: int           = 85
 SOURCE_PRIORITY: tuple[str, ...] = ('cover', '0001')
+# 源 stem → 目标文件名
+DST_FOR: dict[str, str] = {
+    'cover': 'cover.webp',     # 替换原 cover.*
+    '0001':  '0000.webp',      # 追加新封面，排在 0001 之前
+}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -146,10 +154,10 @@ def encode_webp(img: Image.Image, quality: int = DEFAULT_QUALITY) -> bytes:
 # CBZ 追加写入（参考 workflow.metadata.write_comicinfo）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _cover_zinfo(inherited_attr: int) -> zipfile.ZipInfo:
+def _cover_zinfo(filename: str, inherited_attr: int) -> zipfile.ZipInfo:
     t  = time.localtime()
     zi = zipfile.ZipInfo(
-        COVER_FILENAME,
+        filename,
         date_time=(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec),
     )
     zi.compress_type = zipfile.ZIP_STORED      # WebP 已压缩
@@ -164,26 +172,34 @@ def _inherit_attr(infos: list[zipfile.ZipInfo]) -> int:
     return 0x20  # DOS Archive 默认
 
 
-def write_cover(cbz_path: str, webp_bytes: bytes) -> bool:
-    """以追加模式写入 0000.webp，旧条目从内存目录摘除（死空间 < 1 个图像）。
+def write_cover(cbz_path: str, dst_name: str, webp_bytes: bytes) -> bool:
+    """以追加模式写入 ``dst_name``，根目录下同 stem 的旧条目（任何扩展名）
+    从内存目录摘除（死空间 < 1 个图像）。
+
+    清理同 stem 而非仅同名是为了避免 ``cover.png`` 与新写入的
+    ``cover.webp`` 共存。子目录条目不动。
 
     与 ``workflow.metadata.write_comicinfo`` 同构。
 
     Returns:
-        True 表示替换了旧版，False 表示首次写入。
+        True 表示替换了旧版（dst_name 本身已存在），False 表示首次写入。
     """
+    dst_stem = os.path.splitext(dst_name)[0].lower()
     with zipfile.ZipFile(cbz_path, 'a') as zf:
         attr = _inherit_attr(
             [i for i in zf.infolist()
-             if i.filename.lower() != COVER_FILENAME.lower()]
+             if '/' in i.filename
+             or os.path.splitext(i.filename)[0].lower() != dst_stem]
         )
         replaced = False
         for key in list(zf.NameToInfo.keys()):
-            if key.lower() == COVER_FILENAME.lower():
+            if '/' in key:
+                continue
+            if os.path.splitext(key)[0].lower() == dst_stem:
+                if key.lower() == dst_name.lower():
+                    replaced = True
                 zf.filelist.remove(zf.NameToInfo.pop(key))
-                replaced = True
-                break
-        zf.writestr(_cover_zinfo(attr), webp_bytes)
+        zf.writestr(_cover_zinfo(dst_name, attr), webp_bytes)
     return replaced
 
 
@@ -203,23 +219,25 @@ def plan_cover(
     existing: bytes | None = None
     try:
         with zipfile.ZipFile(cbz_path, 'r') as zf:
-            # 读取现有 0000.webp 字节（如果有），用于 changed 判定
-            for zi in zf.infolist():
-                if zi.filename.lower() == COVER_FILENAME.lower():
-                    existing = zf.read(zi.filename)
-                    break
             src_name  = find_source_image(zf)
             if src_name is None:
                 return CoverPlan(
                     cbz_path=cbz_path, src_name=None, src_size=None,
-                    dst_size=None, mode=mode, webp_bytes=None,
-                    existing_bytes=existing, error='未找到 cover.* / 0001.* 源图',
+                    dst_size=None, mode=mode, dst_name=None, webp_bytes=None,
+                    existing_bytes=None, error='未找到 cover.* / 0001.* 源图',
                 )
+            src_stem = os.path.splitext(src_name)[0].lower()
+            dst_name = DST_FOR[src_stem]
+            # 读取现有目标文件字节（若有），用于 changed 判定
+            for zi in zf.infolist():
+                if zi.filename.lower() == dst_name.lower():
+                    existing = zf.read(zi.filename)
+                    break
             src_bytes = zf.read(src_name)
     except Exception as e:
         return CoverPlan(
             cbz_path=cbz_path, src_name=None, src_size=None, dst_size=None,
-            mode=mode, webp_bytes=None, existing_bytes=None,
+            mode=mode, dst_name=None, webp_bytes=None, existing_bytes=None,
             error=f'打开 CBZ 失败: {e}',
         )
 
@@ -242,30 +260,31 @@ def plan_cover(
     except Exception as e:
         return CoverPlan(
             cbz_path=cbz_path, src_name=src_name, src_size=None, dst_size=None,
-            mode=mode, webp_bytes=None, existing_bytes=existing,
+            mode=mode, dst_name=dst_name, webp_bytes=None,
+            existing_bytes=existing,
             error=f'图像处理失败 ({src_name}): {e}',
         )
 
     return CoverPlan(
         cbz_path=cbz_path, src_name=src_name, src_size=src_size,
-        dst_size=fitted.size, mode=mode, webp_bytes=webp,
+        dst_size=fitted.size, mode=mode, dst_name=dst_name, webp_bytes=webp,
         existing_bytes=existing, error='',
     )
 
 
 def apply_cover_plan(plan: CoverPlan) -> str:
-    """写入单个 CBZ 的 0000.webp。
+    """写入单个 CBZ 的目标封面（plan.dst_name）。
 
     Returns:
         'ok' / 'error'（无源图等情况由调用方过滤，此处不再判定）。
     """
     filename = plan.filename
     try:
-        assert plan.webp_bytes is not None   # writable 已保证
-        replaced = write_cover(plan.cbz_path, plan.webp_bytes)
+        assert plan.webp_bytes is not None and plan.dst_name is not None
+        replaced = write_cover(plan.cbz_path, plan.dst_name, plan.webp_bytes)
         verb     = '已更新' if replaced else '已写入'
         sz       = f'{plan.dst_size[0]}×{plan.dst_size[1]}'
-        emit(f'   ✅ {filename} — {COVER_FILENAME} {verb} ({sz})')
+        emit(f'   ✅ {filename} — {plan.dst_name} {verb} ({sz})')
         return 'ok'
     except Exception as e:
         error(f'{filename} — {e}')
@@ -332,7 +351,7 @@ def apply_cover_plans(plans: list[CoverPlan], dry_run: bool = True) -> int:
             skip += 1
             continue
         if not plan.changed:
-            skip += 1   # 现有 0000.webp 与目标字节完全一致，幂等跳过
+            skip += 1   # 现有封面与目标字节完全一致，幂等跳过
             continue
         if apply_cover_plan(plan) == 'ok':
             ok_n += 1
@@ -358,7 +377,7 @@ def make_process_cover_dir(mode: str, quality: int, jobs: int = 1):
         print_cover_preview(plans)
         if not any(p.writable and p.changed for p in plans):
             return
-        if not confirm('\n🟡 确认写入 0000.webp 封面？按 Enter 继续: '):
+        if not confirm('\n🟡 确认写入封面？按 Enter 继续: '):
             return
         fail = apply_cover_plans(plans, dry_run=False)
         if fail == 0 and move_to:

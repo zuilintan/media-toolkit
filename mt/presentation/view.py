@@ -218,12 +218,15 @@ def print_metadata_diff_table(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_cover_preview(plans: list[CoverPlan]) -> None:
-    """打印 0000.webp 封面写入计划，逐卡片渲染。
+    """打印封面写入计划，逐卡片渲染。
+
+    目标文件名取决于源图：源 ``0001.*`` → ``0000.webp``；源 ``cover.*``
+    → ``cover.webp``。
 
     卡片骨架：
       ``   📄 [N] {filename}{ 🔁 替换}``  (3 空格)
       ``     源:   {src_name} {W}×{H}``   (5 空格)
-      ``     目标: 0000.webp {W}×{H} [mode]``
+      ``     目标: {dst_name} {W}×{H} [mode]``
 
     只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 跳过）仅计数提示。
     """
@@ -232,7 +235,7 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
     failed    = [p for p in plans if not p.writable]
     replaced  = [p for p in changed if p.replaced]
 
-    _print_preview_header('封面写入预览（0000.webp）')
+    _print_preview_header('封面写入预览')
 
     if changed:
         emit(f'\n✅ 将写入 ({len(changed)} 个):\n')
@@ -242,7 +245,7 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
             sw, sh = p.src_size or (0, 0)
             dw, dh = p.dst_size or (0, 0)
             emit(f'     源:   {p.src_name}  {sw}×{sh}')
-            emit(f'     目标: 0000.webp  {dw}×{dh}  [{p.mode}]')
+            emit(f'     目标: {p.dst_name}  {dw}×{dh}  [{p.mode}]')
             emit()
     else:
         emit('\n没有需要写入的封面。')

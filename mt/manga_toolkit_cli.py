@@ -4,7 +4,7 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 整合三个子命令:
   - sourcefile → 源文件（.zip / .cbz）批量重命名（原 rename）
   - metadata   → 向 CBZ 写入 ComicInfo.xml 元数据（原 comicinfo）
-  - cover      → 为 CBZ 追加 0000.webp 封面（绕开 grimmory 像素上限）
+  - cover      → 为 CBZ 写入 2:3 封面（绕开 grimmory 像素上限）
 
 模块名遵循 PEP 8（下划线），对外暴露的 console 命令则使用连字符
 ``manga-toolkit-cli``（CLI 惯例）。两者解耦，互不影响。
@@ -25,7 +25,7 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
   manga-toolkit-cli metadata --examples                        # 内置示例
 
   manga-toolkit-cli cover --root /path/to/cbz                  # 预览
-  manga-toolkit-cli cover --root /path/to/cbz --apply          # 追加 0000.webp
+  manga-toolkit-cli cover --root /path/to/cbz --apply          # 写入封面 webp
   manga-toolkit-cli cover --root /path/to/cbz --apply --smart  # smartcrop 模式
 
 兼容性: 也可使用 `python -m mt <subcommand> ...`。
@@ -107,8 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
     # cover
     p_cover = sub.add_parser(
         'cover',
-        help='为 CBZ 追加 0000.webp 封面（绕开 grimmory 像素上限）',
-        description='CBZ 封面追加写入工具（生成 2:3 / ≤ 1000×1500 的 WebP 封面）',
+        help='为 CBZ 写入 2:3 封面（绕开 grimmory 像素上限）',
+        description='CBZ 封面写入工具（生成 2:3 / ≤ 1000×1500 的 WebP；'
+                    '源 0001.* → 0000.webp，源 cover.* → cover.webp）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'

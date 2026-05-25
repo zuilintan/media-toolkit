@@ -1,9 +1,12 @@
 """
-cover.py — cover 子命令：为 CBZ 追加 0000.webp 封面
+cover.py — cover 子命令：为 CBZ 写入 2:3 封面
 
 解决 grimmory 在生成 cover 时遇到「decompression bomb」（源图超过 2000 万
-像素）的问题。通过在 CBZ 内追加一张 2:3 / ≤ 1000×1500 的 WebP（字典序排
-在最前），grimmory 即可直接用之，不再读取超大原图。
+像素）的问题。通过在 CBZ 内写入一张 2:3 / ≤ 1000×1500 的 WebP，grimmory
+即可直接用之，不再读取超大原图。
+
+目标文件名取决于源图：源 ``0001.*`` → ``0000.webp``（字典序排在最前）；
+源 ``cover.*`` → ``cover.webp``（替换原 cover.*）。
 
 流程: scan → 全量 plan（含裁剪+编码）→ 预览 → 二次确认 → 整批写入 → 可选移动。
 与 cli/metadata.py 结构对称。
@@ -47,7 +50,7 @@ def cmd_cover(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('cover', f'CBZ 封面追加写入（mode={mode}）', root, args.apply)
+    print_run_banner('cover', f'CBZ 封面写入（mode={mode}）', root, args.apply)
     plans = plan_covers(str(root), mode=mode, quality=args.quality, jobs=args.jobs)
 
     if not plans:
@@ -87,7 +90,7 @@ def cmd_cover(args: argparse.Namespace) -> int:
         return 0
 
     if not confirm(
-        f'\n🟡 确认对 {n_changed} 个 CBZ 写入 0000.webp？按 Enter 继续: '
+        f'\n🟡 确认对 {n_changed} 个 CBZ 写入封面？按 Enter 继续: '
     ):
         emit('  操作已取消。')
         return 0
@@ -110,7 +113,7 @@ def add_cover_args(p: argparse.ArgumentParser) -> None:
                    help='处理完成后将根目录下的子目录移动至此目录'
                         '（需配合 --drag 或 --apply）')
     p.add_argument('--apply',   action='store_true',
-                   help='实际写入 0000.webp（不加此参数则仅预览）')
+                   help='实际写入封面（不加此参数则仅预览）')
     p.add_argument('--drag',    action='store_true',
                    help='循环拖入模式')
     p.add_argument('--smart',   action='store_true',
