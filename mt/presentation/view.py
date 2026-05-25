@@ -115,13 +115,8 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
 def print_metadata_preview(plans: list[MetadataPlan]) -> None:
     """打印 ComicInfo 写入计划，按作者分组、逐卡片渲染。
 
-    结构对齐 print_sourcefile_preview：相同的 header / 作者分组 / 卡片
-    布局 / footer，仅卡片体换成 ComicInfo 字段块。
-
-    每张卡片头部标注本次状态：
-      - 出版商冲突
-      - 已是最新（existing == new，幂等跳过）
-      - 待写入
+    结构对齐 print_sourcefile_preview：只渲染 ``writable && changed``
+    的卡片，其余（已是最新 / 出版商冲突 / 有警告）仅作计数提示。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -130,18 +125,12 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
 
     _print_preview_header('ComicInfo 写入预览')
 
-    if plans:
-        emit(f'\n✅ 写入计划 ({len(plans)} 项):\n')
-        for idx, p, is_new in _iter_authored_cards(plans):
+    if changed:
+        emit(f'\n✅ 将写入 ({len(changed)} 个):\n')
+        for idx, p, is_new in _iter_authored_cards(changed):
             if is_new:
                 emit(f'  📂 {p.author}')
-            if not p.writable:
-                note = ' 🟡 出版商冲突'
-            elif not p.changed:
-                note = ' — 已是最新'
-            else:
-                note = ''
-            emit(f'     📄 [{idx:>3}] {p.filename}{note}')
+            emit(f'     📄 [{idx:>3}] {p.filename}')
             emit_parse_debug(p.mi)
             # ComicInfo 字段比 Path 多一级缩进，区分"数据块" vs "元信息行"
             print_metadata_fields(p.fields, p.pub_conflict, indent='         ')
@@ -155,7 +144,7 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
             emit(f'       Path:\n       {p.cbz_path}\n')
             emit()
     else:
-        emit('\n没有需要处理的 CBZ 文件。')
+        emit('\n没有需要写入的 ComicInfo.xml。')
 
     if unchanged: emit(f'➡️   已是最新: {len(unchanged)} 个')
     if conflict:  emit(f'⛔  出版商冲突: {len(conflict)} 个')
