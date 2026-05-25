@@ -15,7 +15,7 @@ import argparse
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_metadata_preview, print_run_banner
 from mt.workflow.metadata import (
-    plan_metadatas, apply_metadata_plans, process_metadata_dir,
+    plan_metadatas, apply_metadata_plans, make_process_metadata_dir,
 )
 from mt.workflow.drag import run_drag_loop, move_dir
 from mt.cli import validate_root
@@ -31,7 +31,7 @@ def cmd_metadata(args: argparse.Namespace) -> int:
         run_drag_loop(
             title='metadata 循环拖入模式',
             target=args.move_to,
-            process_one=process_metadata_dir,
+            process_one=make_process_metadata_dir(args.jobs),
         )
         return 0
 
@@ -45,8 +45,7 @@ def cmd_metadata(args: argparse.Namespace) -> int:
         return 2
 
     print_run_banner('metadata', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
-    plans = plan_metadatas(str(root))
-    emit(f'  找到文件: {len(plans)} 个 .cbz（含子目录）')
+    plans = plan_metadatas(str(root), jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
@@ -112,3 +111,6 @@ def add_metadata_args(p: argparse.ArgumentParser) -> None:
                    help='循环拖入模式')
     p.add_argument('--examples', action='store_true',
                    help='解析内置示例并展示结果，不处理任何文件')
+    p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',
+                   help='plan 阶段并行进程数（1=串行，默认；'
+                        '0=自动 min(cpu, 4)；≥ 4 个文件时才真正启用并行）')

@@ -14,7 +14,6 @@ cover.py — cover 子命令：为 CBZ 追加 0000.webp 封面
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_cover_preview, print_run_banner
@@ -49,8 +48,6 @@ def cmd_cover(args: argparse.Namespace) -> int:
         return 2
 
     print_run_banner('cover', f'CBZ 封面追加写入（mode={mode}）', root, args.apply)
-    n_files = sum(1 for _ in Path(root).rglob('*.cbz'))
-    emit(f'  找到文件: {n_files} 个 .cbz（含子目录）')
     plans = plan_covers(str(root), mode=mode, quality=args.quality, jobs=args.jobs)
 
     if not plans:

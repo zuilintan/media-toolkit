@@ -74,6 +74,9 @@ manga-toolkit-cli sourcefile --examples
 
 # 启用调试输出（放在子命令之前）
 manga-toolkit-cli --debug sourcefile --drag
+
+# 并行 plan（纯字符串处理为主，收益有限；主要用于大目录的进度反馈）
+manga-toolkit-cli sourcefile --root /path/to/manga --jobs 4
 ```
 
 ---
@@ -94,6 +97,9 @@ manga-toolkit-cli metadata --drag --move-to /path/to/sorted
 
 # 内置示例
 manga-toolkit-cli metadata --examples
+
+# 并行 plan（plan 阶段是 IO 密集 ZIP 扫描；大目录可加速）
+manga-toolkit-cli metadata --root /path/to/cbz --apply --jobs 4
 ```
 
 ### 字段映射与顺序
@@ -190,11 +196,12 @@ mt/
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
 │   ├── config.py                — 全局默认配置
 │   ├── models.py                — Chapter / Volume / MangaInfo
-│   │                              / SourcefilePlan / MetadataPlan
+│   │                              / SourcefilePlan / MetadataPlan / CoverPlan
 │   └── patterns.py              — 正则表达式常量与规则表
-├── infra/                       — 基础设施层（终端、I/O、字符串工具）
+├── infra/                       — 基础设施层（终端、I/O、字符串工具、调度）
 │   ├── utils.py                 — 纯工具函数（繁简、路径、重命名）
-│   └── console.py               — 终端输出 & 日志
+│   ├── console.py               — 终端输出 & 日志
+│   └── parallel.py              — 通用 plan 调度: run_plans (进度行 + 可选并行)
 ├── naming/                      — 名称解析与构建
 │   ├── parser.py                — parse_name(author, name) → MangaInfo
 │   └── builder.py               — build_new_name(info) → str
@@ -220,16 +227,18 @@ core/patterns      ← core/models
         ↓
 infra/utils        ← core/patterns
 infra/console      ← core/models
+infra/parallel     ← infra/console
         ↓
 naming/parser      ← core/models · core/patterns · infra/utils · infra/console
 naming/builder     ← core/models · core/patterns · infra/utils
         ↓
 workflow/drag      ← infra/utils · infra/console
 workflow/session   ← core/models · core/config · infra/utils · infra/console
-workflow/sourcefile← core/models · core/config · naming/* · infra/* · presentation · workflow/drag
-workflow/metadata  ← core/models · core/config · core/patterns · infra/console · naming/parser · presentation · workflow/drag
+workflow/sourcefile← core/models · core/config · naming/* · infra/{utils,console,parallel} · presentation · workflow/drag
+workflow/metadata  ← core/models · core/config · core/patterns · infra/{console,parallel} · naming/parser · presentation · workflow/drag
+workflow/cover     ← core/models · core/config · infra/{console,parallel} · presentation · workflow/drag
         ↓
-mt/cli/{sourcefile,metadata,examples}
+mt/cli/{sourcefile,metadata,cover,examples}
         ↓
 mt/manga_toolkit_cli.py
 ```

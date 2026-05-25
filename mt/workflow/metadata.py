@@ -31,6 +31,7 @@ from mt.naming.parser import parse_name
 from mt.infra.console import (
     SEP, print_op_result, error, debug, info, warn, emit, confirm,
 )
+from mt.infra.parallel import run_plans
 from mt.presentation.view import print_metadata_preview
 from mt.workflow.drag import move_dir
 
@@ -352,21 +353,33 @@ def apply_metadata_plan(plan: MetadataPlan) -> str:
 # 批量 plan / apply（对齐 sourcefile.plan_sourcefiles / apply_sourcefile_plans）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def plan_metadatas(root: str) -> list[MetadataPlan]:
+def _progress_line(idx: int, total: int, plan: MetadataPlan | None) -> str:
+    if plan is None:
+        return f'   ⛔ [{idx}/{total}] (无作者，已跳过)'
+    icon = ('✅' if plan.writable and plan.changed
+            else '—' if plan.writable
+            else '⛔')
+    return f'   {icon} [{idx}/{total}] {plan.filename}'
+
+
+def plan_metadatas(root: str, jobs: int = 1) -> list[MetadataPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
-    无作者的文件被静默丢弃；状态由调用方根据 ``plan.writable`` 自行判定。
+    Args:
+        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
+              ≥ 4 个文件时才启用并行。
+
+    无作者的文件（plan_metadata 返回 None）静默丢弃；状态由调用方根据
+    ``plan.writable`` 自行判定。每完成一个即打印进度行。
     """
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
-    plans: list[MetadataPlan] = []
-    for fp in sorted(root_path.rglob('*.cbz')):
-        plan = plan_metadata(str(fp))
-        if plan is not None:
-            plans.append(plan)
-    return plans
+    files = [str(fp) for fp in sorted(root_path.rglob('*.cbz'))]
+    emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
+    raw = run_plans(files, plan_metadata, jobs=jobs, progress_line=_progress_line)
+    return [p for p in raw if p is not None]
 
 
 def apply_metadata_plans(plans: list[MetadataPlan], dry_run: bool = True) -> int:
@@ -406,20 +419,22 @@ def apply_metadata_plans(plans: list[MetadataPlan], dry_run: bool = True) -> int
 # 单目录处理（drag 模式回调）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def process_metadata_dir(target_dir: Path, move_to: str) -> None:
-    """drag 模式下处理单个目录：plan → preview → confirm → apply → 可选移动。"""
-    emit(f'\n{SEP}')
-    emit(f'📂 目录: {target_dir}')
-    plans = plan_metadatas(str(target_dir))
-    print_metadata_preview(plans)
-    if not any(p.writable and p.changed for p in plans):
-        return
-    if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
-        return
-    fail = apply_metadata_plans(plans, dry_run=False)
-    if fail == 0 and move_to:
-        move_dir(target_dir, move_to)
-    elif fail > 0:
-        warn(f'{fail} 个写入失败，目录未移动，请修复后重试。')
+def make_process_metadata_dir(jobs: int = 1):
+    """构造一个绑定 jobs 的 process_metadata_dir 函数（供 drag 注入）。"""
+    def process_metadata_dir(target_dir: Path, move_to: str) -> None:
+        emit(f'\n{SEP}')
+        emit(f'📂 目录: {target_dir}')
+        plans = plan_metadatas(str(target_dir), jobs=jobs)
+        print_metadata_preview(plans)
+        if not any(p.writable and p.changed for p in plans):
+            return
+        if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
+            return
+        fail = apply_metadata_plans(plans, dry_run=False)
+        if fail == 0 and move_to:
+            move_dir(target_dir, move_to)
+        elif fail > 0:
+            warn(f'{fail} 个写入失败，目录未移动，请修复后重试。')
+    return process_metadata_dir
 
 

@@ -15,6 +15,7 @@ from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
 from mt.infra.utils import try_rename
 from mt.infra.console import print_op_result, SEP, warn, error, info, emit, confirm
+from mt.infra.parallel import run_plans
 from mt.presentation.view import print_sourcefile_preview
 from mt.workflow.drag import move_dir
 
@@ -23,40 +24,67 @@ from mt.workflow.drag import move_dir
 # 扫描 & 计划
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def scan_author_dir(author_dir: Path) -> list[SourcefilePlan]:
-    """扫描单个作者目录，仅处理 .zip / .cbz 文件。
+def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
+    """模块级 worker（picklable）：``(author, full_path_str)`` → SourcefilePlan。
 
-    DEBUG 由 print_sourcefile_preview 在渲染卡片时统一触发，
-    使每条 DEBUG 紧贴对应卡片。
+    DEBUG 由 print_sourcefile_preview 在渲染卡片时统一触发，本函数无副作用，
+    安全用于子进程。
     """
-    author = author_dir.name
-    plans: list[SourcefilePlan] = []
-    for item in sorted(author_dir.iterdir()):
-        if not item.is_file() or item.suffix.lower() not in FILE_EXTS:
-            continue
-        mi       = parse_name(author, item.stem)
-        new_name = build_new_name(mi) + item.suffix
-        plans.append(SourcefilePlan(
-            author_dir = str(author_dir),
-            author     = author,
-            old_name   = item.name,
-            new_name   = new_name,
-            info       = mi,
-        ))
-    return plans
+    author, path_str = item
+    file     = Path(path_str)
+    mi       = parse_name(author, file.stem)
+    new_name = build_new_name(mi) + file.suffix
+    return SourcefilePlan(
+        author_dir = str(file.parent),
+        author     = author,
+        old_name   = file.name,
+        new_name   = new_name,
+        info       = mi,
+    )
 
 
-def plan_sourcefiles(root: str) -> list[SourcefilePlan]:
-    """扫描根目录下所有作者目录，汇总重命名计划。"""
+def _progress_line(idx: int, total: int, plan: SourcefilePlan) -> str:
+    icon = ('🟡' if plan.needs_review
+            else '✅' if plan.changed
+            else '—')
+    return f'   {icon} [{idx}/{total}] {plan.old_name}'
+
+
+def _iter_sourcefile_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
+    """从作者目录列表展开为 ``(author, full_path)`` 列表（按 (作者, 文件名) 排序）。"""
+    items: list[tuple[str, str]] = []
+    for author_dir in author_dirs:
+        author = author_dir.name
+        for f in sorted(author_dir.iterdir()):
+            if f.is_file() and f.suffix.lower() in FILE_EXTS:
+                items.append((author, str(f)))
+    return items
+
+
+def scan_author_dir(author_dir: Path) -> list[SourcefilePlan]:
+    """扫描单个作者目录，仅处理 .zip / .cbz 文件（drag 模式入口；不打进度）。"""
+    items = _iter_sourcefile_items([author_dir])
+    return [_plan_one(it) for it in items]
+
+
+def plan_sourcefiles(root: str, jobs: int = 1) -> list[SourcefilePlan]:
+    """扫描根目录下所有作者目录，汇总重命名计划。
+
+    Args:
+        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
+              ≥ 4 个文件时才启用并行。
+
+    每完成一个文件即打印进度行。注意 plan 阶段是纯字符串处理（毫秒级），
+    并行收益有限，主要作用是统一接口 + 大规模目录下的进度反馈。
+    """
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
-    plans: list[SourcefilePlan] = []
-    for author_dir in sorted(root_path.iterdir()):
-        if author_dir.is_dir():
-            plans.extend(scan_author_dir(author_dir))
-    return plans
+    author_dirs = [d for d in sorted(root_path.iterdir()) if d.is_dir()]
+    items       = _iter_sourcefile_items(author_dirs)
+    emit(f'  找到条目: {len(items)} 项（{len(author_dirs)} 个作者目录）')
+    return run_plans(items, _plan_one, jobs=jobs, progress_line=_progress_line)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

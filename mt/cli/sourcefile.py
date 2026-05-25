@@ -52,8 +52,7 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
         return 2
 
     print_run_banner('sourcefile', '源文件批量重命名', root, args.apply)
-    plans = plan_sourcefiles(str(root))
-    emit(f'  找到条目: {len(plans)} 项')
+    plans = plan_sourcefiles(str(root), jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
@@ -125,3 +124,7 @@ def add_sourcefile_args(p: argparse.ArgumentParser) -> None:
                    help='列出所有可回退的操作记录')
     p.add_argument('--examples',      action='store_true',
                    help='运行内置解析示例（回归测试）')
+    p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',
+                   help='plan 阶段并行进程数（1=串行，默认；'
+                        '0=自动 min(cpu, 4)；plan 阶段是纯字符串处理'
+                        '故并行收益有限）')
