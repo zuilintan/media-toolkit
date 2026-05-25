@@ -1,5 +1,5 @@
 """
-comicinfo.py — ComicInfo.xml 生成、读取与写入
+comicinfo.py — ComicInfo.xml 生成、读取与写入（comicinfo 子命令的工作流层）
 
 将 MangaInfo 转换为 ComicInfo v2.1 XML 并写入 CBZ/ZIP 文件。
 
@@ -10,7 +10,7 @@ Number 字段规则（与 CH. 同级且互斥）:
 
 Format 字段：part_tag 是合集类（总集篇等）时写入；否则空。
 
-依赖: models / patterns / config / parser / console / presentation
+依赖: models / patterns / config / parser / console / presentation / drag
 """
 
 from __future__ import annotations
@@ -18,18 +18,21 @@ import os
 import re
 import time
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from mt.core.models import MangaInfo, fmt_num
+from mt.core.models import CbzPlan, MangaInfo, fmt_num
 from mt.core import patterns as P
 from mt.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
-from mt.infra.console import SEP, SEP2, error, debug, emit
-from mt.presentation.view import print_comicinfo_fields
+from mt.naming.parser import parse_name
+from mt.infra.console import (
+    SEP, print_op_result, error, debug, info, warn, emit, confirm,
+)
+from mt.presentation.view import print_comicinfo_preview
+from mt.workflow.drag import move_dir
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
 WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
@@ -241,9 +244,9 @@ def _comicinfo_zinfo(inherited_attr: int) -> zipfile.ZipInfo:
 
 
 def _inherit_attr(infos: list[zipfile.ZipInfo]) -> int:
-    for info in infos:
-        if info.external_attr:
-            return info.external_attr
+    for ifo in infos:
+        if ifo.external_attr:
+            return ifo.external_attr
     return 0x20  # DOS Archive 默认
 
 
@@ -271,67 +274,26 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 单文件处理（两阶段：plan → apply，与 rename 的 plan_renames / apply_rename_plans 对称）
+# 单文件 plan / apply（纯函数；批量入口见下）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@dataclass
-class CbzPlan:
-    """单个 CBZ 的 ComicInfo 写入计划（解析阶段产出，写入阶段消费）。"""
-    cbz_path:     str
-    mi:           MangaInfo
-    publisher:    str | None
-    pub_conflict: list[str] | None
-    page_count:   int
-    tags_val:     str
-    fields:       dict[str, str]
-
-    @property
-    def writable(self) -> bool:
-        """是否可写入：无出版商冲突即可。"""
-        return not self.pub_conflict
-
-
-def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
-    """构建单个 CBZ 的写入计划，并在解析前先输出卡片 banner。
-
-    banner（SEP + 📦 文件名）有意提前到 parse_name 之前输出，
-    使 ``--debug`` 模式下 ``parse_name`` 的 DEBUG 行落在当前卡片内，
-    而不是漏到上一张卡片的 SEP 之外。
+def plan_cbz(cbz_path: str) -> CbzPlan | None:
+    """构建单个 CBZ 的写入计划（纯函数，不产生任何输出）。
 
     Returns:
-        (plan, status):
-            status='skip' (无作者)        → plan=None（不输出 banner）
-            status='warn' (出版商冲突)    → plan 返回（用于显示，但不可写）
-            status='ok'                    → plan 可写
+        ``None`` — 文件名无法提取作者（跳过）；
+        否则返回 CbzPlan；``plan.writable`` 标识能否写入。
     """
-    from mt.naming.parser import parse_name, emit_parse_debug  # 在此导入，避免顶层循环
-
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
     if not author:
-        return None, 'skip'
-
-    # banner 提前到 parse_name 之前 → DEBUG 输出在卡片内
-    emit(f'\n{SEP}')
-    emit(f'  📦  {filename}')
+        return None
 
     mi                      = parse_name(author, Path(filename).stem)
-    emit_parse_debug(mi)
     publisher, pub_conflict = find_publisher(cbz_path)
     page_count, tags_val    = read_cbz_meta(cbz_path)
     fields                  = collect_fields(mi, publisher, tags_val, page_count)
-    plan = CbzPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
-    return plan, ('warn' if pub_conflict else 'ok')
-
-
-def print_cbz_plan(plan: CbzPlan) -> None:
-    """打印单个 CBZ 计划的字段、警告与冲突提示（banner 已由 plan_cbz 输出）。"""
-    emit()
-    print_comicinfo_fields(plan.fields, plan.pub_conflict)
-    for w in plan.mi.warnings:
-        emit(f'     🟡 {w}')
-    if plan.pub_conflict:
-        emit(f'\n  ⛔  出版商冲突，跳过本文件，请先解决上述异常。')
+    return CbzPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
 
 
 def apply_cbz_plan(plan: CbzPlan) -> str:
@@ -351,3 +313,77 @@ def apply_cbz_plan(plan: CbzPlan) -> str:
     except Exception as e:
         error(f'{filename} — {e}')
         return 'error'
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 批量 plan / apply（对齐 scanner.plan_renames / apply_rename_plans）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def plan_cbzs(root: str) -> list[CbzPlan]:
+    """递归扫描 root 下所有 .cbz，返回 plan 列表。
+
+    无作者的文件被静默丢弃；状态由调用方根据 ``plan.writable`` 自行判定。
+    """
+    root_path = Path(root)
+    if not root_path.exists():
+        error(f'目录不存在: {root}')
+        return []
+    plans: list[CbzPlan] = []
+    for fp in sorted(root_path.rglob('*.cbz')):
+        plan = plan_cbz(str(fp))
+        if plan is not None:
+            plans.append(plan)
+    return plans
+
+
+def apply_cbz_plans(plans: list[CbzPlan], dry_run: bool = True) -> int:
+    """整批写入 ComicInfo.xml。
+
+    Args:
+        plans:   预览阶段产出的 CbzPlan 列表（含 writable / 不可写两类）。
+        dry_run: True 时仅预览提示，不实际写入。
+
+    Returns:
+        失败数量（dry_run 时返回 0）。
+    """
+    if dry_run:
+        info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')
+        return 0
+
+    ok_n = fail = skip = 0
+    for plan in plans:
+        if not plan.writable:
+            warn(f'跳过（出版商冲突）: {os.path.basename(plan.cbz_path)}')
+            skip += 1
+            continue
+        result = apply_cbz_plan(plan)
+        if result == 'ok':
+            ok_n += 1
+        else:
+            fail += 1
+
+    print_op_result(ok_n, fail, skip)
+    return fail
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 单目录处理（drag 模式回调）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def process_cbz_dir(target_dir: Path, move_to: str) -> None:
+    """drag 模式下处理单个目录：plan → preview → confirm → apply → 可选移动。"""
+    emit(f'\n{SEP}')
+    emit(f'📂 目录: {target_dir}')
+    plans = plan_cbzs(str(target_dir))
+    print_comicinfo_preview(plans)
+    if not any(p.writable for p in plans):
+        return
+    if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
+        return
+    fail = apply_cbz_plans(plans, dry_run=False)
+    if fail == 0 and move_to:
+        move_dir(target_dir, move_to)
+    elif fail > 0:
+        warn(f'{fail} 个写入失败，目录未移动，请修复后重试。')
+
+

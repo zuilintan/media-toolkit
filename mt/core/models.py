@@ -5,6 +5,7 @@ models.py — 核心数据模型
 """
 
 from __future__ import annotations
+import os
 from dataclasses import dataclass
 
 
@@ -144,24 +145,20 @@ class MangaInfo:
 
 @dataclass
 class RenamePlan:
-    """单个条目的重命名计划。
+    """单个文件的重命名计划（rename 仅处理 .zip / .cbz 文件）。
 
     Attributes:
         author_dir: 作者目录路径（字符串，便于 JSON 序列化）。
         author:     作者名。
-        old_name:   原始文件/目录名（含后缀）。
-        new_name:   目标文件/目录名（含后缀）。
+        old_name:   原始文件名（含后缀）。
+        new_name:   目标文件名（含后缀）。
         info:       解析后的 MangaInfo（解析失败时为 None）。
-        is_file:    True 为文件，False 为目录。
-        suffix:     文件后缀（含点号），目录时为空字符串。
     """
     author_dir: str
     author:     str
     old_name:   str
     new_name:   str
     info:       MangaInfo | None
-    is_file:    bool
-    suffix:     str
 
     @property
     def changed(self) -> bool:
@@ -172,3 +169,35 @@ class RenamePlan:
     def needs_review(self) -> bool:
         """主标题过短（< 2 字），需人工审核。"""
         return self.info is not None and len(self.info.main_title) < 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CbzPlan
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class CbzPlan:
+    """单个 CBZ 的 ComicInfo 写入计划（解析阶段产出，写入阶段消费）。
+
+    与 RenamePlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
+    """
+    cbz_path:     str
+    mi:           MangaInfo
+    publisher:    str | None
+    pub_conflict: list[str] | None
+    page_count:   int
+    tags_val:     str
+    fields:       dict[str, str]
+
+    @property
+    def writable(self) -> bool:
+        """是否可写入：无出版商冲突即可。"""
+        return not self.pub_conflict
+
+    @property
+    def author(self) -> str:
+        return self.mi.author
+
+    @property
+    def filename(self) -> str:
+        return os.path.basename(self.cbz_path)
