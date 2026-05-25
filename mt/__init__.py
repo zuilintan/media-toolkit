@@ -22,4 +22,10 @@ console 命令:
     comicinfo  — 向 CBZ 写入 ComicInfo.xml
 """
 
-__version__ = "0.1.1"
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("manga-toolkit")
+except PackageNotFoundError:
+    # 源码运行且未安装包时（极少见，pyproject.toml 不应被读取以避免引入 toml 依赖）
+    __version__ = "0.0.0+unknown"
