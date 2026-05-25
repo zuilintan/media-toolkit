@@ -14,6 +14,7 @@ cover.py — cover 子命令：为 CBZ 追加 0000.webp 封面
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_cover_preview, print_run_banner
@@ -34,7 +35,7 @@ def cmd_cover(args: argparse.Namespace) -> int:
         run_drag_loop(
             title='cover 循环拖入模式',
             target=args.move_to,
-            process_one=make_process_cover_dir(mode, args.quality),
+            process_one=make_process_cover_dir(mode, args.quality, args.jobs),
         )
         return 0
 
@@ -48,8 +49,9 @@ def cmd_cover(args: argparse.Namespace) -> int:
         return 2
 
     print_run_banner('cover', f'CBZ 封面追加写入（mode={mode}）', root, args.apply)
-    plans = plan_covers(str(root), mode=mode, quality=args.quality)
-    emit(f'  找到文件: {len(plans)} 个 .cbz（含子目录）')
+    n_files = sum(1 for _ in Path(root).rglob('*.cbz'))
+    emit(f'  找到文件: {n_files} 个 .cbz（含子目录）')
+    plans = plan_covers(str(root), mode=mode, quality=args.quality, jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
@@ -119,3 +121,6 @@ def add_cover_args(p: argparse.ArgumentParser) -> None:
     p.add_argument('--quality', type=int, default=DEFAULT_QUALITY,
                    metavar='N',
                    help=f'WebP 质量（1-100，默认 {DEFAULT_QUALITY}）')
+    p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',
+                   help='plan 阶段并行进程数（1=串行，默认；'
+                        '0=自动 min(cpu, 4)；≥ 4 个文件时才会真正启用并行）')

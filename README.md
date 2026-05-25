@@ -144,9 +144,16 @@ manga-toolkit-cli cover --root /path/to/cbz --apply
 # smartcrop 显著性裁剪（横图保留主体更稳）
 manga-toolkit-cli cover --root /path/to/cbz --apply --smart
 
+# 并行处理（plan 阶段；4 个文件以上才会真正启用）
+manga-toolkit-cli cover --root /path/to/cbz --apply --jobs 4
+manga-toolkit-cli cover --root /path/to/cbz --apply --jobs 0   # 自动 min(cpu, 4)
+
 # 循环拖入
 manga-toolkit-cli cover --drag --move-to /path/to/sorted
 ```
+
+每处理一个 cbz 即打印进度行 `✅ [12/345] 文件名`，便于大批量任务跟踪。
+plan 阶段是 CPU 密集的解码+裁剪+编码，apply 阶段（ZIP 追加）已经很快不并行。
 
 ### 行为约定
 

@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import time
 import zipfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
 
@@ -274,19 +275,78 @@ def apply_cover_plan(plan: CoverPlan) -> str:
 # 批量 plan / apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _resolve_jobs(jobs: int) -> int:
+    """jobs=0 → 自动 min(cpu, 4)；其余按用户指定，至少 1。
+
+    上限 4 而非全部 cpu 是平衡点：解码/编码 CPU 密集，4 进程能拿到
+    大部分加速；再多增益递减，且 spawn 启动成本与 IPC 字节传输（webp
+    bytes 几十 KB / 个）开始抵消收益。
+    """
+    if jobs == 0:
+        return max(1, min(os.cpu_count() or 1, 4))
+    return max(1, jobs)
+
+
+def _progress_line(idx: int, total: int, plan: CoverPlan) -> str:
+    icon = ('✅' if plan.writable and plan.changed
+            else '➡️ ' if plan.writable
+            else '⛔')
+    return f'   {icon} [{idx}/{total}] {plan.filename}'
+
+
 def plan_covers(
     root:    str,
     mode:    str = 'center',
     quality: int = DEFAULT_QUALITY,
+    jobs:    int = 1,
 ) -> list[CoverPlan]:
-    """递归扫描 root 下所有 .cbz，返回 plan 列表。"""
+    """递归扫描 root 下所有 .cbz，返回 plan 列表。
+
+    Args:
+        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动选 min(cpu,4)。
+              ≥ 4 个文件时才启用并行（避免 spawn 启动成本超过收益）。
+
+    每完成一个文件即打印进度行，便于大批量任务跟踪。
+    """
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
+    files = sorted(root_path.rglob('*.cbz'))
+    if not files:
+        return []
+
+    n_jobs = _resolve_jobs(jobs)
+    total  = len(files)
     plans: list[CoverPlan] = []
-    for fp in sorted(root_path.rglob('*.cbz')):
-        plans.append(plan_cover(str(fp), mode=mode, quality=quality))
+
+    if n_jobs > 1 and total >= 4:
+        emit(f'  ⚙️  并行处理（{n_jobs} 进程）...')
+        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
+            futures = {
+                ex.submit(plan_cover, str(fp), mode, quality): fp
+                for fp in files
+            }
+            for i, fut in enumerate(as_completed(futures), 1):
+                fp = futures[fut]
+                try:
+                    plan = fut.result()
+                except Exception as e:
+                    plan = CoverPlan(
+                        cbz_path=str(fp), src_name=None, src_size=None,
+                        dst_size=None, mode=mode, webp_bytes=None,
+                        existing_bytes=None, error=f'子进程异常: {e}',
+                    )
+                plans.append(plan)
+                emit(_progress_line(i, total, plan), flush=True)
+        # 并行 as_completed 顺序非确定 → 按路径排序保证输出稳定
+        plans.sort(key=lambda p: p.cbz_path)
+    else:
+        for i, fp in enumerate(files, 1):
+            plan = plan_cover(str(fp), mode=mode, quality=quality)
+            plans.append(plan)
+            emit(_progress_line(i, total, plan), flush=True)
+
     return plans
 
 
@@ -326,14 +386,14 @@ def apply_cover_plans(plans: list[CoverPlan], dry_run: bool = True) -> int:
 # 单目录处理（drag 模式回调）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def make_process_cover_dir(mode: str, quality: int):
-    """构造一个绑定 mode/quality 的 process_cover_dir 函数（供 drag 注入）。"""
+def make_process_cover_dir(mode: str, quality: int, jobs: int = 1):
+    """构造一个绑定 mode/quality/jobs 的 process_cover_dir 函数（供 drag 注入）。"""
     from mt.presentation.view import print_cover_preview   # 延迟导入避免循环
 
     def process_cover_dir(target_dir: Path, move_to: str) -> None:
         emit(f'\n{SEP}')
         emit(f'📂 目录: {target_dir}')
-        plans = plan_covers(str(target_dir), mode=mode, quality=quality)
+        plans = plan_covers(str(target_dir), mode=mode, quality=quality, jobs=jobs)
         print_cover_preview(plans)
         if not any(p.writable and p.changed for p in plans):
             return
