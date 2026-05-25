@@ -2,10 +2,10 @@
 view.py — 领域对象的终端渲染
 
 提供:
-  - print_run_banner()          — 命令运行 banner（rename / comicinfo 共用）
-  - print_rename_preview()      — 重命名计划预览（按作者分组的卡片表）
-  - print_comicinfo_preview()   — ComicInfo 写入计划预览（结构对齐 rename）
-  - print_comicinfo_fields()    — ComicInfo 字段块（被 preview 卡片体复用）
+  - print_run_banner()          — 命令运行 banner（sourcefile / metadata 共用）
+  - print_sourcefile_preview()  — 源文件重命名计划预览（按作者分组的卡片表）
+  - print_metadata_preview()    — ComicInfo 写入计划预览（结构对齐 sourcefile）
+  - print_metadata_fields()     — ComicInfo 字段块（被 preview 卡片体复用）
 
 依赖: core.models / core.config / infra.console / naming.parser
 """
@@ -14,14 +14,14 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Iterator
 
-from mt.core.models import CbzPlan, MangaInfo, RenamePlan
+from mt.core.models import MangaInfo, MetadataPlan, SourceFilePlan
 from mt.core.config import COMICINFO_TAGS
 from mt.infra.console import SEP, SEP2, RED, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 运行 banner（rename / comicinfo 共用）
+# 运行 banner（sourcefile / metadata 共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) -> None:
@@ -39,7 +39,7 @@ def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) ->
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 卡片骨架（rename / comicinfo 共用）
+# 卡片骨架（sourcefile / metadata 共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _print_preview_header(title: str) -> None:
@@ -67,7 +67,7 @@ def _iter_authored_cards(items: Iterable[object]) -> Iterator[tuple[int, object,
 
 
 def _emit_flag_line(mi: MangaInfo) -> None:
-    """rename 卡片体专用：把 MangaInfo 的关键字段折成一行 Flag。"""
+    """sourcefile 卡片体专用：把 MangaInfo 的关键字段折成一行 Flag。"""
     flags: list[str] = []
     if mi.language:      flags.append(mi.language)
     if mi.is_uncensored: flags.append('uncensored')
@@ -83,11 +83,11 @@ def _emit_flag_line(mi: MangaInfo) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 重命名预览
+# 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_rename_preview(plans: list[RenamePlan]) -> None:
-    """以可读格式打印重命名计划。"""
+def print_sourcefile_preview(plans: list[SourceFilePlan]) -> None:
+    """以可读格式打印源文件重命名计划。"""
     changed   = [p for p in plans if p.changed]
     unchanged = [p for p in plans if not p.changed]
     reviews   = [p for p in plans if p.needs_review]
@@ -126,13 +126,13 @@ def print_rename_preview(plans: list[RenamePlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ComicInfo 预览（结构与 rename 对齐）
+# Metadata 预览（结构与 sourcefile 对齐）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_comicinfo_preview(plans: list[CbzPlan]) -> None:
+def print_metadata_preview(plans: list[MetadataPlan]) -> None:
     """打印 ComicInfo 写入计划，按作者分组、逐卡片渲染。
 
-    结构对齐 print_rename_preview：相同的 header / 作者分组 / 卡片
+    结构对齐 print_sourcefile_preview：相同的 header / 作者分组 / 卡片
     布局 / footer，仅卡片体换成 ComicInfo 字段块。
     """
     writable = [p for p in plans if p.writable]
@@ -149,7 +149,7 @@ def print_comicinfo_preview(plans: list[CbzPlan]) -> None:
             note = ' 🟡 出版商冲突' if not p.writable else ''
             emit(f'     📄 [{idx:>3}] {p.filename}{note}')
             emit_parse_debug(p.mi)
-            print_comicinfo_fields(p.fields, p.pub_conflict, indent='       ')
+            print_metadata_fields(p.fields, p.pub_conflict, indent='       ')
             for w in p.mi.warnings:
                 emit(f'       🟡 {w}')
             emit(f'       Path:\n       {p.cbz_path}\n')
@@ -167,10 +167,10 @@ def print_comicinfo_preview(plans: list[CbzPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ComicInfo 字段块
+# Metadata 字段块（ComicInfo 字段名为 spec 名，不做改动）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_comicinfo_fields(
+def print_metadata_fields(
     fields:       dict[str, str],
     pub_conflict: list[str] | None = None,
     *,

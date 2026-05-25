@@ -459,8 +459,7 @@ def emit_parse_debug(mi: MangaInfo) -> None:
     """Emit ``parse_name`` 的 DEBUG 摘要行（DEBUG 级别下生效）。
 
     parse_name 本身只做解析、不输出 DEBUG，由调用方在最合适的时机触发：
-      - comicinfo plan_cbz：紧跟卡片 banner 之后；
-      - rename print_preview：渲染 changed 卡片时；
+      - print_sourcefile_preview / print_metadata_preview：渲染卡片时；
       - examples：每条示例渲染时。
 
     funcname 锁定为 ``parse_name``，与原先 parse_name 内部 debug() 的输出一致。

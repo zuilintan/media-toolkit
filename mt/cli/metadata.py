@@ -1,10 +1,10 @@
 """
-comicinfo.py — comicinfo 子命令：向 CBZ 写入 ComicInfo.xml
+metadata.py — metadata 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入 → 可选移动。
-与 cli/rename.py 结构对称。
+与 cli/sourcefile.py 结构对称。
 
-依赖: workflow.comicinfo / workflow.drag / infra.console / presentation
+依赖: workflow.metadata / workflow.drag / infra.console / presentation
       / cli.examples
 """
 
@@ -14,16 +14,16 @@ import argparse
 from pathlib import Path
 
 from mt.infra.console import SEP2, emit, confirm, print_summary
-from mt.presentation.view import print_comicinfo_preview, print_run_banner
-from mt.workflow.comicinfo import (
-    plan_cbzs, apply_cbz_plans, process_cbz_dir,
+from mt.presentation.view import print_metadata_preview, print_run_banner
+from mt.workflow.metadata import (
+    plan_metadata_files, apply_metadata_plans, process_metadata_dir,
 )
 from mt.workflow.drag import run_drag_loop, move_dir
-from mt.cli.examples import run_comicinfo_examples
+from mt.cli.examples import run_metadata_examples
 
 
 def _validate_root(root_arg: str) -> Path | None:
-    """统一的 --root 校验（与 cli/rename 对齐）。返回 None 表示已报错。"""
+    """统一的 --root 校验（与 cli/sourcefile 对齐）。返回 None 表示已报错。"""
     if not root_arg:
         emit('❌ 请指定 --root <目录>'); return None
     root = Path(root_arg).resolve()
@@ -34,16 +34,16 @@ def _validate_root(root_arg: str) -> Path | None:
     return root
 
 
-def cmd_comicinfo(args: argparse.Namespace) -> int:
-    """comicinfo 子命令调度。"""
+def cmd_metadata(args: argparse.Namespace) -> int:
+    """metadata 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
-        return 0 if run_comicinfo_examples() == 0 else 1
+        return 0 if run_metadata_examples() == 0 else 1
     if args.drag:
         run_drag_loop(
-            title='comicinfo 循环拖入模式',
+            title='metadata 循环拖入模式',
             target=args.move_to,
-            process_one=process_cbz_dir,
+            process_one=process_metadata_dir,
         )
         return 0
 
@@ -56,8 +56,8 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('comicinfo', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
-    plans = plan_cbzs(str(root))
+    print_run_banner('metadata', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
+    plans = plan_metadata_files(str(root))
     emit(f'  找到文件: {len(plans)} 个 .cbz（含子目录）')
 
     if not plans:
@@ -65,9 +65,9 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_comicinfo_preview(plans)
+    print_metadata_preview(plans)
 
-    # ── 预览汇总（与 rename 对齐） ────────────────────────────────────────────
+    # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_writable = sum(1 for p in plans if p.writable)
     n_conflict = sum(1 for p in plans if not p.writable)
     n_warn     = sum(1 for p in plans if p.mi.warnings)
@@ -100,7 +100,7 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
         emit('  操作已取消。')
         return 0
 
-    apply_cbz_plans(plans, dry_run=False)
+    apply_metadata_plans(plans, dry_run=False)
     if args.move_to:
         for sub in sorted(root.iterdir()):
             if sub.is_dir():
@@ -109,8 +109,8 @@ def cmd_comicinfo(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_comicinfo_args(p: argparse.ArgumentParser) -> None:
-    """挂载 comicinfo 子命令的参数。"""
+def add_metadata_args(p: argparse.ArgumentParser) -> None:
+    """挂载 metadata 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--move-to', default='', dest='move_to',

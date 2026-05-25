@@ -1,5 +1,5 @@
 """
-comicinfo.py — ComicInfo.xml 生成、读取与写入（comicinfo 子命令的工作流层）
+metadata.py — ComicInfo.xml 生成、读取与写入（metadata 子命令的工作流层）
 
 将 MangaInfo 转换为 ComicInfo v2.1 XML 并写入 CBZ/ZIP 文件。
 
@@ -22,7 +22,7 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from mt.core.models import CbzPlan, MangaInfo, fmt_num
+from mt.core.models import MangaInfo, MetadataPlan, fmt_num
 from mt.core import patterns as P
 from mt.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
@@ -31,7 +31,7 @@ from mt.naming.parser import parse_name
 from mt.infra.console import (
     SEP, print_op_result, error, debug, info, warn, emit, confirm,
 )
-from mt.presentation.view import print_comicinfo_preview
+from mt.presentation.view import print_metadata_preview
 from mt.workflow.drag import move_dir
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
@@ -277,12 +277,12 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 # 单文件 plan / apply（纯函数；批量入口见下）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def plan_cbz(cbz_path: str) -> CbzPlan | None:
-    """构建单个 CBZ 的写入计划（纯函数，不产生任何输出）。
+def plan_metadata(cbz_path: str) -> MetadataPlan | None:
+    """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，不产生任何输出）。
 
     Returns:
         ``None`` — 文件名无法提取作者（跳过）；
-        否则返回 CbzPlan；``plan.writable`` 标识能否写入。
+        否则返回 MetadataPlan；``plan.writable`` 标识能否写入。
     """
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
@@ -293,10 +293,10 @@ def plan_cbz(cbz_path: str) -> CbzPlan | None:
     publisher, pub_conflict = find_publisher(cbz_path)
     page_count, tags_val    = read_cbz_meta(cbz_path)
     fields                  = collect_fields(mi, publisher, tags_val, page_count)
-    return CbzPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
+    return MetadataPlan(cbz_path, mi, publisher, pub_conflict, page_count, tags_val, fields)
 
 
-def apply_cbz_plan(plan: CbzPlan) -> str:
+def apply_metadata_plan(plan: MetadataPlan) -> str:
     """执行单个 CBZ 的 ComicInfo.xml 写入。
 
     Returns:
@@ -316,10 +316,10 @@ def apply_cbz_plan(plan: CbzPlan) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 批量 plan / apply（对齐 scanner.plan_renames / apply_rename_plans）
+# 批量 plan / apply（对齐 sourcefile.plan_sourcefiles / apply_sourcefile_plans）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def plan_cbzs(root: str) -> list[CbzPlan]:
+def plan_metadata_files(root: str) -> list[MetadataPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     无作者的文件被静默丢弃；状态由调用方根据 ``plan.writable`` 自行判定。
@@ -328,19 +328,19 @@ def plan_cbzs(root: str) -> list[CbzPlan]:
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
-    plans: list[CbzPlan] = []
+    plans: list[MetadataPlan] = []
     for fp in sorted(root_path.rglob('*.cbz')):
-        plan = plan_cbz(str(fp))
+        plan = plan_metadata(str(fp))
         if plan is not None:
             plans.append(plan)
     return plans
 
 
-def apply_cbz_plans(plans: list[CbzPlan], dry_run: bool = True) -> int:
+def apply_metadata_plans(plans: list[MetadataPlan], dry_run: bool = True) -> int:
     """整批写入 ComicInfo.xml。
 
     Args:
-        plans:   预览阶段产出的 CbzPlan 列表（含 writable / 不可写两类）。
+        plans:   预览阶段产出的 MetadataPlan 列表（含 writable / 不可写两类）。
         dry_run: True 时仅预览提示，不实际写入。
 
     Returns:
@@ -356,7 +356,7 @@ def apply_cbz_plans(plans: list[CbzPlan], dry_run: bool = True) -> int:
             warn(f'跳过（出版商冲突）: {os.path.basename(plan.cbz_path)}')
             skip += 1
             continue
-        result = apply_cbz_plan(plan)
+        result = apply_metadata_plan(plan)
         if result == 'ok':
             ok_n += 1
         else:
@@ -370,17 +370,17 @@ def apply_cbz_plans(plans: list[CbzPlan], dry_run: bool = True) -> int:
 # 单目录处理（drag 模式回调）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def process_cbz_dir(target_dir: Path, move_to: str) -> None:
+def process_metadata_dir(target_dir: Path, move_to: str) -> None:
     """drag 模式下处理单个目录：plan → preview → confirm → apply → 可选移动。"""
     emit(f'\n{SEP}')
     emit(f'📂 目录: {target_dir}')
-    plans = plan_cbzs(str(target_dir))
-    print_comicinfo_preview(plans)
+    plans = plan_metadata_files(str(target_dir))
+    print_metadata_preview(plans)
     if not any(p.writable for p in plans):
         return
     if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
         return
-    fail = apply_cbz_plans(plans, dry_run=False)
+    fail = apply_metadata_plans(plans, dry_run=False)
     if fail == 0 and move_to:
         move_dir(target_dir, move_to)
     elif fail > 0:

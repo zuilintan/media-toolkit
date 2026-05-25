@@ -1,10 +1,10 @@
 """
-rename.py — rename 子命令：漫画文件（.zip / .cbz）批量重命名
+sourcefile.py — sourcefile 子命令：源文件（.zip / .cbz）批量重命名
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入 → 可选移动。
-与 cli/comicinfo.py 结构对称。
+与 cli/metadata.py 结构对称。
 
-依赖: workflow.scanner / workflow.drag / workflow.session / infra.console
+依赖: workflow.sourcefile / workflow.drag / workflow.session / infra.console
       / presentation / cli.examples
 """
 
@@ -14,15 +14,17 @@ import argparse
 from pathlib import Path
 
 from mt.infra.console import SEP2, emit, confirm, print_summary
-from mt.presentation.view import print_rename_preview, print_run_banner
-from mt.workflow.scanner import plan_renames, apply_rename_plans, process_author_dir
+from mt.presentation.view import print_sourcefile_preview, print_run_banner
+from mt.workflow.sourcefile import (
+    plan_sourcefiles, apply_sourcefile_plans, process_sourcefile_dir,
+)
 from mt.workflow.drag import run_drag_loop, move_dir
 from mt.workflow.session import list_sessions, rollback
-from mt.cli.examples import run_rename_examples
+from mt.cli.examples import run_sourcefile_examples
 
 
 def _validate_root(root_arg: str) -> Path | None:
-    """统一的 --root 校验（与 cli/comicinfo 对齐）。返回 None 表示已报错。"""
+    """统一的 --root 校验（与 cli/metadata 对齐）。返回 None 表示已报错。"""
     if not root_arg:
         emit('❌ 请指定 --root <目录>'); return None
     root = Path(root_arg).resolve()
@@ -33,11 +35,11 @@ def _validate_root(root_arg: str) -> Path | None:
     return root
 
 
-def cmd_rename(args: argparse.Namespace) -> int:
-    """rename 子命令调度。"""
+def cmd_sourcefile(args: argparse.Namespace) -> int:
+    """sourcefile 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
-        return 0 if run_rename_examples() == 0 else 1
+        return 0 if run_sourcefile_examples() == 0 else 1
     if args.list_sessions:
         list_sessions()
         return 0
@@ -46,9 +48,9 @@ def cmd_rename(args: argparse.Namespace) -> int:
         return 0
     if args.drag:
         run_drag_loop(
-            title='rename 循环拖入模式',
+            title='sourcefile 循环拖入模式',
             target=args.move_to,
-            process_one=process_author_dir,
+            process_one=process_sourcefile_dir,
         )
         return 0
 
@@ -61,8 +63,8 @@ def cmd_rename(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('rename', '漫画文件批量重命名', root, args.apply)
-    plans = plan_renames(str(root))
+    print_run_banner('sourcefile', '源文件批量重命名', root, args.apply)
+    plans = plan_sourcefiles(str(root))
     emit(f'  找到条目: {len(plans)} 项')
 
     if not plans:
@@ -70,9 +72,9 @@ def cmd_rename(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_rename_preview(plans)
+    print_sourcefile_preview(plans)
 
-    # ── 预览汇总（采用 print_summary 风格，与 comicinfo 一致） ───────────────
+    # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.changed)
     n_review    = sum(1 for p in plans if p.needs_review)
     n_unchanged = sum(1 for p in plans if not p.changed)
@@ -106,7 +108,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         emit('  操作已取消。')
         return 0
 
-    apply_rename_plans(plans, dry_run=False)
+    apply_sourcefile_plans(plans, dry_run=False)
     if args.move_to:
         for author_dir in sorted(root.iterdir()):
             if author_dir.is_dir():
@@ -115,8 +117,8 @@ def cmd_rename(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_rename_args(p: argparse.ArgumentParser) -> None:
-    """挂载 rename 子命令的参数。"""
+def add_sourcefile_args(p: argparse.ArgumentParser) -> None:
+    """挂载 sourcefile 子命令的参数。"""
     p.add_argument('--root',          default='',
                    help='漫画根目录（批量模式，目录下按作者目录组织）')
     p.add_argument('--move-to',       default='', dest='move_to',

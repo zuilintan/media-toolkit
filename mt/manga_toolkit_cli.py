@@ -1,9 +1,9 @@
 """
 manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 
-整合了原先两个独立工具：
-  - 子命令 rename     → 漫画文件 / 目录批量重命名（原 manga-rename）
-  - 子命令 comicinfo  → 向 CBZ 写入 ComicInfo.xml（原 manga-comicinfo）
+整合两个子命令:
+  - sourcefile → 源文件（.zip / .cbz）批量重命名（原 rename）
+  - metadata   → 向 CBZ 写入 ComicInfo.xml 元数据（原 comicinfo）
 
 模块名遵循 PEP 8（下划线），对外暴露的 console 命令则使用连字符
 ``manga-toolkit-cli``（CLI 惯例）。两者解耦，互不影响。
@@ -11,17 +11,17 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 子命令实现位于 mt.cli 包；本模块仅负责参数解析与调度。
 
 用法示例:
-  manga-toolkit-cli rename --drag                          # 循环拖入模式（推荐）
-  manga-toolkit-cli rename --drag --target /sorted         # 拖入后移动到指定目录
-  manga-toolkit-cli rename --root /path/to/manga           # 批量预览
-  manga-toolkit-cli rename --root /path/to/manga --apply   # 批量执行
-  manga-toolkit-cli rename --rollback                      # 回退上次操作
-  manga-toolkit-cli rename --list-sessions                 # 列出所有操作记录
-  manga-toolkit-cli rename --examples                      # 内置解析示例
+  manga-toolkit-cli sourcefile --drag                          # 循环拖入模式（推荐）
+  manga-toolkit-cli sourcefile --drag --move-to /sorted        # 拖入后移动到指定目录
+  manga-toolkit-cli sourcefile --root /path/to/manga           # 批量预览
+  manga-toolkit-cli sourcefile --root /path/to/manga --apply   # 批量执行
+  manga-toolkit-cli sourcefile --rollback                      # 回退上次操作
+  manga-toolkit-cli sourcefile --list-sessions                 # 列出所有操作记录
+  manga-toolkit-cli sourcefile --examples                      # 内置解析示例
 
-  manga-toolkit-cli comicinfo --root /path/to/cbz          # 预览
-  manga-toolkit-cli comicinfo --root /path/to/cbz --apply  # 写入 ComicInfo.xml
-  manga-toolkit-cli comicinfo --examples                   # 内置示例
+  manga-toolkit-cli metadata --root /path/to/cbz               # 预览
+  manga-toolkit-cli metadata --root /path/to/cbz --apply       # 写入 ComicInfo.xml
+  manga-toolkit-cli metadata --examples                        # 内置示例
 
 兼容性: 也可使用 `python -m mt <subcommand> ...`。
 """
@@ -32,25 +32,25 @@ import argparse
 import sys
 
 from mt.infra.console import setup_logging
-from mt.cli.rename import cmd_rename, add_rename_args
-from mt.cli.comicinfo import cmd_comicinfo, add_comicinfo_args
+from mt.cli.sourcefile import cmd_sourcefile, add_sourcefile_args
+from mt.cli.metadata   import cmd_metadata,   add_metadata_args
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='manga-toolkit-cli',
-        description='manga-toolkit 统一命令行工具（rename + comicinfo）',
+        description='manga-toolkit 统一命令行工具（sourcefile + metadata）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '示例:\n'
-            '  manga-toolkit-cli rename --drag\n'
-            '  manga-toolkit-cli rename --drag --target /sorted\n'
-            '  manga-toolkit-cli rename --root /path/to/manga --apply\n'
-            '  manga-toolkit-cli rename --rollback\n'
-            '  manga-toolkit-cli rename --examples\n'
-            '  manga-toolkit-cli comicinfo --root /path/to/cbz\n'
-            '  manga-toolkit-cli comicinfo --root /path/to/cbz --apply\n'
-            '  manga-toolkit-cli comicinfo --examples\n'
+            '  manga-toolkit-cli sourcefile --drag\n'
+            '  manga-toolkit-cli sourcefile --drag --move-to /sorted\n'
+            '  manga-toolkit-cli sourcefile --root /path/to/manga --apply\n'
+            '  manga-toolkit-cli sourcefile --rollback\n'
+            '  manga-toolkit-cli sourcefile --examples\n'
+            '  manga-toolkit-cli metadata --root /path/to/cbz\n'
+            '  manga-toolkit-cli metadata --root /path/to/cbz --apply\n'
+            '  manga-toolkit-cli metadata --examples\n'
         ),
     )
     parser.add_argument('--debug', action='store_true',
@@ -61,40 +61,40 @@ def build_parser() -> argparse.ArgumentParser:
         help='可用子命令'
     )
 
-    # rename
-    p_rename = sub.add_parser(
-        'rename',
-        help='漫画文件 / 目录批量重命名',
-        description='漫画文件 / 目录批量重命名工具',
+    # sourcefile（原 rename）
+    p_sourcefile = sub.add_parser(
+        'sourcefile',
+        help='源文件（.zip / .cbz）批量重命名',
+        description='源文件批量重命名工具（处理 .zip / .cbz）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '常用模式:\n'
-            '  manga-toolkit-cli rename --root <dir>         # 批量预览\n'
-            '  manga-toolkit-cli rename --root <dir> --apply # 批量执行\n'
-            '  manga-toolkit-cli rename --drag               # 循环拖入模式（推荐）\n'
-            '  manga-toolkit-cli rename --drag --move-to <dir># 拖入后移动至目录\n'
-            '  manga-toolkit-cli rename --examples           # 内置解析示例\n'
+            '  manga-toolkit-cli sourcefile --root <dir>         # 批量预览\n'
+            '  manga-toolkit-cli sourcefile --root <dir> --apply # 批量执行\n'
+            '  manga-toolkit-cli sourcefile --drag               # 循环拖入模式（推荐）\n'
+            '  manga-toolkit-cli sourcefile --drag --move-to <dir> # 拖入后移动至目录\n'
+            '  manga-toolkit-cli sourcefile --examples           # 内置解析示例\n'
         ),
     )
-    add_rename_args(p_rename)
-    p_rename.set_defaults(func=cmd_rename)
+    add_sourcefile_args(p_sourcefile)
+    p_sourcefile.set_defaults(func=cmd_sourcefile)
 
-    # comicinfo
-    p_comicinfo = sub.add_parser(
-        'comicinfo',
-        help='向 CBZ 写入 ComicInfo.xml',
+    # metadata（原 comicinfo）
+    p_metadata = sub.add_parser(
+        'metadata',
+        help='向 CBZ 写入 ComicInfo.xml 元数据',
         description='CBZ 漫画 ComicInfo.xml 批量生成/更新工具（ComicInfo v2.1）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
             '示例:\n'
-            '  manga-toolkit-cli comicinfo --examples\n'
-            '  manga-toolkit-cli comicinfo --root ./manga\n'
-            '  manga-toolkit-cli comicinfo --root ./manga --apply\n'
+            '  manga-toolkit-cli metadata --examples\n'
+            '  manga-toolkit-cli metadata --root ./manga\n'
+            '  manga-toolkit-cli metadata --root ./manga --apply\n'
         ),
     )
-    add_comicinfo_args(p_comicinfo)
-    p_comicinfo.set_defaults(func=cmd_comicinfo)
+    add_metadata_args(p_metadata)
+    p_metadata.set_defaults(func=cmd_metadata)
 
     return parser
 

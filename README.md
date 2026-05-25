@@ -4,8 +4,8 @@
 
 | 子命令 | 功能 |
 |---|---|
-| `rename` | 批量重命名漫画文件 / 目录，统一格式 |
-| `comicinfo` | 向 CBZ 写入 ComicInfo.xml 元数据 |
+| `sourcefile` | 批量重命名源文件（.zip / .cbz），统一格式 |
+| `metadata` | 向 CBZ 写入 ComicInfo.xml 元数据 |
 
 ---
 
@@ -47,49 +47,50 @@ poetry install
 
 ---
 
-## rename 子命令
+## sourcefile 子命令
 
 ```bash
 # 循环拖入模式（推荐日常使用，默认不移动）
-manga-toolkit-cli rename --drag
+manga-toolkit-cli sourcefile --drag
 
-# 拖入后自动移动到整理目录（仅当显式指定 --target 时启用移动）
-manga-toolkit-cli rename --drag --target /path/to/sorted
+# 拖入后自动移动到整理目录（仅当显式指定 --move-to 时启用移动）
+manga-toolkit-cli sourcefile --drag --move-to /path/to/sorted
 
 # 批量预览（不修改文件）
-manga-toolkit-cli rename --root /path/to/manga
+manga-toolkit-cli sourcefile --root /path/to/manga
 
 # 批量执行
-manga-toolkit-cli rename --root /path/to/manga --apply
+manga-toolkit-cli sourcefile --root /path/to/manga --apply
 
-# 回退上次操作
-manga-toolkit-cli rename --rollback
-
-# 列出所有操作记录
-manga-toolkit-cli rename --list-sessions
+# 列出 / 回退已有的 session 记录（当前 apply 不再写新 session）
+manga-toolkit-cli sourcefile --list-sessions
+manga-toolkit-cli sourcefile --rollback
 
 # 内置解析示例（回归测试）
-manga-toolkit-cli rename --examples
+manga-toolkit-cli sourcefile --examples
 
 # 启用调试输出（放在子命令之前）
-manga-toolkit-cli --debug rename --drag
+manga-toolkit-cli --debug sourcefile --drag
 ```
 
 ---
 
-## comicinfo 子命令
+## metadata 子命令
 
 生成 ComicInfo v2.1 XML，写入 CBZ 文件。
 
 ```bash
 # 预览（不修改文件）
-manga-toolkit-cli comicinfo --root /path/to/cbz
+manga-toolkit-cli metadata --root /path/to/cbz
 
 # 实际写入
-manga-toolkit-cli comicinfo --root /path/to/cbz --apply
+manga-toolkit-cli metadata --root /path/to/cbz --apply
+
+# 循环拖入模式
+manga-toolkit-cli metadata --drag --move-to /path/to/sorted
 
 # 内置示例
-manga-toolkit-cli comicinfo --examples
+manga-toolkit-cli metadata --examples
 ```
 
 ### 字段映射与顺序
@@ -124,25 +125,29 @@ LanguageISO → Genre → Tags → PageCount → Notes
 mt/
 ├── __init__.py
 ├── __main__.py                  — 适配 `python -m mt` 的转发层
-├── manga_toolkit_cli.py         — 统一 CLI 实现（rename + comicinfo 子命令）
+├── manga_toolkit_cli.py         — 统一 CLI 实现（sourcefile + metadata 子命令）
+├── cli/                         — 子命令调度层
+│   ├── sourcefile.py            — sourcefile 子命令
+│   ├── metadata.py              — metadata 子命令
+│   └── examples.py              — 内置示例（双子命令共用）
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
-│   ├── __init__.py
 │   ├── config.py                — 全局默认配置
-│   ├── models.py                — Chapter / Volume / MangaInfo / RenamePlan
+│   ├── models.py                — Chapter / Volume / MangaInfo
+│   │                              / SourceFilePlan / MetadataPlan
 │   └── patterns.py              — 正则表达式常量与规则表
 ├── infra/                       — 基础设施层（终端、I/O、字符串工具）
-│   ├── __init__.py
 │   ├── utils.py                 — 纯工具函数（繁简、路径、重命名）
 │   └── console.py               — 终端输出 & 日志
 ├── naming/                      — 名称解析与构建
-│   ├── __init__.py
 │   ├── parser.py                — parse_name(author, name) → MangaInfo
 │   └── builder.py               — build_new_name(info) → str
+├── presentation/                — 领域对象的终端渲染
+│   └── view.py                  — print_run_banner / print_*_preview / print_metadata_fields
 └── workflow/                    — 高层工作流
-    ├── __init__.py
-    ├── scanner.py               — 目录扫描、重命名执行、拖入模式
-    ├── session.py               — 操作记录 & 回退
-    └── comicinfo.py             — ComicInfo.xml 生成 & 写入
+    ├── sourcefile.py            — 源文件扫描、重命名执行
+    ├── metadata.py              — ComicInfo.xml 生成 & 写入
+    ├── drag.py                  — 通用拖入循环 + 目录搬移（共用）
+    └── session.py               — 操作记录 & 回退（仅 sourcefile 读取使用）
 ```
 
 > 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
@@ -161,9 +166,12 @@ infra/console      ← core/models
 naming/parser      ← core/models · core/patterns · infra/utils · infra/console
 naming/builder     ← core/models · core/patterns · infra/utils
         ↓
+workflow/drag      ← infra/utils · infra/console
 workflow/session   ← core/models · core/config · infra/utils · infra/console
-workflow/scanner   ← core/models · core/config · naming/* · infra/* · workflow/session
-workflow/comicinfo ← core/models · core/config · core/patterns · infra/console · naming/parser
+workflow/sourcefile← core/models · core/config · naming/* · infra/* · presentation · workflow/drag
+workflow/metadata  ← core/models · core/config · core/patterns · infra/console · naming/parser · presentation · workflow/drag
+        ↓
+mt/cli/{sourcefile,metadata,examples}
         ↓
 mt/manga_toolkit_cli.py
 ```

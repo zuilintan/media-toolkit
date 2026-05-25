@@ -140,12 +140,12 @@ class MangaInfo:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RenamePlan
+# SourceFilePlan（sourcefile 子命令：源文件重命名计划）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class RenamePlan:
-    """单个文件的重命名计划（rename 仅处理 .zip / .cbz 文件）。
+class SourceFilePlan:
+    """单个源文件的重命名计划（sourcefile 子命令仅处理 .zip / .cbz 文件）。
 
     Attributes:
         author_dir: 作者目录路径（字符串，便于 JSON 序列化）。
@@ -172,14 +172,14 @@ class RenamePlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CbzPlan
+# MetadataPlan（metadata 子命令：单个 CBZ 的 ComicInfo 写入计划）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class CbzPlan:
-    """单个 CBZ 的 ComicInfo 写入计划（解析阶段产出，写入阶段消费）。
+class MetadataPlan:
+    """单个 CBZ 的 ComicInfo.xml 写入计划（解析阶段产出，写入阶段消费）。
 
-    与 RenamePlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
+    与 SourceFilePlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
     """
     cbz_path:     str
     mi:           MangaInfo
