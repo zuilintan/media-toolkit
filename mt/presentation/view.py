@@ -209,6 +209,7 @@ def print_metadata_diff_table(
 
     - 列标题: 旧 / 新
     - 行标题: COMICINFO_TAGS 中的每个 tag
+    - 新列差异字符用 RED 高亮（与 sourcefile 卡片体的 highlight_diff 对齐）
     - 行尾「*」标记本行新旧不一致（含字段从无到有 / 从有到无）
     - Publisher 出版商冲突时在表下追加冲突文件列表
     """
@@ -222,8 +223,15 @@ def print_metadata_diff_table(
     for tag in COMICINFO_TAGS:
         ov = old_fields.get(tag, '')
         nv = new_fields.get(tag, '')
-        marker = '' if ov == nv else f'  {YELLOW}*{RESET}'
-        emit(f'{indent}{_pad(tag, tag_w)}  {_pad(ov, old_w)}  {_pad(nv, new_w)}{marker}')
+        if ov == nv:
+            new_cell = _pad(nv, new_w)
+            marker   = ''
+        else:
+            colored  = highlight_diff(ov, nv, RED)
+            # ANSI 转义不占显示宽度，按原 nv 宽度补齐
+            new_cell = colored + ' ' * max(0, new_w - _vis_width(nv))
+            marker   = f'  {YELLOW}*{RESET}'
+        emit(f'{indent}{_pad(tag, tag_w)}  {_pad(ov, old_w)}  {new_cell}{marker}')
     emit(sep)
 
     if pub_conflict:
