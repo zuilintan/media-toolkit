@@ -51,7 +51,7 @@ def scan_author_dir(author_dir: Path) -> list[RenamePlan]:
     return plans
 
 
-def scan_and_plan(root: str) -> list[RenamePlan]:
+def plan_renames(root: str) -> list[RenamePlan]:
     """扫描根目录下所有作者目录，汇总重命名计划。"""
     root_path = Path(root)
     if not root_path.exists():
@@ -68,7 +68,7 @@ def scan_and_plan(root: str) -> list[RenamePlan]:
 # 执行重命名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def apply_renames(plans: list[RenamePlan], dry_run: bool = True) -> int:
+def apply_rename_plans(plans: list[RenamePlan], dry_run: bool = True) -> int:
     """执行重命名计划。
 
     Args:
@@ -182,7 +182,7 @@ def _process_author_dir(author_dir: Path, target: str) -> None:
     print_preview(plans)
     if not confirm('\n🟡 确认执行重命名？按 Enter 继续: '):
         return
-    fail = apply_renames(plans, dry_run=False)
+    fail = apply_rename_plans(plans, dry_run=False)
     if fail == 0 and target:
         move_author_dir(author_dir, target)
     elif fail > 0:

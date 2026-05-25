@@ -42,18 +42,9 @@ FCOLON      = '\uff1a'   # ：  全角冒号  （社团文件分隔符）
 # 作者提取（从 CBZ 文件名中）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _get_stem(filename: str) -> str:
-    """剥离 .zip / .cbz 后缀。"""
-    for ext in ('.zip', '.cbz'):
-        if filename.lower().endswith(ext):
-            return filename[: -len(ext)]
-    return filename
-
-
 def extract_author(filename: str) -> str:
     """从 CBZ 文件名中提取作者名（第一个 [xxx] 括号）。"""
-    stem = _get_stem(os.path.basename(filename))
-    m = re.match(r'^\[(.+?)\]', stem)
+    m = re.match(r'^\[(.+?)\]', Path(filename).stem)
     return m.group(1).strip() if m else ''
 
 
@@ -280,7 +271,7 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 单文件处理（两阶段：plan → apply，与 rename 的 scan_and_plan / apply_renames 对称）
+# 单文件处理（两阶段：plan → apply，与 rename 的 plan_renames / apply_rename_plans 对称）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
@@ -324,8 +315,7 @@ def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
     emit(f'\n{SEP}')
     emit(f'  📦  {filename}')
 
-    stem                    = _get_stem(filename)
-    mi                      = parse_name(author, stem)
+    mi                      = parse_name(author, Path(filename).stem)
     emit_parse_debug(mi)
     publisher, pub_conflict = find_publisher(cbz_path)
     page_count, tags_val    = read_cbz_meta(cbz_path)

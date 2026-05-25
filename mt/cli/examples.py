@@ -18,7 +18,7 @@ from pathlib import Path
 from mt.naming.parser import parse_name, emit_parse_debug
 from mt.naming.builder import build_new_name
 from mt.workflow.comicinfo import collect_fields, _extract_publisher_name
-from mt.infra.console import highlight_diff, SEP, SEP2, RED, GREEN, emit
+from mt.infra.console import highlight_diff, SEP, SEP2, RED, GREEN, emit, print_summary
 from mt.presentation.view import print_comicinfo_fields
 
 # 示例数据文件（随包分发）
@@ -106,9 +106,9 @@ def run_comicinfo_examples() -> int:
         ok_n += 1
 
     emit(f'\n{SEP2}')
-    parts = [f'✅ {ok_n} 成功']
-    if warn_n: parts.append(f'🟡 {warn_n} 警告')
-    if fail:   parts.append(f'❌ {fail} 失败')
-    emit(f'  示例解析完成   {"   ".join(parts)}')
+    print_summary(
+        '示例解析完成',
+        [('✅', ok_n, '成功'), ('🟡', warn_n, '警告'), ('❌', fail, '失败')],
+    )
     emit(SEP2)
     return fail

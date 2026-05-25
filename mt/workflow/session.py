@@ -1,7 +1,7 @@
 """
 session.py — 操作记录 & 回退
 
-记录每次 apply_renames 的成功条目，支持按 session 逐条撤销。
+记录每次 apply_rename_plans 的成功条目，支持按 session 逐条撤销。
 记录文件: config.SESSIONS_FILE（JSON 格式）
 
 依赖: models / config / utils / console

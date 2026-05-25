@@ -13,7 +13,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from mt.infra.console import SEP2, emit, capture, confirm
+from mt.infra.console import SEP2, emit, capture, confirm, print_summary
 from mt.workflow.comicinfo import (
     CbzPlan, plan_cbz, print_cbz_plan, apply_cbz_plan,
 )
@@ -98,17 +98,25 @@ def _apply_all(
 
 def _print_preview_summary(plan_counts: dict[str, int], apply: bool) -> None:
     emit(f'\n{SEP2}')
-    note  = '' if apply else '（预览，未实际修改）'
-    parts = [f'✅ {plan_counts["ok"]} 可写']
-    if plan_counts['warn']: parts.append(f'🟡 {plan_counts["warn"]} 需 review')
-    if plan_counts['skip']: parts.append(f'— {plan_counts["skip"]} 跳过')
-    emit(f'  解析完成{note}  {"   ".join(parts)}')
+    print_summary(
+        '解析完成',
+        [
+            ('✅', plan_counts['ok'],   '可写'),
+            ('🟡', plan_counts['warn'], '需 review'),
+            ('—',  plan_counts['skip'], '跳过'),
+        ],
+        note='' if apply else '（预览，未实际修改）',
+    )
 
 
 def _print_apply_summary(write_counts: dict[str, int]) -> None:
-    parts = [f'✅ {write_counts.get("ok", 0)} 成功']
-    if write_counts.get('error'): parts.append(f'❌ {write_counts["error"]} 失败')
-    emit(f'  写入完成  {"   ".join(parts)}')
+    print_summary(
+        '写入完成',
+        [
+            ('✅', write_counts.get('ok',    0), '成功'),
+            ('❌', write_counts.get('error', 0), '失败'),
+        ],
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
