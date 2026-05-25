@@ -5,7 +5,9 @@ view.py — 领域对象的终端渲染
   - print_run_banner()          — 命令运行 banner（sourcefile / metadata 共用）
   - print_sourcefile_preview()  — 源文件重命名计划预览（按作者分组的卡片表）
   - print_metadata_preview()    — ComicInfo 写入计划预览（结构对齐 sourcefile）
-  - print_metadata_fields()     — ComicInfo 字段块（被 preview 卡片体复用）
+  - print_metadata_fields()     — ComicInfo 字段单列展示（仅 examples 子命令使用；
+                                  metadata 预览卡片体改走 print_metadata_diff_table）
+  - print_metadata_diff_table() — ComicInfo 字段「旧/新」两列 diff 表格
 
 依赖: core.models / core.config / infra.console / naming.parser
 """

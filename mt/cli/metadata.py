@@ -11,7 +11,6 @@ metadata.py — metadata 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_metadata_preview, print_run_banner
@@ -19,19 +18,8 @@ from mt.workflow.metadata import (
     plan_metadatas, apply_metadata_plans, process_metadata_dir,
 )
 from mt.workflow.drag import run_drag_loop, move_dir
+from mt.cli import validate_root
 from mt.cli.examples import run_metadata_examples
-
-
-def _validate_root(root_arg: str) -> Path | None:
-    """统一的 --root 校验（与 cli/sourcefile 对齐）。返回 None 表示已报错。"""
-    if not root_arg:
-        emit('❌ 请指定 --root <目录>'); return None
-    root = Path(root_arg).resolve()
-    if not root.exists():
-        emit(f'❌ 目录不存在: {root}'); return None
-    if not root.is_dir():
-        emit(f'❌ 路径不是目录: {root}'); return None
-    return root
 
 
 def cmd_metadata(args: argparse.Namespace) -> int:
@@ -52,7 +40,7 @@ def cmd_metadata(args: argparse.Namespace) -> int:
         return 2
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
-    root = _validate_root(args.root)
+    root = validate_root(args.root)
     if root is None:
         return 2
 

@@ -41,7 +41,11 @@ def _save(sessions: list[dict]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def append_session(renamed: list[SourcefilePlan]) -> None:
-    """将本次成功重命名的条目记录为新 session。"""
+    """将本次成功重命名的条目记录为新 session。
+
+    注：当前 apply_sourcefile_plans 暂不调用本函数（dormant API）；
+    保留实现以便未来恢复"写 session"能力时无需重写。
+    """
     now     = datetime.now()
     session = {
         'session_id': now.strftime('%Y%m%d_%H%M%S'),
