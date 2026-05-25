@@ -12,12 +12,23 @@ view.py — 领域对象的终端渲染
 
 from __future__ import annotations
 import os
+import unicodedata
 from collections.abc import Iterable, Iterator
 
 from mt.core.models import MangaInfo, MetadataPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
-from mt.infra.console import SEP, SEP2, RED, highlight_diff, emit
+from mt.infra.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
+
+
+# ── 显示宽度工具（中文 / 全角字符占 2 列）─────────────────────────────────────
+def _vis_width(s: str) -> int:
+    return sum(2 if unicodedata.east_asian_width(c) in ('W', 'F') else 1 for c in s)
+
+
+def _pad(s: str, w: int) -> str:
+    """按显示宽度右侧补空格。"""
+    return s + ' ' * max(0, w - _vis_width(s))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -132,8 +143,11 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
                 emit(f'  📂 {p.author}')
             emit(f'     📄 [{idx:>3}] {p.filename}')
             emit_parse_debug(p.mi)
-            # ComicInfo 字段比 Path 多一级缩进，区分"数据块" vs "元信息行"
-            print_metadata_fields(p.fields, p.pub_conflict, indent='         ')
+            # 旧/新两列表格，比 Path 多一级缩进
+            print_metadata_diff_table(
+                p.existing_fields, p.fields, p.pub_conflict,
+                indent='         ',
+            )
             for w in p.mi.warnings:
                 emit(f'       🟡 {w}')
             cur_enc = p.existing_encoding or '—'
@@ -167,7 +181,7 @@ def print_metadata_fields(
     *,
     indent:       str = '     ',
 ) -> None:
-    """以 'TagName: value' 格式打印 ComicInfo 字段（标签与 DEBUG 同栏对齐）。"""
+    """单列形式打印 ComicInfo 字段（examples 子命令使用）。"""
     col_w = max(len(t) for t in COMICINFO_TAGS) + 2     # 'Tag: ' 列宽（含冒号 + 空格）
     for tag in COMICINFO_TAGS:
         label = f'{indent}{(tag + ":"):<{col_w}}'
@@ -182,3 +196,37 @@ def print_metadata_fields(
         else:
             val = fields.get(tag, '')
             emit(f'{label}{val}'.rstrip())
+
+
+def print_metadata_diff_table(
+    old_fields:   dict[str, str],
+    new_fields:   dict[str, str],
+    pub_conflict: list[str] | None = None,
+    *,
+    indent:       str = '         ',
+) -> None:
+    """旧/新两列表格，行标题为 ComicInfo.xml 的标签。
+
+    - 列标题: 旧 / 新
+    - 行标题: COMICINFO_TAGS 中的每个 tag
+    - 行尾「*」标记本行新旧不一致（含字段从无到有 / 从有到无）
+    - Publisher 出版商冲突时在表下追加冲突文件列表
+    """
+    tag_w = max(len(t) for t in COMICINFO_TAGS)
+    old_w = max(_vis_width('旧'), *(_vis_width(old_fields.get(t, '')) for t in COMICINFO_TAGS))
+    new_w = max(_vis_width('新'), *(_vis_width(new_fields.get(t, '')) for t in COMICINFO_TAGS))
+
+    sep = f'{indent}{"─"*tag_w}  {"─"*old_w}  {"─"*new_w}'
+    emit(f'{indent}{_pad("Tag", tag_w)}  {_pad("旧", old_w)}  {_pad("新", new_w)}')
+    emit(sep)
+    for tag in COMICINFO_TAGS:
+        ov = old_fields.get(tag, '')
+        nv = new_fields.get(tag, '')
+        marker = '' if ov == nv else f'  {YELLOW}*{RESET}'
+        emit(f'{indent}{_pad(tag, tag_w)}  {_pad(ov, old_w)}  {_pad(nv, new_w)}{marker}')
+    emit(sep)
+
+    if pub_conflict:
+        emit(f'{indent}🟡 Publisher: 多个社团文件，请手动确认！')
+        for p in pub_conflict:
+            emit(f'{indent}  • {os.path.basename(p)}')

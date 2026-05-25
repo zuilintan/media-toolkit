@@ -281,6 +281,25 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 # 单文件 plan / apply（纯函数；批量入口见下）
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _parse_existing_fields(xml_bytes: bytes | None) -> dict[str, str]:
+    """从现有 ComicInfo.xml 提取 ``{tag: value}``，缺失或解析失败按空串。
+
+    返回值始终包含 COMICINFO_TAGS 全部 key，便于 diff 表格直接对位渲染。
+    """
+    out: dict[str, str] = {tag: '' for tag in COMICINFO_TAGS}
+    if not xml_bytes:
+        return out
+    try:
+        root = fromstring(xml_bytes)
+        for tag in COMICINFO_TAGS:
+            el = root.find(tag)
+            if el is not None and el.text:
+                out[tag] = el.text.strip()
+    except Exception as e:
+        debug(f'_parse_existing_fields 失败（按全空处理）: {e}')
+    return out
+
+
 def plan_metadata(cbz_path: str) -> MetadataPlan | None:
     """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，不产生任何输出）。
 
@@ -300,15 +319,16 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
     fields                      = collect_fields(mi, publisher, tags_val, page_count)
     new_xml                     = build_comicinfo_xml(mi, publisher, tags_val, page_count)
     return MetadataPlan(
-        cbz_path     = cbz_path,
-        mi           = mi,
-        publisher    = publisher,
-        pub_conflict = pub_conflict,
-        page_count   = page_count,
-        tags_val     = tags_val,
-        fields       = fields,
-        existing_xml = existing_xml,
-        new_xml      = new_xml,
+        cbz_path        = cbz_path,
+        mi              = mi,
+        publisher       = publisher,
+        pub_conflict    = pub_conflict,
+        page_count      = page_count,
+        tags_val        = tags_val,
+        fields          = fields,
+        existing_fields = _parse_existing_fields(existing_xml),
+        existing_xml    = existing_xml,
+        new_xml         = new_xml,
     )
 
 

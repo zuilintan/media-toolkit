@@ -197,15 +197,16 @@ class MetadataPlan:
     plan 阶段即构建 new_xml（确定性），写入阶段直接复用，并据 ``changed``
     实现幂等：已有 ComicInfo.xml 完全一致则跳过。
     """
-    cbz_path:     str
-    mi:           MangaInfo
-    publisher:    str | None
-    pub_conflict: list[str] | None
-    page_count:   int
-    tags_val:     str
-    fields:       dict[str, str]
-    existing_xml: bytes | None     # 现有 ComicInfo.xml 原始字节（无则 None）
-    new_xml:      bytes            # 本次构建的目标字节
+    cbz_path:        str
+    mi:              MangaInfo
+    publisher:       str | None
+    pub_conflict:    list[str] | None
+    page_count:      int
+    tags_val:        str
+    fields:          dict[str, str]  # 本次构建的字段（新值）
+    existing_fields: dict[str, str]  # 现有 ComicInfo.xml 解析出的字段（旧值）
+    existing_xml:    bytes | None    # 现有 ComicInfo.xml 原始字节（无则 None）
+    new_xml:         bytes           # 本次构建的目标字节
 
     @property
     def writable(self) -> bool:
