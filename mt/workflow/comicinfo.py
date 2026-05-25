@@ -313,7 +313,7 @@ def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
             status='warn' (出版商冲突)    → plan 返回（用于显示，但不可写）
             status='ok'                    → plan 可写
     """
-    from mt.naming.parser import parse_name  # 在此导入，避免顶层循环
+    from mt.naming.parser import parse_name, emit_parse_debug  # 在此导入，避免顶层循环
 
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
@@ -326,6 +326,7 @@ def plan_cbz(cbz_path: str) -> tuple[CbzPlan | None, str]:
 
     stem                    = _get_stem(filename)
     mi                      = parse_name(author, stem)
+    emit_parse_debug(mi)
     publisher, pub_conflict = find_publisher(cbz_path)
     page_count, tags_val    = read_cbz_meta(cbz_path)
     fields                  = collect_fields(mi, publisher, tags_val, page_count)

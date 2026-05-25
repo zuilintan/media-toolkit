@@ -438,16 +438,6 @@ def parse_name(author: str, name: str) -> MangaInfo:
         main_title, ch_title, is_bonus, pre_part_tag
     )
 
-    debug(
-        f"main='{CYAN}{main_title}{RESET}' "
-        f"vol='{CYAN}{volume}{RESET}' "
-        f"ch='{CYAN}{chapter}{RESET}' "
-        f"ch_title='{CYAN}{ch_title}{RESET}' "
-        f"part_tag='{CYAN}{part_tag}{RESET}' "
-        f"series='{CYAN}{series}{RESET}' "
-        f"lang='{CYAN}{language}{RESET}'"
-    )
-
     return MangaInfo(
         author        = author,
         main_title    = main_title,
@@ -462,4 +452,26 @@ def parse_name(author: str, name: str) -> MangaInfo:
         is_ongoing    = is_ongoing,
         part_tag      = part_tag,
         original      = name,
+    )
+
+
+def emit_parse_debug(mi: MangaInfo) -> None:
+    """Emit ``parse_name`` 的 DEBUG 摘要行（DEBUG 级别下生效）。
+
+    parse_name 本身只做解析、不输出 DEBUG，由调用方在最合适的时机触发：
+      - comicinfo plan_cbz：紧跟卡片 banner 之后；
+      - rename print_preview：渲染 changed 卡片时；
+      - examples：每条示例渲染时。
+
+    funcname 锁定为 ``parse_name``，与原先 parse_name 内部 debug() 的输出一致。
+    """
+    debug(
+        f"main='{CYAN}{mi.main_title}{RESET}' "
+        f"vol='{CYAN}{mi.volume}{RESET}' "
+        f"ch='{CYAN}{mi.chapter}{RESET}' "
+        f"ch_title='{CYAN}{mi.chapter_title}{RESET}' "
+        f"part_tag='{CYAN}{mi.part_tag}{RESET}' "
+        f"series='{CYAN}{mi.series}{RESET}' "
+        f"lang='{CYAN}{mi.language}{RESET}'",
+        funcname='parse_name',
     )

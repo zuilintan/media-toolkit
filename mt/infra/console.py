@@ -97,11 +97,24 @@ def setup_logging(debug: bool = False) -> None:
 
 # ── 日志便捷函数 ──────────────────────────────────────────────────────────────
 
-def debug(msg: str) -> None:
-    """带调用函数名的调试日志（DEBUG 级别时输出）。"""
-    frame = inspect.currentframe().f_back
-    func  = frame.f_code.co_name
-    _log.debug('[%s] → %s', func, msg)
+def debug(msg: str, funcname: str | None = None) -> None:
+    """调试日志（DEBUG 级别时输出）。
+
+    Args:
+        msg:      日志正文。
+        funcname: 显示的函数名标签；None 时自动取调用栈的当前函数名，
+                  调用方可显式覆盖以保持原始语义函数名
+                  （例如 view.print_preview 想 emit `[parse_name]` 的 DEBUG）。
+    """
+    if funcname is None:
+        frame    = inspect.currentframe().f_back
+        funcname = frame.f_code.co_name
+    _log.debug('[%s] → %s', funcname, msg)
+
+
+def is_debug() -> bool:
+    """是否处于 DEBUG 日志级别（供调用方决定要不要 emit 额外上下文行）。"""
+    return _log.isEnabledFor(logging.DEBUG)
 
 
 def info(msg: str)  -> None: emit(msg)

@@ -24,7 +24,11 @@ from mt.workflow.session import append_session
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def scan_author_dir(author_dir: Path) -> list[RenamePlan]:
-    """扫描单个作者目录，返回所有条目的重命名计划。"""
+    """扫描单个作者目录，返回所有条目的重命名计划。
+
+    本阶段不输出 DEBUG（parse_name 已抽空 emit），DEBUG 由 print_preview
+    在渲染 changed 卡片时统一触发，使每条 DEBUG 紧贴对应卡片。
+    """
     author = author_dir.name
     plans: list[RenamePlan] = []
     for item in sorted(author_dir.iterdir()):

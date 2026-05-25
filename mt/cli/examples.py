@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from mt.naming.parser import parse_name
+from mt.naming.parser import parse_name, emit_parse_debug
 from mt.naming.builder import build_new_name
 from mt.workflow.comicinfo import collect_fields, _extract_publisher_name
 from mt.infra.console import highlight_diff, SEP, SEP2, RED, GREEN, emit
@@ -47,6 +47,7 @@ def run_rename_examples() -> int:
     fail = warn_n = 0
     for author, name, expected in load_examples():
         info   = parse_name(author, name)
+        emit_parse_debug(info)
         result = build_new_name(info)
         passed = result == expected
         if not passed:
@@ -95,6 +96,7 @@ def run_comicinfo_examples() -> int:
             fail += 1
             continue
         mi     = parse_name(author, expected)
+        emit_parse_debug(mi)
         fields = collect_fields(mi, sim_pub)
         print_comicinfo_fields(fields)
         for w in mi.warnings:

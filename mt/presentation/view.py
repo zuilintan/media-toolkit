@@ -14,6 +14,7 @@ import os
 from mt.core.models import RenamePlan
 from mt.core.config import COMICINFO_TAGS
 from mt.infra.console import SEP, SEP2, RED, highlight_diff, emit
+from mt.naming.parser import emit_parse_debug
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -59,6 +60,8 @@ def print_preview(plans: list[RenamePlan]) -> None:
             icon = '📄' if p.is_file else '🗂 '
             note = ' 🟡 需审核' if p.needs_review else ''
             emit(f'     {icon} [{idx:>3}]')
+            if p.info is not None:
+                emit_parse_debug(p.info)
             emit(f'       旧: {p.old_name}')
             emit(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
             if p.info:
