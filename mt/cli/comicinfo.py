@@ -13,7 +13,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from mt.infra.console import SEP2, emit, capture, confirm, print_summary
+from mt.infra.console import SEP2, emit, confirm, print_summary, iter_with_progress
 from mt.workflow.comicinfo import (
     CbzPlan, plan_cbz, print_cbz_plan, apply_cbz_plan,
 )
@@ -25,20 +25,15 @@ _LARGE_THRESHOLD = 100
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 进度条
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _progress(done: int, total: int) -> None:
-    bar_w  = 30
-    filled = int(bar_w * done / total)
-    bar    = '█' * filled + '░' * (bar_w - filled)
-    pct    = done * 100 // total
-    emit(f'\r  [{bar}] {pct:3d}%  {done}/{total}', end='', flush=True)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # 预览阶段：全量 plan + 打印
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def _plan_and_print(fp: Path) -> tuple[CbzPlan | None, str]:
+    plan, status = plan_cbz(str(fp))
+    if plan:
+        print_cbz_plan(plan)
+    return plan, status
+
 
 def _preview_all(
     cbz_files: list[Path],
@@ -47,24 +42,12 @@ def _preview_all(
 ) -> list[CbzPlan]:
     """逐文件 plan + print，按需把每条输出落到 log_lines（用于大批量模式）。"""
     plans: list[CbzPlan] = []
-    total = len(cbz_files)
-    for idx, fp in enumerate(cbz_files, 1):
-        if log_lines is not None:
-            with capture() as buf:
-                plan, status = plan_cbz(str(fp))
-                if plan:
-                    print_cbz_plan(plan)
-            log_lines.append(buf.getvalue().rstrip('\n'))
-            _progress(idx, total)
-        else:
-            plan, status = plan_cbz(str(fp))
-            if plan:
-                print_cbz_plan(plan)
+    for plan, status in iter_with_progress(
+        cbz_files, _plan_and_print, log_lines=log_lines,
+    ):
         plan_counts[status] += 1
         if plan:
             plans.append(plan)
-    if log_lines is not None:
-        emit()  # 进度条换行
     return plans
 
 
@@ -78,18 +61,8 @@ def _apply_all(
     log_lines: list[str] | None,
 ) -> None:
     """对所有可写计划执行写入，按需把每条输出落到 log_lines。"""
-    total = len(plans)
-    for idx, plan in enumerate(plans, 1):
-        if log_lines is not None:
-            with capture() as buf:
-                result = apply_cbz_plan(plan)
-            log_lines.append(buf.getvalue().rstrip('\n'))
-            _progress(idx, total)
-        else:
-            result = apply_cbz_plan(plan)
+    for result in iter_with_progress(plans, apply_cbz_plan, log_lines=log_lines):
         write_counts[result] = write_counts.get(result, 0) + 1
-    if log_lines is not None:
-        emit()  # 进度条换行
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
