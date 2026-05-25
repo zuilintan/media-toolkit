@@ -16,7 +16,7 @@ from pathlib import Path
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_metadata_preview, print_run_banner
 from mt.workflow.metadata import (
-    plan_metadata_files, apply_metadata_plans, process_metadata_dir,
+    plan_metadatas, apply_metadata_plans, process_metadata_dir,
 )
 from mt.workflow.drag import run_drag_loop, move_dir
 from mt.cli.examples import run_metadata_examples
@@ -57,7 +57,7 @@ def cmd_metadata(args: argparse.Namespace) -> int:
         return 2
 
     print_run_banner('metadata', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
-    plans = plan_metadata_files(str(root))
+    plans = plan_metadatas(str(root))
     emit(f'  找到文件: {len(plans)} 个 .cbz（含子目录）')
 
     if not plans:

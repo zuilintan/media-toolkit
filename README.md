@@ -133,7 +133,7 @@ mt/
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
 │   ├── config.py                — 全局默认配置
 │   ├── models.py                — Chapter / Volume / MangaInfo
-│   │                              / SourceFilePlan / MetadataPlan
+│   │                              / SourcefilePlan / MetadataPlan
 │   └── patterns.py              — 正则表达式常量与规则表
 ├── infra/                       — 基础设施层（终端、I/O、字符串工具）
 │   ├── utils.py                 — 纯工具函数（繁简、路径、重命名）

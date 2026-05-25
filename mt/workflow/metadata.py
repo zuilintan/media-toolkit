@@ -319,7 +319,7 @@ def apply_metadata_plan(plan: MetadataPlan) -> str:
 # 批量 plan / apply（对齐 sourcefile.plan_sourcefiles / apply_sourcefile_plans）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def plan_metadata_files(root: str) -> list[MetadataPlan]:
+def plan_metadatas(root: str) -> list[MetadataPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     无作者的文件被静默丢弃；状态由调用方根据 ``plan.writable`` 自行判定。
@@ -374,7 +374,7 @@ def process_metadata_dir(target_dir: Path, move_to: str) -> None:
     """drag 模式下处理单个目录：plan → preview → confirm → apply → 可选移动。"""
     emit(f'\n{SEP}')
     emit(f'📂 目录: {target_dir}')
-    plans = plan_metadata_files(str(target_dir))
+    plans = plan_metadatas(str(target_dir))
     print_metadata_preview(plans)
     if not any(p.writable for p in plans):
         return

@@ -9,7 +9,7 @@ sourcefile.py — 源文件扫描与重命名（sourcefile 子命令的工作流
 from __future__ import annotations
 from pathlib import Path
 
-from mt.core.models import SourceFilePlan
+from mt.core.models import SourcefilePlan
 from mt.core.config import FILE_EXTS
 from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
@@ -23,20 +23,20 @@ from mt.workflow.drag import move_dir
 # 扫描 & 计划
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def scan_author_dir(author_dir: Path) -> list[SourceFilePlan]:
+def scan_author_dir(author_dir: Path) -> list[SourcefilePlan]:
     """扫描单个作者目录，仅处理 .zip / .cbz 文件。
 
     DEBUG 由 print_sourcefile_preview 在渲染卡片时统一触发，
     使每条 DEBUG 紧贴对应卡片。
     """
     author = author_dir.name
-    plans: list[SourceFilePlan] = []
+    plans: list[SourcefilePlan] = []
     for item in sorted(author_dir.iterdir()):
         if not item.is_file() or item.suffix.lower() not in FILE_EXTS:
             continue
         mi       = parse_name(author, item.stem)
         new_name = build_new_name(mi) + item.suffix
-        plans.append(SourceFilePlan(
+        plans.append(SourcefilePlan(
             author_dir = str(author_dir),
             author     = author,
             old_name   = item.name,
@@ -46,13 +46,13 @@ def scan_author_dir(author_dir: Path) -> list[SourceFilePlan]:
     return plans
 
 
-def plan_sourcefiles(root: str) -> list[SourceFilePlan]:
+def plan_sourcefiles(root: str) -> list[SourcefilePlan]:
     """扫描根目录下所有作者目录，汇总重命名计划。"""
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
-    plans: list[SourceFilePlan] = []
+    plans: list[SourcefilePlan] = []
     for author_dir in sorted(root_path.iterdir()):
         if author_dir.is_dir():
             plans.extend(scan_author_dir(author_dir))
@@ -63,7 +63,7 @@ def plan_sourcefiles(root: str) -> list[SourceFilePlan]:
 # 执行重命名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def apply_sourcefile_plans(plans: list[SourceFilePlan], dry_run: bool = True) -> int:
+def apply_sourcefile_plans(plans: list[SourcefilePlan], dry_run: bool = True) -> int:
     """执行重命名计划。
 
     Args:

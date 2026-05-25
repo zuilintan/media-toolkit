@@ -15,7 +15,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from mt.core.models import SourceFilePlan
+from mt.core.models import SourcefilePlan
 from mt.core.config import SESSIONS_FILE
 from mt.infra.utils import try_rename
 from mt.infra.console import print_op_result, SEP, warn, error, info, emit
@@ -40,7 +40,7 @@ def _save(sessions: list[dict]) -> None:
 # 公开 API
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def append_session(renamed: list[SourceFilePlan]) -> None:
+def append_session(renamed: list[SourcefilePlan]) -> None:
     """将本次成功重命名的条目记录为新 session。"""
     now     = datetime.now()
     session = {

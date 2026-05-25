@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Iterator
 
-from mt.core.models import MangaInfo, MetadataPlan, SourceFilePlan
+from mt.core.models import MangaInfo, MetadataPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
 from mt.infra.console import SEP, SEP2, RED, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
@@ -86,7 +86,7 @@ def _emit_flag_line(mi: MangaInfo) -> None:
 # 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_sourcefile_preview(plans: list[SourceFilePlan]) -> None:
+def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
     """以可读格式打印源文件重命名计划。"""
     changed   = [p for p in plans if p.changed]
     unchanged = [p for p in plans if not p.changed]
