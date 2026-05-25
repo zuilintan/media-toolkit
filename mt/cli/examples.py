@@ -16,11 +16,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from mt.core.config import COMICINFO_TAGS
 from mt.naming.parser import parse_name, emit_parse_debug
 from mt.naming.builder import build_new_name
 from mt.workflow.metadata import collect_fields, _extract_publisher_name
 from mt.infra.console import highlight_diff, SEP, SEP2, RED, GREEN, emit, print_summary
-from mt.presentation.view import print_metadata_fields
+from mt.presentation.view import print_metadata_diff_table
 
 # 示例数据文件（随包分发）
 _DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
@@ -46,9 +47,8 @@ def run_sourcefile_examples() -> int:
     emit('🧪 解析示例')
     emit(SEP2)
     fail = warn_n = 0
-    for author, name, expected in load_examples():
+    for idx, (author, name, expected) in enumerate(load_examples(), 1):
         info   = parse_name(author, name)
-        emit_parse_debug(info)
         result = build_new_name(info)
         passed = result == expected
         if not passed:
@@ -56,10 +56,12 @@ def run_sourcefile_examples() -> int:
         if info.warnings:
             warn_n += 1
         mark = '✅' if passed else '❌'
-        emit(f'   {mark} 旧: {name}')
+        emit(f'   📄 [{idx}] {mark}')
+        emit_parse_debug(info)
+        emit(f'     旧: {name}')
         emit(f'     新: {highlight_diff(name, result, RED)}')
         if not passed:
-            emit(f'   预期: {highlight_diff(result, expected, GREEN)}')
+            emit(f'     预期: {highlight_diff(result, expected, GREEN)}')
         for w in info.warnings:
             emit(f'     🟡 {w}')
         emit()
@@ -99,7 +101,11 @@ def run_metadata_examples() -> int:
         mi     = parse_name(author, expected)
         emit_parse_debug(mi)
         fields = collect_fields(mi, sim_pub)
-        print_metadata_fields(fields)
+        # 旧列恒空（examples 模拟"首次写入"语义），新列即 build 结果
+        print_metadata_diff_table(
+            {tag: '' for tag in COMICINFO_TAGS}, fields,
+            indent='     ',
+        )
         for w in mi.warnings:
             emit(f'     🟡 {w}')
         if mi.warnings:

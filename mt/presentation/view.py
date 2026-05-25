@@ -5,9 +5,8 @@ view.py — 领域对象的终端渲染
   - print_run_banner()          — 命令运行 banner（sourcefile / metadata 共用）
   - print_sourcefile_preview()  — 源文件重命名计划预览（按作者分组的卡片表）
   - print_metadata_preview()    — ComicInfo 写入计划预览（结构对齐 sourcefile）
-  - print_metadata_fields()     — ComicInfo 字段单列展示（仅 examples 子命令使用；
-                                  metadata 预览卡片体改走 print_metadata_diff_table）
   - print_metadata_diff_table() — ComicInfo 字段「旧/新」两列 diff 表格
+                                  （metadata 预览 & examples 共用）
 
 依赖: core.models / core.config / infra.console / naming.parser
 """
@@ -84,7 +83,14 @@ def _iter_authored_cards(items: Iterable[object]) -> Iterator[tuple[int, object,
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
-    """以可读格式打印源文件重命名计划。"""
+    """以可读格式打印源文件重命名计划。
+
+    卡片骨架与 run_sourcefile_examples 对齐：
+      ``   📄 [N]{note}``   (3 空格)
+      ``     DEBUG: …``     (5 空格，与 emit_parse_debug formatter 一致)
+      ``     旧: …``        (5 空格)
+      ``     新: …``        (5 空格)
+    """
     changed   = [p for p in plans if p.changed]
     unchanged = [p for p in plans if not p.changed]
     reviews   = [p for p in plans if p.needs_review]
@@ -94,19 +100,16 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
 
     if changed:
         emit(f'\n✅ 将重命名 ({len(changed)} 个):\n')
-        for idx, p, is_new in _iter_authored_cards(changed):
-            if is_new:
-                emit(f'  📂 {p.author}')
+        for idx, p in enumerate(changed, 1):
             note = ' 🟡 需审核' if p.needs_review else ''
-            emit(f'     📄 [{idx:>3}]')
+            emit(f'   📄 [{idx}]{note}')
             if p.info is not None:
                 emit_parse_debug(p.info)
-            emit(f'       旧: {p.old_name}')
-            emit(f'       新: {highlight_diff(p.old_name, p.new_name, RED)}{note}')
+            emit(f'     旧: {p.old_name}')
+            emit(f'     新: {highlight_diff(p.old_name, p.new_name, RED)}')
             if p.info:
                 for w in p.info.warnings:
-                    emit(f'       🟡 {w}')
-                emit(f'       Path:\n       {p.author_dir}\\{p.old_name}\n')
+                    emit(f'     🟡 {w}')
             emit()
     else:
         emit('\n没有需要改名的项目。')
@@ -176,29 +179,6 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Metadata 字段块（ComicInfo 字段名为 spec 名，不做改动）
 # ═══════════════════════════════════════════════════════════════════════════════
-
-def print_metadata_fields(
-    fields:       dict[str, str],
-    pub_conflict: list[str] | None = None,
-    *,
-    indent:       str = '     ',
-) -> None:
-    """单列形式打印 ComicInfo 字段（examples 子命令使用）。"""
-    col_w = max(len(t) for t in COMICINFO_TAGS) + 2     # 'Tag: ' 列宽（含冒号 + 空格）
-    for tag in COMICINFO_TAGS:
-        label = f'{indent}{(tag + ":"):<{col_w}}'
-        if tag == 'Publisher' and pub_conflict:
-            emit(f'{label}🟡 多个社团文件，请手动确认！')
-            for p in pub_conflict:
-                emit(f'{" " * len(label)}• {os.path.basename(p)}')
-        elif tag == 'Tags':
-            val = fields.get(tag, '')
-            suffix = '  (保留)' if val else ''
-            emit(f'{label}{val}{suffix}'.rstrip())
-        else:
-            val = fields.get(tag, '')
-            emit(f'{label}{val}'.rstrip())
-
 
 def print_metadata_diff_table(
     old_fields:   dict[str, str],

@@ -142,7 +142,7 @@ mt/
 │   ├── parser.py                — parse_name(author, name) → MangaInfo
 │   └── builder.py               — build_new_name(info) → str
 ├── presentation/                — 领域对象的终端渲染
-│   └── view.py                  — print_run_banner / print_*_preview / print_metadata_fields
+│   └── view.py                  — print_run_banner / print_*_preview / print_metadata_diff_table
 └── workflow/                    — 高层工作流
     ├── sourcefile.py            — 源文件扫描、重命名执行
     ├── metadata.py              — ComicInfo.xml 生成 & 写入
