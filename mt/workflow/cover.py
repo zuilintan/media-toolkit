@@ -241,6 +241,16 @@ def plan_cover(
             error=f'打开 CBZ 失败: {e}',
         )
 
+    # 源即目标 → 上一次已处理过；再次裁剪/编码必然产生新字节（smartcrop
+    # 步长取整会切几像素，center 模式也会因 WebP 重编码而字节不一致），
+    # 导致每跑一次都"变小一圈"。这里直接标记为已是最新，跳过处理。
+    if src_name.lower() == dst_name.lower():
+        return CoverPlan(
+            cbz_path=cbz_path, src_name=src_name, src_size=None,
+            dst_size=None, mode=mode, dst_name=dst_name,
+            webp_bytes=src_bytes, existing_bytes=src_bytes, error='',
+        )
+
     try:
         # 解码源图：开启炸弹豁免（我们自己控制下游尺寸）
         Image.MAX_IMAGE_PIXELS = None
