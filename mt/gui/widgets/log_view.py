@@ -13,8 +13,32 @@ from __future__ import annotations
 import re
 
 from PySide6.QtCore import Slot
-from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit
+
+# 中西等宽融合字体优先列表（CJK 字形宽 = ASCII 字形宽 × 2，表格对齐稳定）。
+# 找不到任何一款时回落 Consolas（纯 ASCII 等宽，CJK 靠系统回落字体，可能对齐略差）。
+_CJK_MONO_CANDIDATES = [
+    'JetBrains Maple Mono',   # Fusion-JetBrainsMapleMono（用户已安装）
+    'Maple Mono NF CN',
+    'Maple Mono CN',
+    'Sarasa Mono SC',
+    'Sarasa Fixed SC',
+    'Source Han Mono SC',
+]
+
+
+def _pick_log_font(size: int = 10) -> QFont:
+    installed = set(QFontDatabase.families())
+    for name in _CJK_MONO_CANDIDATES:
+        if name in installed:
+            font = QFont(name)
+            font.setPointSize(size)
+            return font
+    font = QFont('Consolas')
+    font.setStyleHint(QFont.Monospace)
+    font.setPointSize(size)
+    return font
 
 
 # ── ANSI SGR ───────────────────────────────────────────────────────────────────
@@ -40,10 +64,7 @@ class LogView(QPlainTextEdit):
         self.setReadOnly(True)
         self.setMaximumBlockCount(10000)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
-        font = QFont('Consolas')
-        font.setStyleHint(QFont.Monospace)
-        font.setPointSize(10)
-        self.setFont(font)
+        self.setFont(_pick_log_font())
 
         # 当前段前景色；None = 用调色板默认色
         self._fg: QColor | None = None
