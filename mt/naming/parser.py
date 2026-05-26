@@ -257,8 +257,10 @@ def _extract_translation(bare: str) -> tuple[str, str]:
 
 
 def _normalize_chapter_title(s: str) -> str:
-    """将话标题中的 本1/本2 转为带圈数字 本①/本②。"""
-    return re.sub(r'本(\d{1,2})', lambda m: '本' + to_circle(int(m.group(1))), s)
+    """将话标题中的 本1/本2 转为带圈数字 本①/本②；CJK 间的 ASCII 连字符规范化为 ・。"""
+    s = re.sub(r'本(\d{1,2})', lambda m: '本' + to_circle(int(m.group(1))), s)
+    s = re.sub(r'(?<=[^\x00-\x7f])-(?=[^\x00-\x7f])', '・', s)
+    return s
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -429,7 +431,9 @@ def parse_name(author: str, name: str) -> MangaInfo:
             )
 
     # 7. 提取话标题 & part_tag
-    clean_title = P.normalize_subtitle_delimiters(clean_title)
+    # 若标题已含 ～...～ 形态，无需再做定界符转换（避免误处理内部 -）
+    if not P.SUBTITLE_RE.search(clean_title):
+        clean_title = P.normalize_subtitle_delimiters(clean_title)
     main_title, ch_title = extract_subtitle(clean_title)
     if ch_title:
         ch_title = _normalize_chapter_title(ch_title)
