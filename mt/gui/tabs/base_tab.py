@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from mt.gui.gui_config import get_config
 from mt.gui.qt_sink import QtSink
 from mt.gui.widgets.path_picker import PathPicker
 from mt.gui.workers.apply import apply_and_move
@@ -51,9 +52,13 @@ class BaseTab(QWidget):
         self._plans: list[Any] | None = None
 
         # ── UI 装配 ───────────────────────────────────────────────────
-        self._root_picker = PathPicker(self.root_label, self.root_placeholder)
+        self._root_picker = PathPicker(
+            self.root_label, self.root_placeholder,
+            history_key=f'{self.cmd_name}.root',
+        )
         self._move_picker = PathPicker(
             '处理后移动到:', '可选；留空则不移动',
+            history_key=f'{self.cmd_name}.move',
         )
         dir_box = QGroupBox('目录')
         dir_lay = QVBoxLayout(dir_box)
@@ -84,11 +89,25 @@ class BaseTab(QWidget):
         root_lay.addStretch(1)
 
         self.busy_changed.connect(self._on_busy)
+        self._load_settings()
 
     # ── 子类策略钩子 ───────────────────────────────────────────────────
     def _build_options_box(self) -> QWidget | None:
         """返回放在「目录」组下方的选项组（QGroupBox）；无可省略选项可返回 None。"""
         return None
+
+    def _load_settings(self) -> None:
+        """从持久化配置恢复控件状态；在 _build_options_box 之后调用。
+        基类处理 jobs（所有 Tab 共有）；子类可 super() 后追加自己的字段。"""
+        if not hasattr(self, '_jobs'):
+            return
+        cfg = get_config()
+        v = cfg.get(f'{self.cmd_name}.jobs')
+        if v is not None:
+            self._jobs.setValue(int(v))
+        self._jobs.valueChanged.connect(
+            lambda val: cfg.set(f'{self.cmd_name}.jobs', val)
+        )
 
     def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
         """返回 ``(plan_fn, args, kwargs)``，BaseTab 据此在 worker 线程调用。"""

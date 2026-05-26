@@ -1,7 +1,9 @@
 """
-path_picker.py — 路径选择部件（输入框 + 浏览按钮 + 接收拖拽）
+path_picker.py — 路径选择部件（下拉历史 + 浏览按钮 + 接收拖拽）
 
 替代 CLI 的 --root / --move-to 文本参数，并兼容把目录从资源管理器拖入。
+传入 history_key 后，部件自动从持久化配置读取历史路径并在下拉列表展示；
+通过浏览/拖拽/手动输入确认路径时，自动将其推入历史（最近优先）。
 """
 
 from __future__ import annotations
@@ -10,22 +12,40 @@ from pathlib import Path
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget,
+    QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QWidget,
 )
+
+from mt.gui.gui_config import get_config
 
 
 class PathPicker(QWidget):
-    """单行路径输入：标签 + 输入框 + 浏览按钮；整体接受目录拖拽。"""
+    """路径输入：标签 + 可编辑下拉框（历史） + 浏览按钮；整体接受目录拖拽。"""
 
     path_changed = Signal(str)
 
-    def __init__(self, label: str = '目录:', placeholder: str = '', parent=None) -> None:
+    def __init__(
+        self,
+        label:       str = '目录:',
+        placeholder: str = '',
+        history_key: str = '',
+        parent=None,
+    ) -> None:
         super().__init__(parent)
+        self._history_key = history_key
         self.setAcceptDrops(True)
 
-        self._edit = QLineEdit()
-        self._edit.setPlaceholderText(placeholder or '选择或拖入目录...')
-        self._edit.textChanged.connect(self.path_changed)
+        self._combo = QComboBox()
+        self._combo.setEditable(True)
+        self._combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self._combo.lineEdit().setPlaceholderText(placeholder or '选择或拖入目录...')
+        self._combo.currentTextChanged.connect(self.path_changed)
+
+        # 加载历史，并预填最近一次使用的路径
+        if history_key:
+            self._reload_items()
 
         self._btn = QPushButton('浏览…')
         self._btn.clicked.connect(self._pick)
@@ -33,17 +53,19 @@ class PathPicker(QWidget):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(QLabel(label))
-        lay.addWidget(self._edit, 1)
+        lay.addWidget(self._combo, 1)
         lay.addWidget(self._btn)
 
-    # ── 公共 API ──
+    # ── 公共 API ──────────────────────────────────────────────────────
     def path(self) -> str:
-        return self._edit.text().strip()
+        return self._combo.currentText().strip()
 
     def set_path(self, p: str) -> None:
-        self._edit.setText(p)
+        """设置当前路径，并推入历史。"""
+        self._combo.setCurrentText(p)
+        self._push(p)
 
-    # ── 拖拽 ──
+    # ── 拖拽 ──────────────────────────────────────────────────────────
     def dragEnterEvent(self, e: QDragEnterEvent) -> None:
         if e.mimeData().hasUrls():
             for url in e.mimeData().urls():
@@ -62,9 +84,28 @@ class PathPicker(QWidget):
                     return
         e.ignore()
 
-    # ── 内部 ──
+    # ── 内部 ──────────────────────────────────────────────────────────
     def _pick(self) -> None:
-        start = self._edit.text().strip() or ''
+        start = self.path() or ''
         chosen = QFileDialog.getExistingDirectory(self, '选择目录', start)
         if chosen:
             self.set_path(chosen)
+
+    def _push(self, p: str) -> None:
+        """推入历史并刷新下拉列表。"""
+        if not p or not self._history_key:
+            return
+        get_config().push_history(self._history_key, p)
+        self._reload_items()
+
+    def _reload_items(self) -> None:
+        """从配置重新加载历史条目到下拉列表，保持当前文本不变。"""
+        hist = get_config().get_history(self._history_key)
+        current = self._combo.currentText()
+        self._combo.blockSignals(True)
+        self._combo.clear()
+        for item in hist:
+            self._combo.addItem(item)
+        # 恢复文本；若历史非空且当前为空，则预填最近路径
+        self._combo.setCurrentText(current if current else (hist[0] if hist else ''))
+        self._combo.blockSignals(False)

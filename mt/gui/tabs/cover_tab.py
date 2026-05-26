@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from mt.core.models import CoverPlan
+from mt.gui.gui_config import get_config
 from mt.gui.tabs.base_tab import BaseTab
 from mt.presentation.view import print_cover_preview
 from mt.workflow.cover import (
@@ -55,6 +56,20 @@ class CoverTab(BaseTab):
         lay.addWidget(self._jobs)
         lay.addStretch(1)
         return box
+
+    def _load_settings(self) -> None:
+        super()._load_settings()
+        cfg = get_config()
+        if (v := cfg.get('cover.smart')) is not None:
+            self._smart.setChecked(bool(v))
+        if (v := cfg.get('cover.quality')) is not None:
+            self._quality.setValue(int(v))
+        self._smart.stateChanged.connect(
+            lambda: cfg.set('cover.smart', self._smart.isChecked())
+        )
+        self._quality.valueChanged.connect(
+            lambda v: cfg.set('cover.quality', v)
+        )
 
     def _mode(self) -> str:
         return 'smart' if self._smart.isChecked() else 'center'
