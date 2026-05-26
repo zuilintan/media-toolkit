@@ -78,16 +78,13 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from mt.gui.main_window import MainWindow
-    from mt.gui.qt_sink import QtSink
-    from mt.infra.console import set_output, setup_logging
+    from mt.infra.console import setup_logging
 
     app = QApplication(argv if argv is not None else sys.argv)
 
     setup_logging(debug=False)
-    sink = QtSink()
-    set_output(sink)
 
-    win = MainWindow(sink)
+    win = MainWindow()
     win.show()
     return app.exec()
 

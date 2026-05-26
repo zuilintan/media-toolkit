@@ -22,10 +22,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from mt.gui.qt_sink import QtSink
 from mt.gui.widgets.path_picker import PathPicker
 from mt.gui.workers.apply import apply_and_move
 from mt.gui.workers.plan_worker import Worker
-from mt.infra.console import SEP2, emit
+from mt.infra.console import SEP2, emit, set_output
 from mt.presentation.view import print_run_banner
 
 
@@ -44,6 +45,7 @@ class BaseTab(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self._sink   = QtSink()          # 此 Tab 专属输出通道
         self._thread: QThread | None = None
         self._worker: Worker | None = None
         self._plans: list[Any] | None = None
@@ -118,6 +120,7 @@ class BaseTab(QWidget):
             QMessageBox.warning(self, '提示', f'不是有效目录:\n{root}')
             return
 
+        set_output(self._sink)
         self._plans = None
         self._apply_btn.setEnabled(False)
         self._status.setText('扫描中...')
@@ -148,6 +151,7 @@ class BaseTab(QWidget):
     def _on_apply(self) -> None:
         if not self._plans:
             return
+        set_output(self._sink)
         n = self._count_actionable(self._plans)
         if not n:
             QMessageBox.information(self, '提示', self.no_change_msg)
