@@ -1,5 +1,16 @@
 # manga-toolkit
 
+> 从网络下载的漫画文件，命名混乱、格式不一，时间一长就变得难以管理，几乎不可能直接导入 Booklore（现 Grimmory）。  
+> 该项目旨在通过正则匹配批量规范文件名、填充标准元数据，并生成统一比例封面，让你的漫画收藏更加整洁、专业。
+
+**如何快速判断该项目是否适合你？**
+
+直接查看示例对比：  
+[`mt/data/examples.json`](mt/data/examples.json)  
+其中 `i`（input）为原始文件名，`e`（expected）为本项目处理后的预期结果。
+
+---
+
 漫画文件整理工具集，提供：
 
 - 统一 CLI `manga-toolkit-cli`
