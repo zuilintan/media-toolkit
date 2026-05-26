@@ -45,6 +45,15 @@ poetry run manga-toolkit-gui
 > GUI 当前要求 Python 3.11 – 3.13（受 PySide6 wheel 覆盖范围限制）。
 > 仅装 CLI 时无此限制。
 
+### 体检
+
+```bash
+poetry run manga-toolkit-cli doctor
+```
+
+打印当前 Python 版本与各依赖安装状态；任一项异常时退出码 1，便于发
+issue 前自查或脚本判断。
+
 ---
 
 ## 目标命名格式

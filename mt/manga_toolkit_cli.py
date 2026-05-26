@@ -40,6 +40,7 @@ from mt.infra.console import setup_logging
 from mt.cli.sourcefile import cmd_sourcefile, add_sourcefile_args
 from mt.cli.metadata   import cmd_metadata,   add_metadata_args
 from mt.cli.cover      import cmd_cover,      add_cover_args
+from mt.cli.doctor     import cmd_doctor,     add_doctor_args
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -125,6 +126,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_cover_args(p_cover)
     p_cover.set_defaults(func=cmd_cover)
+
+    # doctor
+    p_doctor = sub.add_parser(
+        'doctor',
+        help='环境体检（Python 版本 + 各依赖安装状态）',
+        description='打印当前环境的 Python 版本与依赖安装状态，'
+                    '便于发 issue 前自查。',
+    )
+    add_doctor_args(p_doctor)
+    p_doctor.set_defaults(func=cmd_doctor)
 
     return parser
 
