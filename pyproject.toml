@@ -2,7 +2,8 @@
 name = "manga-toolkit"
 version = "0.1.2"
 description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
-authors = []
+authors = ["Lin Tan"]
+license = "MIT"
 readme = "README.md"
 packages = [{include = "mt"}]
 
