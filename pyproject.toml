@@ -18,9 +18,19 @@ smartcrop = ">=0.3.2"
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"
 
+# 可选 GUI 组：`poetry install --with gui` 才装；CLI 用户零负担
+[tool.poetry.group.gui]
+optional = true
+
+[tool.poetry.group.gui.dependencies]
+# PySide6 当前 wheel 仅覆盖 Python 3.9–3.13；约束写在依赖项而非主 python，
+# 避免影响仅装 CLI 的用户。
+PySide6 = { version = ">=6.6", python = ">=3.11,<3.14" }
+
 [tool.poetry.scripts]
 # CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
 manga-toolkit-cli = "mt.manga_toolkit_cli:main"
+manga-toolkit-gui = "mt.gui.app:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
