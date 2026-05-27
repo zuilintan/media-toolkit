@@ -109,7 +109,8 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
 
     _print_preview_footer(
         len(plans),
-        [('计划处理', len(changed)), ('需审核', len(reviews)), ('警告', len(warns))],
+        [('计划处理', len(changed)), ('无需处理', len(unchanged)),
+         ('需审核', len(reviews)), ('警告', len(warns))],
     )
 
 
