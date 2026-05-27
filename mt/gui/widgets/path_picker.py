@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QWidget,
 )
@@ -70,11 +70,19 @@ class PathPicker(QWidget):
         if e.mimeData().hasUrls():
             for url in e.mimeData().urls():
                 if url.isLocalFile() and Path(url.toLocalFile()).is_dir():
+                    self._combo.setStyleSheet(
+                        'QComboBox { border: 2px solid #56b6c2; }'
+                    )
                     e.acceptProposedAction()
                     return
         e.ignore()
 
+    def dragLeaveEvent(self, e: QDragLeaveEvent) -> None:
+        self._combo.setStyleSheet('')
+        e.accept()
+
     def dropEvent(self, e: QDropEvent) -> None:
+        self._combo.setStyleSheet('')
         for url in e.mimeData().urls():
             if url.isLocalFile():
                 p = Path(url.toLocalFile())
