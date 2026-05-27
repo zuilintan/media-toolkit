@@ -135,13 +135,13 @@ class MainWindow(QMainWindow):
                 super().keyPressEvent(event)
                 return
             tab = self._tab_list[self._tabs.currentIndex()]
-            if event.modifiers() == Qt.ControlModifier:
+            if event.modifiers() & Qt.ControlModifier:
                 if tab._apply_btn.isEnabled():
                     tab._apply_btn.click()
             else:
                 if tab._scan_btn.isEnabled():
                     tab._scan_btn.click()
-        elif event.key() == Qt.Key_L and event.modifiers() == Qt.ControlModifier:
+        elif event.key() == Qt.Key_L and event.modifiers() & Qt.ControlModifier:
             self._clear_current_log()
         else:
             super().keyPressEvent(event)
