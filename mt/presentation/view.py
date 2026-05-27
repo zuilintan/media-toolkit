@@ -88,7 +88,7 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
     _print_preview_header('漫画重命名预览')
 
     if changed:
-        emit(f'\n计划处理: {len(changed)} 个\n')
+        emit()
         for idx, p in enumerate(changed, 1):
             note = ' 🟡 需审核' if p.needs_review else ''
             emit(f'   📄 [{idx}]{note}')
@@ -103,7 +103,7 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
     else:
         emit('\n没有需要改名的项目。')
 
-    if unchanged: emit(f'无需处理: {len(unchanged)} 个')
+
     if reviews:   emit(f'🟡  需人工审核: {len(reviews)} 个')
     if warns:     emit(f'🟡  有警告:    {len(warns)} 个')
 
@@ -137,7 +137,7 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
     _print_preview_header('ComicInfo 写入预览')
 
     if changed:
-        emit(f'\n计划处理: {len(changed)} 个\n')
+        emit()
         for idx, p in enumerate(changed, 1):
             emit(f'   📄 [{idx}] {p.filename}')
             emit_parse_debug(p.mi)
@@ -156,7 +156,7 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
     else:
         emit('\n没有需要写入的 ComicInfo.xml。')
 
-    if unchanged: emit(f'无需处理: {len(unchanged)} 个')
+
     if conflict:  emit(f'⛔  出版商冲突: {len(conflict)} 个')
     if warns:     emit(f'🟡  有警告:    {len(warns)} 个')
 
@@ -238,7 +238,7 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
     _print_preview_header('封面写入预览')
 
     if changed:
-        emit(f'\n计划处理: {len(changed)} 个\n')
+        emit()
         for idx, p in enumerate(changed, 1):
             note = ' 🔁 替换现有' if p.replaced else ''
             emit(f'   📄 [{idx}] {p.filename}{note}')
