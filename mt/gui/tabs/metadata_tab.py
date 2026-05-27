@@ -20,8 +20,8 @@ from mt.workflow.metadata import apply_metadata_plans, plan_metadatas
 
 class MetadataTab(BaseTab):
     cmd_name         = 'metadata'
-    apply_btn_text   = '写入 ComicInfo.xml'
-    confirm_verb     = '写入 ComicInfo.xml'
+    apply_btn_text   = '执行'
+    confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的文件'
     root_label       = 'CBZ 根目录:'
     root_placeholder = '递归扫描所有 .cbz'

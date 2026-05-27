@@ -85,7 +85,7 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
     reviews   = [p for p in plans if p.needs_review]
     warns     = [p for p in plans if p.info and p.info.warnings]
 
-    _print_preview_header('漫画重命名预览')
+    _print_preview_header('预览')
 
     if changed:
         emit()
@@ -135,7 +135,7 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
     conflict  = [p for p in plans if not p.writable]
     warns     = [p for p in plans if p.mi.warnings]
 
-    _print_preview_header('ComicInfo 写入预览')
+    _print_preview_header('预览')
 
     if changed:
         emit()
@@ -236,7 +236,7 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
     failed    = [p for p in plans if not p.writable]
     replaced  = [p for p in changed if p.replaced]
 
-    _print_preview_header('封面写入预览')
+    _print_preview_header('预览')
 
     if changed:
         emit()

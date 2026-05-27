@@ -21,8 +21,8 @@ from mt.workflow.sourcefile import apply_sourcefile_plans, plan_sourcefiles
 
 class SourcefileTab(BaseTab):
     cmd_name         = 'sourcefile'
-    apply_btn_text   = '执行重命名'
-    confirm_verb     = '执行重命名'
+    apply_btn_text   = '执行'
+    confirm_verb     = '执行'
     no_change_msg    = '没有可执行的重命名'
     root_label       = '漫画根目录:'
     root_placeholder = '作者目录所在的根目录'

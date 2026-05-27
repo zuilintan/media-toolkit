@@ -23,8 +23,8 @@ from mt.workflow.cover import (
 
 class CoverTab(BaseTab):
     cmd_name         = 'cover'
-    apply_btn_text   = '写入封面'
-    confirm_verb     = '写入封面'
+    apply_btn_text   = '执行'
+    confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的封面'
     root_label       = 'CBZ 根目录:'
     root_placeholder = '递归扫描所有 .cbz'

@@ -65,8 +65,8 @@ class BaseTab(QWidget):
         dir_lay.addWidget(self._root_picker)
         dir_lay.addWidget(self._move_picker)
 
-        self._scan_btn  = QPushButton('扫描预览')
-        self._scan_btn.setToolTip('扫描预览 [Enter]')
+        self._scan_btn  = QPushButton('预览')
+        self._scan_btn.setToolTip('预览 [Enter]')
         self._apply_btn = QPushButton(self.apply_btn_text)
         self._apply_btn.setToolTip(f'{self.apply_btn_text} [Ctrl+Enter]')
         self._apply_btn.setEnabled(False)
@@ -196,7 +196,7 @@ class BaseTab(QWidget):
             self, '确认',
             f'确认对 {n} 个项目{self.confirm_verb}？',
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
+            QMessageBox.No,
         )
         if ans != QMessageBox.Yes:
             return
