@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtWidgets import (
-    QHBoxLayout, QMainWindow, QPushButton, QSplitter, QStackedWidget,
-    QTabWidget, QVBoxLayout, QWidget,
+    QAbstractSpinBox, QHBoxLayout, QLineEdit, QMainWindow, QPushButton,
+    QSplitter, QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from mt import __version__
@@ -99,6 +99,24 @@ class MainWindow(QMainWindow):
 
     def _clear_current_log(self) -> None:
         self._logs[self._tabs.currentIndex()].clear_log()
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            focused = self.focusWidget()
+            if isinstance(focused, (QLineEdit, QAbstractSpinBox)):
+                super().keyPressEvent(event)
+                return
+            tab = self._tab_list[self._tabs.currentIndex()]
+            if event.modifiers() == Qt.ControlModifier:
+                if tab._apply_btn.isEnabled():
+                    tab._apply_btn.click()
+            else:
+                if tab._scan_btn.isEnabled():
+                    tab._scan_btn.click()
+        elif event.key() == Qt.Key_L and event.modifiers() == Qt.ControlModifier:
+            self._clear_current_log()
+        else:
+            super().keyPressEvent(event)
 
     def closeEvent(self, event) -> None:
         cfg = get_config()
