@@ -128,9 +128,45 @@ def collect_fields(
     }
 
 
+# 「metadata creator」Notes 形态：识别仅本工具自动产出的版本号差异
+_METADATA_CREATOR_RE = re.compile(
+    rf'^"metadata creator":\s*"{re.escape(SCRIPT_NAME)}\s+\S+"$'
+)
+
+
+def _only_creator_version_differs(
+    existing: dict[str, str], new: dict[str, str],
+) -> bool:
+    """旧/新字段除 Notes 外完全相同，且双方 Notes 都是「metadata creator」形态。
+
+    用于避免本工具版本升级导致仅 Notes 中 SCRIPT_VERSION 变动的无意义改写。
+    """
+    for tag in COMICINFO_TAGS:
+        if tag == 'Notes':
+            continue
+        if existing.get(tag, '') != new.get(tag, ''):
+            return False
+    en, nn = existing.get('Notes', ''), new.get('Notes', '')
+    if en == nn:
+        return False
+    return bool(_METADATA_CREATOR_RE.match(en) and _METADATA_CREATOR_RE.match(nn))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # XML 生成
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def _serialize_xml(fields: dict[str, str]) -> bytes:
+    """按 COMICINFO_TAGS 顺序将 {tag: value} 序列化为 ComicInfo v2.1 UTF-8 XML。"""
+    root = Element('ComicInfo')
+    root.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+    root.set('xmlns:xsd', 'http://www.w3.org/2001/XMLSchema')
+    for tag in COMICINFO_TAGS:
+        SubElement(root, tag).text = fields[tag]
+    raw    = tostring(root, encoding='unicode')
+    pretty = minidom.parseString(raw).toprettyxml(indent='  ', encoding='utf-8')
+    return pretty
+
 
 def build_comicinfo_xml(
     info: MangaInfo,
@@ -139,15 +175,7 @@ def build_comicinfo_xml(
     page_count: int = 0,
 ) -> bytes:
     """生成 ComicInfo v2.1 XML，返回 UTF-8 bytes。"""
-    root = Element('ComicInfo')
-    root.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
-    root.set('xmlns:xsd', 'http://www.w3.org/2001/XMLSchema')
-    fields = collect_fields(info, publisher, existing_tags, page_count)
-    for tag in COMICINFO_TAGS:
-        SubElement(root, tag).text = fields[tag]
-    raw    = tostring(root, encoding='unicode')
-    pretty = minidom.parseString(raw).toprettyxml(indent='  ', encoding='utf-8')
-    return pretty
+    return _serialize_xml(collect_fields(info, publisher, existing_tags, page_count))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -318,7 +346,14 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
     publisher, pub_conflict     = find_publisher(cbz_path)
     page_count, tags_val, existing_xml = read_cbz_meta(cbz_path)
     fields                      = collect_fields(mi, publisher, tags_val, page_count)
-    new_xml                     = build_comicinfo_xml(mi, publisher, tags_val, page_count)
+    existing_fields             = _parse_existing_fields(existing_xml)
+
+    # 仅 Notes 中 SCRIPT_VERSION 变动时保留旧 Notes，使 new_xml == existing_xml
+    # → plan.changed 为 False，整批写入幂等跳过此文件
+    if existing_xml is not None and _only_creator_version_differs(existing_fields, fields):
+        fields['Notes'] = existing_fields['Notes']
+
+    new_xml = _serialize_xml(fields)
     return MetadataPlan(
         cbz_path        = cbz_path,
         mi              = mi,
@@ -327,7 +362,7 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
         page_count      = page_count,
         tags_val        = tags_val,
         fields          = fields,
-        existing_fields = _parse_existing_fields(existing_xml),
+        existing_fields = existing_fields,
         existing_xml    = existing_xml,
         new_xml         = new_xml,
     )
