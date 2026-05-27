@@ -10,13 +10,11 @@ log_view.py — 接收 QtSink 文本流的只读日志框
 """
 
 from __future__ import annotations
-import os
 import re
-from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl, Slot
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import (
-    QAction, QColor, QFont, QFontDatabase, QMouseEvent,
+    QAction, QColor, QFont, QFontDatabase,
     QTextCharFormat, QTextCursor,
 )
 from PySide6.QtWidgets import QApplication, QMenu, QPlainTextEdit
@@ -115,17 +113,7 @@ class LogView(QPlainTextEdit):
         self.clear()
         self._fg = None
 
-    # ── 路径交互 ───────────────────────────────────────────────────────
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        cursor = self.cursorForPosition(event.pos())
-        block = cursor.block()
-        line_text = block.text()
-        paths = _PATH_RE.findall(line_text)
-        if paths:
-            from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QUrl.fromLocalFile(paths[0]))
-        super().mouseDoubleClickEvent(event)
-
+    # ── 右键菜单 ───────────────────────────────────────────────────────
     def contextMenuEvent(self, event) -> None:
         menu = self.createStandardContextMenu(event.pos())
         cursor = self.cursorForPosition(event.pos())
