@@ -291,10 +291,8 @@ def apply_cover_plan(plan: CoverPlan) -> str:
     filename = plan.filename
     try:
         assert plan.webp_bytes is not None and plan.dst_name is not None
-        replaced = write_cover(plan.cbz_path, plan.dst_name, plan.webp_bytes)
-        verb     = '已更新' if replaced else '已写入'
-        sz       = f'{plan.dst_size[0]}×{plan.dst_size[1]}'
-        emit(f'   ✅ {filename} — {plan.dst_name} {verb} ({sz})')
+        write_cover(plan.cbz_path, plan.dst_name, plan.webp_bytes)
+        emit(f'   ✅ {filename} — 已处理')
         return 'ok'
     except Exception as e:
         error(f'{filename} — {e}')

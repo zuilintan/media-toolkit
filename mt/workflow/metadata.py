@@ -376,8 +376,8 @@ def apply_metadata_plan(plan: MetadataPlan) -> str:
     """
     filename = os.path.basename(plan.cbz_path)
     try:
-        replaced = write_comicinfo(plan.cbz_path, plan.new_xml)
-        emit(f'   ✅ {filename} — ComicInfo.xml {"已更新" if replaced else "已写入"}')
+        write_comicinfo(plan.cbz_path, plan.new_xml)
+        emit(f'   ✅ {filename} — 已处理')
         return 'ok'
     except Exception as e:
         error(f'{filename} — {e}')

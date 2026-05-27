@@ -137,8 +137,7 @@ def apply_sourcefile_plans(
                 warn(f'跳过（目标已存在）: {p.new_name}')
                 skip += 1
             else:
-                emit(f'   ✅ 旧: {p.old_name}')
-                emit(f'     新: {p.new_name}')
+                emit(f'   ✅ {p.old_name} — 已处理')
                 ok_n += 1
         except Exception as e:
             error(f'{p.old_name} — {e}')
