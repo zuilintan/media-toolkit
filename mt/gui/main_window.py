@@ -45,9 +45,9 @@ class MainWindow(QMainWindow):
         self._tab_list = [tab0, tab1, tab2]
 
         self._tabs = QTabWidget()
-        self._tabs.addTab(tab0, 'sourcefile')
-        self._tabs.addTab(tab1, 'cover')
-        self._tabs.addTab(tab2, 'metadata')
+        self._tabs.addTab(tab0, '1. sourcefile')
+        self._tabs.addTab(tab1, '2. cover')
+        self._tabs.addTab(tab2, '3. metadata')
 
         # ── 每 Tab 独立 LogView，叠放在 QStackedWidget ────────────────
         self._log_stack = QStackedWidget()
