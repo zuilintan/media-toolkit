@@ -185,6 +185,7 @@ class BaseTab(QWidget):
         if ans != QMessageBox.Yes:
             return
 
+        self._actionable_n = n
         self._status.setText('写入中...')
         self._run(
             apply_and_move,
@@ -197,7 +198,11 @@ class BaseTab(QWidget):
         )
 
     def _on_applied(self, fail: int) -> None:
-        self._status.setText(f'写入完成{"（有失败）" if fail else ""}')
+        ok = self._actionable_n - fail
+        self._status.setText(
+            f'写入完成：成功 {ok} / 失败 {fail}'
+            if fail else f'写入完成：全部成功 ({ok})'
+        )
         emit(SEP2)
         self._plans = None
         self._apply_btn.setEnabled(False)
