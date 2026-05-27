@@ -42,6 +42,8 @@ class PathPicker(QWidget):
         )
         self._combo.lineEdit().setPlaceholderText(placeholder or '选择或拖入目录...')
         self._combo.currentTextChanged.connect(self.path_changed)
+        # 下拉选择时推入历史（浏览/拖拽已通过 set_path → _push 处理）
+        self._combo.activated.connect(lambda: self._push(self.path()))
 
         # 加载历史，并预填最近一次使用的路径
         if history_key:
