@@ -88,7 +88,10 @@ def plan_sourcefiles(
         return []
     author_dirs = [d for d in sorted(root_path.iterdir()) if d.is_dir()]
     items       = _iter_sourcefile_items(author_dirs)
-    emit(f'  找到条目: {len(items)} 项（{len(author_dirs)} 个作者目录）')
+    zip_n = sum(1 for _, p in items if p.lower().endswith('.zip'))
+    cbz_n = len(items) - zip_n
+    emit(f'  找到文件: {zip_n} 个 .zip，{cbz_n} 个 .cbz'
+         f'（{len(author_dirs)} 个作者目录）')
     return run_plans(
         items, _plan_one, jobs=jobs, progress_line=_progress_line,
         on_progress=on_progress, cancel_token=cancel_token,
