@@ -64,14 +64,18 @@ class MainWindow(QMainWindow):
         # 初始输出路由到第一个 Tab
         set_output(tab0._sink)
 
-        # ── 日志头：清空按钮 ──────────────────────────────────────────
+        # ── 日志头：导出 / 清空 ──────────────────────────────────────
         log_header = QWidget()
         hh = QHBoxLayout(log_header)
         hh.setContentsMargins(0, 0, 0, 0)
+        export_btn = QPushButton('导出日志')
+        export_btn.setToolTip('将当前日志保存为 .txt')
+        export_btn.clicked.connect(self._export_current_log)
         clear_btn = QPushButton('清空日志')
         clear_btn.setToolTip('清空日志 [Ctrl+L]')
         clear_btn.clicked.connect(self._clear_current_log)
         hh.addStretch(1)
+        hh.addWidget(export_btn)
         hh.addWidget(clear_btn)
 
         log_panel = QWidget()
@@ -100,6 +104,18 @@ class MainWindow(QMainWindow):
 
     def _clear_current_log(self) -> None:
         self._logs[self._tabs.currentIndex()].clear_log()
+
+    def _export_current_log(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self, '导出日志', 'manga-toolkit.log',
+            'Text files (*.txt *.log);;All files (*)',
+        )
+        if not path:
+            return
+        text = self._logs[self._tabs.currentIndex()].toPlainText()
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(text)
 
     def keyPressEvent(self, event) -> None:
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
