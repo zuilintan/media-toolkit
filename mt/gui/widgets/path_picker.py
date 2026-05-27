@@ -60,10 +60,11 @@ class PathPicker(QWidget):
 
     # ── 公共 API ──────────────────────────────────────────────────────
     def path(self) -> str:
-        return self._combo.currentText().strip()
+        return self._combo.currentText().strip().replace('\\', '/')
 
     def set_path(self, p: str) -> None:
         """设置当前路径，并推入历史。"""
+        p = p.replace('\\', '/')
         self._combo.setCurrentText(p)
         self._push(p)
 
