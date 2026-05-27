@@ -58,7 +58,7 @@ def run_plans(
     jobs:               int = 1,
     parallel_threshold: int = DEFAULT_PARALLEL_THRESHOLD,
     progress_line:      Callable[[int, int, R], str] | None = None,
-    parallel_banner:    str = '⚙️  并行处理',
+    parallel_banner:    str = '⚙️ 并行处理',
     on_progress:        Callable[[int, int], None] | None = None,
     cancel_token:       threading.Event | None = None,
 ) -> list[R]:
