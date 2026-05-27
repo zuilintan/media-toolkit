@@ -35,14 +35,18 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f'manga-toolkit  —  {__version__}')
+        self._base_title = f'manga-toolkit  —  {__version__}'
+        self.setWindowTitle(self._base_title)
         self.resize(1100, 800)
+        self._busy_count = 0
 
         # ── Tab ──────────────────────────────────────────────────────
         tab0 = SourcefileTab()
         tab1 = CoverTab()
         tab2 = MetadataTab()
         self._tab_list = [tab0, tab1, tab2]
+        for tab in self._tab_list:
+            tab.busy_changed.connect(self._on_tab_busy)
 
         self._tabs = QTabWidget()
         self._tabs.addTab(tab0, '1. sourcefile')
@@ -101,6 +105,13 @@ class MainWindow(QMainWindow):
         sizes = cfg.get('window.splitter')
         if sizes:
             self._splitter.setSizes(sizes)
+
+    def _on_tab_busy(self, busy: bool) -> None:
+        self._busy_count += 1 if busy else -1
+        if self._busy_count > 0:
+            self.setWindowTitle(f'[处理中] {self._base_title}')
+        else:
+            self.setWindowTitle(self._base_title)
 
     def _clear_current_log(self) -> None:
         self._logs[self._tabs.currentIndex()].clear_log()
