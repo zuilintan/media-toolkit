@@ -66,7 +66,9 @@ class BaseTab(QWidget):
         dir_lay.addWidget(self._move_picker)
 
         self._scan_btn  = QPushButton('扫描预览')
+        self._scan_btn.setToolTip('扫描预览 [Enter]')
         self._apply_btn = QPushButton(self.apply_btn_text)
+        self._apply_btn.setToolTip(f'{self.apply_btn_text} [Ctrl+Enter]')
         self._apply_btn.setEnabled(False)
         self._scan_btn.clicked.connect(self._on_scan)
         self._apply_btn.clicked.connect(self._on_apply)

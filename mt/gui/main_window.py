@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
         hh = QHBoxLayout(log_header)
         hh.setContentsMargins(0, 0, 0, 0)
         clear_btn = QPushButton('清空日志')
+        clear_btn.setToolTip('清空日志 [Ctrl+L]')
         clear_btn.clicked.connect(self._clear_current_log)
         hh.addStretch(1)
         hh.addWidget(clear_btn)
