@@ -59,6 +59,11 @@ _PATH_RE = re.compile(
     r'\.(?:cbz|zip|xml|txt|webp|png|jpg|jpeg|gif|bmp)\b',
 )
 
+# emoji / 符号后紧跟的空格（GUI 等宽字体下 emoji 占 1 列，CLI 中占 2 列）
+_EMOJI_SPACE_RE = re.compile(
+    r'([\u2300-\u27FF\uFE00-\uFE0F\U0001F000-\U0001F9FF]) '
+)
+
 # SGR 30–37 → 前景色（深色背景下醒目的中间饱和度，不刺眼）
 _SGR_FG: dict[int, QColor] = {
     31: QColor('#e06c75'),   # red    — 差异字符
@@ -85,6 +90,10 @@ class LogView(QPlainTextEdit):
     # ── 接收文本 ───────────────────────────────────────────────────────
     @Slot(str)
     def append_text(self, s: str) -> None:
+        # 移除 emoji 后紧跟的一个空格（GUI 中等宽字体下 emoji 占 1 列，
+        # CLI 中占 2 列，去掉空格使两端对齐一致）
+        s = _EMOJI_SPACE_RE.sub(r'\1', s)
+
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
 
