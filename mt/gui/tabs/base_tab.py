@@ -125,6 +125,11 @@ class BaseTab(QWidget):
         """统计可执行项（用于按钮启用与确认对话框）。"""
         raise NotImplementedError
 
+    def _classify_plans(self, plans: list[Any]) -> dict[str, int]:
+        """返回分类统计；子类可覆盖提供更精确的分类。"""
+        n = self._count_actionable(plans)
+        return {'可执行': n, '无需操作': len(plans) - n}
+
     def _banner_subtitle(self) -> str:
         """print_run_banner 的副标题；默认为空，子类可覆盖。"""
         return ''
@@ -164,7 +169,11 @@ class BaseTab(QWidget):
         self._render_preview(plans)
         n = self._count_actionable(plans)
         emit(SEP2)
-        self._status.setText(f'扫描完成：{len(plans)} 项，{n} 项可执行')
+        cats = self._classify_plans(plans)
+        parts = ' / '.join(
+            f'{v} {k}' for k, v in cats.items() if v
+        )
+        self._status.setText(f'扫描完成：{len(plans)} 项（{parts}）')
         self._apply_btn.setEnabled(n > 0)
 
     def _on_apply(self) -> None:

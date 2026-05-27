@@ -55,3 +55,9 @@ class SourcefileTab(BaseTab):
 
     def _count_actionable(self, plans: list[SourcefilePlan]) -> int:
         return sum(1 for p in plans if p.changed and not p.needs_review)
+
+    def _classify_plans(self, plans: list[SourcefilePlan]) -> dict[str, int]:
+        actionable = sum(1 for p in plans if p.changed and not p.needs_review)
+        review     = sum(1 for p in plans if p.needs_review)
+        return {'可重命名': actionable, '需审核': review,
+                '无变化': len(plans) - actionable - review}

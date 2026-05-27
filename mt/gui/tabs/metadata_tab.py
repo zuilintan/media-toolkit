@@ -54,3 +54,9 @@ class MetadataTab(BaseTab):
 
     def _count_actionable(self, plans: list[MetadataPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
+
+    def _classify_plans(self, plans: list[MetadataPlan]) -> dict[str, int]:
+        writable = sum(1 for p in plans if p.writable and p.changed)
+        unchanged = sum(1 for p in plans if p.writable and not p.changed)
+        return {'可写入': writable, '无变化': unchanged,
+                '冲突': len(plans) - writable - unchanged}
