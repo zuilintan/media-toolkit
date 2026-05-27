@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "manga-toolkit"
-version = "0.1.3"
+version = "0.1.4"
 description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
 authors = ["Lin Tan"]
 license = "MIT"
