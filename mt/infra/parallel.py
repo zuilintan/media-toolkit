@@ -99,6 +99,17 @@ def run_plans(
                 for idx, item in enumerate(items)
             }
             for done_n, fut in enumerate(as_completed(futures), 1):
+                if _cancelled():
+                    emit('  ⏹️  已取消')
+                    # 先 snapshot 再 shutdown（shutdown 异步清理 _processes）
+                    procs = list(getattr(ex, '_processes', {}).values())
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    for p in procs:
+                        try:
+                            p.kill()
+                        except Exception:
+                            pass
+                    break
                 idx          = futures[fut]
                 result       = fut.result()   # worker 内部应已吸收业务异常
                 results[idx] = result
@@ -106,9 +117,6 @@ def run_plans(
                     emit(progress_line(done_n, total, result), flush=True)
                 if on_progress:
                     on_progress(done_n, total)
-                if _cancelled():
-                    emit('  ⏹️  已取消')
-                    break
     else:
         for idx, item in enumerate(items):
             if _cancelled():
