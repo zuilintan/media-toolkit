@@ -73,9 +73,14 @@ class BaseTab(QWidget):
         self._scan_btn.clicked.connect(self._on_scan)
         self._apply_btn.clicked.connect(self._on_apply)
 
+        self._cancel_btn = QPushButton('取消')
+        self._cancel_btn.setVisible(False)
+        self._cancel_btn.clicked.connect(self._on_cancel)
+
         btn_lay = QHBoxLayout()
         btn_lay.addWidget(self._scan_btn)
         btn_lay.addWidget(self._apply_btn)
+        btn_lay.addWidget(self._cancel_btn)
         btn_lay.addStretch(1)
 
         self._status = QLabel('待扫描')
@@ -223,8 +228,15 @@ class BaseTab(QWidget):
         emit(f'❌ 后台任务异常:\n{msg}')
         emit(SEP2)
 
+    def _on_cancel(self) -> None:
+        if self._worker is not None:
+            self._worker.cancel()
+            self._cancel_btn.setEnabled(False)
+            self._status.setText('取消中...')
+
     def _on_busy(self, busy: bool) -> None:
         self._scan_btn.setEnabled(not busy)
+        self._cancel_btn.setVisible(busy)
         if busy:
             self._apply_btn.setEnabled(False)
 

@@ -318,6 +318,7 @@ def plan_covers(
     quality: int = DEFAULT_QUALITY,
     jobs:    int = 1,
     on_progress=None,
+    cancel_token=None,
 ) -> list[CoverPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
@@ -325,6 +326,7 @@ def plan_covers(
         jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动选 min(cpu,4)。
               ≥ 4 个文件时才启用并行（避免 spawn 启动成本超过收益）。
         on_progress: 每完成一项即回调 ``f(done, total)``。
+        cancel_token: threading.Event，已 set 时提前退出。
 
     每完成一个文件即打印进度行，便于大批量任务跟踪。
     """
@@ -340,15 +342,19 @@ def plan_covers(
         jobs=jobs,
         progress_line=_progress_line,
         on_progress=on_progress,
+        cancel_token=cancel_token,
     )
 
 
-def apply_cover_plans(plans: list[CoverPlan], dry_run: bool = True) -> int:
+def apply_cover_plans(
+    plans: list[CoverPlan], dry_run: bool = True, cancel_token=None,
+) -> int:
     """整批写入封面。
 
     Args:
         plans:   预览阶段产出的 CoverPlan 列表。
         dry_run: True 时仅提示。
+        cancel_token: threading.Event，已 set 时提前退出。
 
     Returns:
         失败数量（dry_run 时 0）。
@@ -357,8 +363,14 @@ def apply_cover_plans(plans: list[CoverPlan], dry_run: bool = True) -> int:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')
         return 0
 
+    def _cancelled() -> bool:
+        return cancel_token is not None and cancel_token.is_set()
+
     ok_n = fail = skip = 0
     for plan in plans:
+        if _cancelled():
+            emit('  ⏹️  已取消')
+            break
         if not plan.writable:
             warn(f'跳过 ({plan.error or "无源图"}): {plan.filename}')
             skip += 1

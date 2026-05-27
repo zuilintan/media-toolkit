@@ -18,25 +18,26 @@ P = TypeVar('P')
 
 
 def apply_and_move(
-    apply_fn: Callable[[list[P], bool], int],
+    apply_fn: Callable[..., int],
     plans:    list[P],
     root:     str,
     move_to:  str,
-    **_: object,
+    **kwargs: object,
 ) -> int:
     """整批写入 + 失败为 0 时移动 root 下顶层子目录到 move_to。
 
     Args:
         apply_fn: ``apply_sourcefile_plans`` / ``apply_metadata_plans`` /
-                  ``apply_cover_plans`` 之一；签名 ``(plans, dry_run) -> fail``。
+                  ``apply_cover_plans`` 之一。
         plans:    plan 列表。
         root:     原扫描根目录。
         move_to:  目标目录；空串表示不移动。
+        kwargs:   透传至 apply_fn（如 cancel_token）。
 
     Returns:
         apply_fn 的失败计数。
     """
-    fail = apply_fn(plans, False)
+    fail = apply_fn(plans, False, **kwargs)
     if fail == 0 and move_to:
         for sub in sorted(Path(root).iterdir()):
             if sub.is_dir():

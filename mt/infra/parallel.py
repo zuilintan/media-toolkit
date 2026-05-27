@@ -24,6 +24,7 @@ parallel.py — 通用 plan 调度：进度反馈 + 可选 ProcessPoolExecutor
 
 from __future__ import annotations
 import os
+import threading
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import TypeVar
@@ -59,6 +60,7 @@ def run_plans(
     progress_line:      Callable[[int, int, R], str] | None = None,
     parallel_banner:    str = '⚙️  并行处理',
     on_progress:        Callable[[int, int], None] | None = None,
+    cancel_token:       threading.Event | None = None,
 ) -> list[R]:
     """通用 plan 调度。
 
@@ -73,9 +75,11 @@ def run_plans(
                             ``None`` 表示不打进度。
         parallel_banner:    并行启动时打印的提示前缀。
         on_progress:        每完成一项即回调 ``f(done, total)``；始终在主进程调用。
+        cancel_token:       设为已 set 时提前退出，返回当前已处理的结果。
 
     Returns:
-        与 ``items`` 等长、顺序一致的 ``[R]``（即使并行也按原序）。
+        与 ``items`` 等长、顺序一致的 ``[R]``（即使并行也按原序）；
+        取消时未处理项位置上为 None。
     """
     total = len(items)
     if total == 0:
@@ -83,6 +87,9 @@ def run_plans(
 
     n_jobs = resolve_jobs(jobs)
     results: list[R] = [None] * total  # type: ignore[list-item]
+
+    def _cancelled() -> bool:
+        return cancel_token is not None and cancel_token.is_set()
 
     if n_jobs > 1 and total >= parallel_threshold:
         emit(f'  {parallel_banner}（{n_jobs} 进程）...')
@@ -99,8 +106,14 @@ def run_plans(
                     emit(progress_line(done_n, total, result), flush=True)
                 if on_progress:
                     on_progress(done_n, total)
+                if _cancelled():
+                    emit('  ⏹️  已取消')
+                    break
     else:
         for idx, item in enumerate(items):
+            if _cancelled():
+                emit('  ⏹️  已取消')
+                break
             result       = worker(item)
             results[idx] = result
             if progress_line:
