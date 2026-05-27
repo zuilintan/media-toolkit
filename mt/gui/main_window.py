@@ -15,13 +15,14 @@ QSplitter (Vertical)
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtWidgets import (
     QHBoxLayout, QMainWindow, QPushButton, QSplitter, QStackedWidget,
     QTabWidget, QVBoxLayout, QWidget,
 )
 
 from mt import __version__
+from mt.gui.gui_config import get_config
 from mt.gui.tabs.cover_tab import CoverTab
 from mt.gui.tabs.metadata_tab import MetadataTab
 from mt.gui.tabs.sourcefile_tab import SourcefileTab
@@ -78,14 +79,30 @@ class MainWindow(QMainWindow):
         lv.addWidget(log_header)
         lv.addWidget(self._log_stack, 1)
 
-        splitter = QSplitter(Qt.Vertical)
-        splitter.addWidget(self._tabs)
-        splitter.addWidget(log_panel)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([280, 520])
+        self._splitter = QSplitter(Qt.Vertical)
+        self._splitter.addWidget(self._tabs)
+        self._splitter.addWidget(log_panel)
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        self._splitter.setSizes([280, 520])
 
-        self.setCentralWidget(splitter)
+        self.setCentralWidget(self._splitter)
+
+        # 恢复窗口几何与 splitter 状态
+        cfg = get_config()
+        geo = cfg.get('window.geometry')
+        if geo:
+            self.restoreGeometry(QByteArray.fromBase64(geo.encode()))
+        sizes = cfg.get('window.splitter')
+        if sizes:
+            self._splitter.setSizes(sizes)
 
     def _clear_current_log(self) -> None:
         self._logs[self._tabs.currentIndex()].clear_log()
+
+    def closeEvent(self, event) -> None:
+        cfg = get_config()
+        cfg.set('window.geometry',
+                self.saveGeometry().toBase64().data().decode())
+        cfg.set('window.splitter', self._splitter.sizes())
+        super().closeEvent(event)
