@@ -67,12 +67,15 @@ def scan_author_dir(author_dir: Path) -> list[SourcefilePlan]:
     return [_plan_one(it) for it in items]
 
 
-def plan_sourcefiles(root: str, jobs: int = 1) -> list[SourcefilePlan]:
+def plan_sourcefiles(
+    root: str, jobs: int = 1, on_progress=None,
+) -> list[SourcefilePlan]:
     """扫描根目录下所有作者目录，汇总重命名计划。
 
     Args:
         jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
               ≥ 4 个文件时才启用并行。
+        on_progress: 每完成一项即回调 ``f(done, total)``。
 
     每完成一个文件即打印进度行。注意 plan 阶段是纯字符串处理（毫秒级），
     并行收益有限，主要作用是统一接口 + 大规模目录下的进度反馈。
@@ -84,7 +87,10 @@ def plan_sourcefiles(root: str, jobs: int = 1) -> list[SourcefilePlan]:
     author_dirs = [d for d in sorted(root_path.iterdir()) if d.is_dir()]
     items       = _iter_sourcefile_items(author_dirs)
     emit(f'  找到条目: {len(items)} 项（{len(author_dirs)} 个作者目录）')
-    return run_plans(items, _plan_one, jobs=jobs, progress_line=_progress_line)
+    return run_plans(
+        items, _plan_one, jobs=jobs, progress_line=_progress_line,
+        on_progress=on_progress,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

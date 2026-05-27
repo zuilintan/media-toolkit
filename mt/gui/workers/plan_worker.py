@@ -28,11 +28,14 @@ class Worker(QObject):
 
     finished = Signal(object)   # 任务正常返回值
     failed   = Signal(str)      # 任务异常时的错误描述
+    progress = Signal(int, int) # 进度：done, total
 
     def __init__(self, fn: Callable[..., Any], *args, **kwargs) -> None:
         super().__init__()
         self._fn     = fn
         self._args   = args
+        # 注入 on_progress 回调 → progress 信号（始终在主/工作线程调用，安全）
+        kwargs['on_progress'] = lambda c, t: self.progress.emit(c, t)
         self._kwargs = kwargs
 
     @Slot()

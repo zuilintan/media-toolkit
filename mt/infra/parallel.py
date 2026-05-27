@@ -58,6 +58,7 @@ def run_plans(
     parallel_threshold: int = DEFAULT_PARALLEL_THRESHOLD,
     progress_line:      Callable[[int, int, R], str] | None = None,
     parallel_banner:    str = '⚙️  并行处理',
+    on_progress:        Callable[[int, int], None] | None = None,
 ) -> list[R]:
     """通用 plan 调度。
 
@@ -71,6 +72,7 @@ def run_plans(
         progress_line:      ``f(idx_done, total, result) -> str``；
                             ``None`` 表示不打进度。
         parallel_banner:    并行启动时打印的提示前缀。
+        on_progress:        每完成一项即回调 ``f(done, total)``；始终在主进程调用。
 
     Returns:
         与 ``items`` 等长、顺序一致的 ``[R]``（即使并行也按原序）。
@@ -95,11 +97,15 @@ def run_plans(
                 results[idx] = result
                 if progress_line:
                     emit(progress_line(done_n, total, result), flush=True)
+                if on_progress:
+                    on_progress(done_n, total)
     else:
         for idx, item in enumerate(items):
             result       = worker(item)
             results[idx] = result
             if progress_line:
                 emit(progress_line(idx + 1, total, result), flush=True)
+            if on_progress:
+                on_progress(idx + 1, total)
 
     return results

@@ -317,12 +317,14 @@ def plan_covers(
     mode:    str = 'center',
     quality: int = DEFAULT_QUALITY,
     jobs:    int = 1,
+    on_progress=None,
 ) -> list[CoverPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     Args:
         jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动选 min(cpu,4)。
               ≥ 4 个文件时才启用并行（避免 spawn 启动成本超过收益）。
+        on_progress: 每完成一项即回调 ``f(done, total)``。
 
     每完成一个文件即打印进度行，便于大批量任务跟踪。
     """
@@ -337,6 +339,7 @@ def plan_covers(
         partial(plan_cover, mode=mode, quality=quality),
         jobs=jobs,
         progress_line=_progress_line,
+        on_progress=on_progress,
     )
 
 

@@ -239,6 +239,10 @@ class BaseTab(QWidget):
         if on_failed:
             self._worker.failed.connect(on_failed)
 
+        self._worker.progress.connect(
+            lambda c, t: self._status.setText(f'{c}/{t}')
+        )
+
         self._thread.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
         self._thread.finished.connect(self._on_thread_done)

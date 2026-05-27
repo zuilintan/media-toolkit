@@ -397,12 +397,15 @@ def _progress_line(idx: int, total: int, plan: MetadataPlan | None) -> str:
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
-def plan_metadatas(root: str, jobs: int = 1) -> list[MetadataPlan]:
+def plan_metadatas(
+    root: str, jobs: int = 1, on_progress=None,
+) -> list[MetadataPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     Args:
         jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
               ≥ 4 个文件时才启用并行。
+        on_progress: 每完成一项即回调 ``f(done, total)``。
 
     无作者的文件（plan_metadata 返回 None）静默丢弃；状态由调用方根据
     ``plan.writable`` 自行判定。每完成一个即打印进度行。
@@ -413,7 +416,10 @@ def plan_metadatas(root: str, jobs: int = 1) -> list[MetadataPlan]:
         return []
     files = [str(fp) for fp in sorted(root_path.rglob('*.cbz'))]
     emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
-    raw = run_plans(files, plan_metadata, jobs=jobs, progress_line=_progress_line)
+    raw = run_plans(
+        files, plan_metadata, jobs=jobs, progress_line=_progress_line,
+        on_progress=on_progress,
+    )
     return [p for p in raw if p is not None]
 
 

@@ -22,6 +22,7 @@ def apply_and_move(
     plans:    list[P],
     root:     str,
     move_to:  str,
+    **_: object,
 ) -> int:
     """整批写入 + 失败为 0 时移动 root 下顶层子目录到 move_to。
 
