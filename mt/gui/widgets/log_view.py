@@ -10,11 +10,16 @@ log_view.py — 接收 QtSink 文本流的只读日志框
 """
 
 from __future__ import annotations
+import os
 import re
+from pathlib import Path
 
-from PySide6.QtCore import Slot
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QTextCharFormat, QTextCursor
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtCore import Qt, QUrl, Slot
+from PySide6.QtGui import (
+    QAction, QColor, QFont, QFontDatabase, QMouseEvent,
+    QTextCharFormat, QTextCursor,
+)
+from PySide6.QtWidgets import QApplication, QMenu, QPlainTextEdit
 
 # 中西等宽融合字体优先列表（CJK 字形宽 = ASCII 字形宽 × 2，表格对齐稳定）。
 # 找不到任何一款时回落 Consolas（纯 ASCII 等宽，CJK 靠系统回落字体，可能对齐略差）。
@@ -47,6 +52,13 @@ _SGR_RE = re.compile(r'\x1b\[([\d;]*)m')
 # 兜底丢弃其他 CSI 序列
 _OTHER_CSI_RE = re.compile(r'\x1b\[[\d;]*[A-Za-ln-~]')
 
+# 文件路径匹配：Windows 绝对路径 或 Unix 绝对路径
+_PATH_RE = re.compile(
+    r'(?:[A-Za-z]:[/\\]|/)'
+    r'(?:[^\s<>:"|?*\x1b]| (?=[^/\\]*(?:[/\\]|\.\w{2,5}\b)))+'
+    r'\.(?:cbz|zip|xml|txt|webp|png|jpg|jpeg|gif|bmp)\b',
+)
+
 # SGR 30–37 → 前景色（深色背景下醒目的中间饱和度，不刺眼）
 _SGR_FG: dict[int, QColor] = {
     31: QColor('#e06c75'),   # red    — 差异字符
@@ -65,6 +77,7 @@ class LogView(QPlainTextEdit):
         self.setMaximumBlockCount(10000)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.setFont(_pick_log_font())
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
 
         # 当前段前景色；None = 用调色板默认色
         self._fg: QColor | None = None
@@ -92,6 +105,33 @@ class LogView(QPlainTextEdit):
     def clear_log(self) -> None:
         self.clear()
         self._fg = None
+
+    # ── 路径交互 ───────────────────────────────────────────────────────
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        cursor = self.cursorForPosition(event.pos())
+        block = cursor.block()
+        line_text = block.text()
+        paths = _PATH_RE.findall(line_text)
+        if paths:
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(paths[0]))
+        super().mouseDoubleClickEvent(event)
+
+    def contextMenuEvent(self, event) -> None:
+        menu = self.createStandardContextMenu(event.pos())
+        cursor = self.cursorForPosition(event.pos())
+        block = cursor.block()
+        line_text = block.text()
+        paths = _PATH_RE.findall(line_text)
+        if paths:
+            path = paths[0]
+            copy_path_action = QAction('复制路径')
+            copy_path_action.triggered.connect(
+                lambda: QApplication.clipboard().setText(path)
+            )
+            menu.addSeparator()
+            menu.addAction(copy_path_action)
+        menu.exec(event.globalPos())
 
     # ── 内部 ───────────────────────────────────────────────────────────
     def _insert(self, cursor: QTextCursor, text: str) -> None:
