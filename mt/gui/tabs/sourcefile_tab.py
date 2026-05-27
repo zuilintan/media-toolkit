@@ -24,7 +24,7 @@ class SourcefileTab(BaseTab):
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有可执行的重命名'
-    root_label       = '漫画根目录:'
+    root_label       = 'ZIP/CBZ根目录:'
     root_placeholder = '作者目录所在的根目录'
 
     def _build_options_box(self) -> QWidget:
