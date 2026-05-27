@@ -4,7 +4,7 @@ main_window.py — 主窗口：上方 QTabWidget，下方每 Tab 独立日志面
 布局
 ----
 QSplitter (Vertical)
-├── QTabWidget       — sourcefile / metadata / cover 三个 Tab
+├── QTabWidget       — sourcefile / cover / metadata 三个 Tab
 └── log_panel        — QStackedWidget：每个 Tab 各有一个 LogView
 
 每个 Tab 持有自己的 QtSink（BaseTab._sink）；Tab 上的用户操作（扫描/写入）
@@ -39,14 +39,14 @@ class MainWindow(QMainWindow):
 
         # ── Tab ──────────────────────────────────────────────────────
         tab0 = SourcefileTab()
-        tab1 = MetadataTab()
-        tab2 = CoverTab()
+        tab1 = CoverTab()
+        tab2 = MetadataTab()
         self._tab_list = [tab0, tab1, tab2]
 
         self._tabs = QTabWidget()
         self._tabs.addTab(tab0, 'sourcefile')
-        self._tabs.addTab(tab1, 'metadata')
-        self._tabs.addTab(tab2, 'cover')
+        self._tabs.addTab(tab1, 'cover')
+        self._tabs.addTab(tab2, 'metadata')
 
         # ── 每 Tab 独立 LogView，叠放在 QStackedWidget ────────────────
         self._log_stack = QStackedWidget()
