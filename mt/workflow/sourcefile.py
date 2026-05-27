@@ -44,9 +44,9 @@ def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
 
 
 def _progress_line(idx: int, total: int, plan: SourcefilePlan) -> str:
-    icon = ('🟡' if plan.needs_review
-            else '✅' if plan.changed
-            else '—')
+    icon = ('!' if plan.needs_review
+            else '*' if plan.changed
+            else '-')
     return f'   {icon} [{idx}/{total}] {plan.old_name}'
 
 

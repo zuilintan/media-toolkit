@@ -306,9 +306,9 @@ def apply_cover_plan(plan: CoverPlan) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _progress_line(idx: int, total: int, plan: CoverPlan) -> str:
-    icon = ('✅' if plan.writable and plan.changed
-            else '➡️ ' if plan.writable
-            else '⛔')
+    icon = ('*' if plan.writable and plan.changed
+            else '-' if plan.writable
+            else '!')
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 

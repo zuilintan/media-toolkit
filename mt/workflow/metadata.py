@@ -390,10 +390,10 @@ def apply_metadata_plan(plan: MetadataPlan) -> str:
 
 def _progress_line(idx: int, total: int, plan: MetadataPlan | None) -> str:
     if plan is None:
-        return f'   ⛔ [{idx}/{total}] (无作者，已跳过)'
-    icon = ('✅' if plan.writable and plan.changed
-            else '—' if plan.writable
-            else '⛔')
+        return f'   ! [{idx}/{total}] (无作者，已跳过)'
+    icon = ('*' if plan.writable and plan.changed
+            else '-' if plan.writable
+            else '!')
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 

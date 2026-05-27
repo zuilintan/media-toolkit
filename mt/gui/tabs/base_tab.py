@@ -196,7 +196,7 @@ class BaseTab(QWidget):
             self, '确认',
             f'确认对 {n} 个项目{self.confirm_verb}？',
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.Yes,
         )
         if ans != QMessageBox.Yes:
             return
