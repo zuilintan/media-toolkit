@@ -167,6 +167,7 @@ class BaseTab(QWidget):
         )
 
     def _on_planned(self, plans: list[Any]) -> None:
+        plans = [p for p in plans if p is not None]
         self._plans = plans
         if not plans:
             emit('\n  没有需要处理的文件。')
@@ -237,6 +238,7 @@ class BaseTab(QWidget):
     def _on_busy(self, busy: bool) -> None:
         self._scan_btn.setEnabled(not busy)
         self._cancel_btn.setVisible(busy)
+        self._cancel_btn.setEnabled(busy)
         if busy:
             self._apply_btn.setEnabled(False)
 
