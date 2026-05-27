@@ -33,7 +33,8 @@ def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
     author, path_str = item
     file     = Path(path_str)
     mi       = parse_name(author, file.stem)
-    new_name = build_new_name(mi) + file.suffix
+    suffix   = '.cbz' if file.suffix.lower() == '.zip' else file.suffix
+    new_name = build_new_name(mi) + suffix
     return SourcefilePlan(
         author_dir = str(file.parent),
         author     = author,
