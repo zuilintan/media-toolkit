@@ -32,11 +32,12 @@ def apply_and_move(
         plans:    plan 列表。
         root:     原扫描根目录。
         move_to:  目标目录；空串表示不移动。
-        kwargs:   透传至 apply_fn（如 cancel_token）。
+        kwargs:   透传至 apply_fn（cancel_token 等）。
 
     Returns:
         apply_fn 的失败计数。
     """
+    kwargs.pop('on_progress', None)  # Worker 内部回调，apply 函数不需要
     fail = apply_fn(plans, False, **kwargs)
     if fail == 0 and move_to:
         for sub in sorted(Path(root).iterdir()):
