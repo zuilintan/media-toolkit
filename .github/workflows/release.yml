@@ -1,0 +1,91 @@
+name: Release
+
+# 触发：推送形如 v0.1.5 的 tag 时自动构建并发布；也允许在 Actions 页手动触发。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '已存在的 tag 名（如 v0.1.5），手动触发时必填'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # 创建 release / 上传成果物
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout (tag)
+        uses: actions/checkout@v4
+        with:
+          # 手动触发时 checkout 指定 tag；push tag 触发时默认 checkout 该 tag
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: poetry-${{ runner.os }}-py3.13-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies (gui + dev)
+        run: poetry install --with gui --with dev --no-interaction
+
+      - name: Resolve version tag
+        id: tag
+        shell: bash
+        run: |
+          # push tag 触发: github.ref = refs/tags/vX.Y.Z；workflow_dispatch: 用输入
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build GUI exe (PyInstaller, onefile windowed)
+        run: |
+          poetry run pyinstaller --noconfirm --windowed --onefile `
+            --name "manga-toolkit-gui-${{ steps.tag.outputs.name }}" `
+            --add-data "mt/data/examples.json;mt/data" `
+            --collect-submodules mt `
+            mt/gui/app.py
+
+      - name: Smoke test exe (启动后立即结束即视为失败)
+        shell: pwsh
+        run: |
+          $exe = "dist/manga-toolkit-gui-${{ steps.tag.outputs.name }}.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 10
+          if ($p.HasExited) {
+            Write-Error "exe 启动 10s 内退出 (ExitCode=$($p.ExitCode))，打包可能有问题"
+            exit 1
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "OK: exe 启动 10s 仍在运行"
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          # 由 GitHub 自动从 commits / merged PRs 生成 release notes
+          generate_release_notes: true
+          # 允许更新已存在的 release（手动重跑时不报错）
+          fail_on_unmatched_files: true
+          files: dist/manga-toolkit-gui-${{ steps.tag.outputs.name }}.exe

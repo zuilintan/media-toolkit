@@ -18,6 +18,8 @@ smartcrop = ">=0.3.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"
+# 仅 CI 打包 Windows 单文件 exe 时使用；pyinstaller wheel 仅覆盖 Python <3.15
+pyinstaller = { version = "^6.20.0", python = ">=3.11,<3.15" }
 
 # 可选 GUI 组：`poetry install --with gui` 才装；CLI 用户零负担
 [tool.poetry.group.gui]

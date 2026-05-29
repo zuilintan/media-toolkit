@@ -11,3 +11,8 @@ __pycache__/
 
 # 项目产物
 /rename_sessions.json
+
+# PyInstaller 本地构建产物（CI 才是权威发布源）
+/build/
+/dist/
+*.spec
