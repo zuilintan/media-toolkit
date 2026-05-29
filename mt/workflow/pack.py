@@ -399,6 +399,21 @@ def _stored_zinfo(arcname: str, src_path: Path) -> zipfile.ZipInfo:
     return zi
 
 
+def _stored_dir_zinfo(arcname: str, src_dir: Path) -> zipfile.ZipInfo:
+    """构造目录条目的 ZipInfo，属性置 DOS Subdirectory bit (0x10)，
+    时间取源目录 mtime。
+    """
+    t = time.localtime(src_dir.stat().st_mtime)
+    zi = zipfile.ZipInfo(
+        arcname,
+        date_time=(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec),
+    )
+    zi.compress_type = zipfile.ZIP_STORED
+    zi.external_attr = 0x10         # DOS Subdirectory
+    zi.create_system = 0            # FAT/DOS
+    return zi
+
+
 def _write_stored_zip(
     zip_path: Path, src_dir: Path, renames: list[tuple[str, str]],
 ) -> None:
@@ -414,11 +429,31 @@ def _write_stored_zip(
     nested 模式下 renames 的字符串带子目录前缀（``Ch01/x.jpg`` →
     ``Ch01/0001.jpg``）；Path 在 Windows 上能正确解析正斜杠，zip arcname
     本身也用正斜杠，二者天然兼容。
+
+    对 nested 结构会先写入显式目录条目（``Ch01/``），使 Bandizip 等查看器
+    能为话文件夹展示属性与修改日期。
     """
+    # 收集需要写入的目录条目（arcname 含 / 的条目其父目录前缀）
+    dirs: set[str] = set()
+    for _, new in renames:
+        parent = os.path.dirname(new)
+        if parent:
+            dirs.add(parent)
+    # 祖先目录也需写入（如 a/b/c.jpg 需要 a/ 和 a/b/）
+    extra: set[str] = set()
+    for d in sorted(dirs):
+        parts = d.replace('\\', '/').split('/')
+        for i in range(1, len(parts)):
+            extra.add('/'.join(parts[:i]))
+    dirs |= extra
+
     guard_path(zip_path)
     with zipfile.ZipFile(
         zip_path, 'w', compression=zipfile.ZIP_STORED, allowZip64=True,
     ) as zf:
+        for d in sorted(dirs):
+            arcname = d + '/'
+            zf.writestr(_stored_dir_zinfo(arcname, src_dir / d), b'')
         for old, new in renames:
             src = src_dir / old
             with open(src, 'rb') as fp:
