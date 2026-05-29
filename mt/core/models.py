@@ -341,7 +341,11 @@ class PackPlan:
 
     @property
     def n_subdirs(self) -> int:
-        """nested 模式下涉及的子目录数；flat 模式恒为 0。"""
+        """nested 模式下涉及的子目录数；flat 模式恒为 0。
+
+        只统计含 ``/`` 的条目（真正的子目录条目）；nested 顶层文件
+        （cover/ComicInfo 等）的 old 是裸文件名，不在此处计入。
+        """
         if self.kind != 'nested':
             return 0
-        return len({old.split('/', 1)[0] for old, _ in self.renames})
+        return len({old.split('/', 1)[0] for old, _ in self.renames if '/' in old})
