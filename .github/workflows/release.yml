@@ -25,6 +25,8 @@ jobs:
         with:
           # 手动触发时 checkout 指定 tag；push tag 触发时默认 checkout 该 tag
           ref: ${{ github.event.inputs.tag || github.ref }}
+          # git-cliff 需要完整 commit/tag 历史界定 --latest 的范围
+          fetch-depth: 0
 
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
@@ -80,13 +82,24 @@ jobs:
           Stop-Process -Id $p.Id -Force
           Write-Host "OK: exe 启动 10s 仍在运行"
 
+      - name: Generate changelog (git-cliff)
+        # 按 conventional commits 分类生成"当前 tag 范围"的 changelog
+        # 配置见仓库根目录 cliff.toml
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: CHANGES.md
+
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           name: ${{ steps.tag.outputs.name }}
-          # 由 GitHub 自动从 commits / merged PRs 生成 release notes
-          generate_release_notes: true
+          # 用 git-cliff 输出的结构化 changelog 作为 release notes
+          body: ${{ steps.changelog.outputs.content }}
           # 允许更新已存在的 release（手动重跑时不报错）
           fail_on_unmatched_files: true
           files: dist/manga-toolkit-gui-${{ steps.tag.outputs.name }}.exe
