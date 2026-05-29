@@ -303,7 +303,8 @@ def print_pack_preview(plans: list[PackPlan]) -> None:
             if p.extras:
                 preview_extras = ', '.join(p.extras[:5])
                 more = f'，… 等 {len(p.extras)} 项' if len(p.extras) > 5 else ''
-                emit(f'     🟡 跳过非图片 {len(p.extras)} 项: {preview_extras}{more}')
+                emit(f'     🟡 {len(p.extras)} 项非图片不进 zip，'
+                     f'将随源目录一并删除: {preview_extras}{more}')
             emit()
     else:
         emit('\n没有需要打包的目录。')

@@ -80,7 +80,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
         return 0
 
     if not confirm(
-        f'\n🟡 确认对 {n_writable} 个目录执行重命名并打包？按 Enter 继续: '
+        f'\n🟡 确认对 {n_writable} 个目录执行打包并删除源目录？按 Enter 继续: '
     ):
         emit('  操作已取消。')
         return 0
