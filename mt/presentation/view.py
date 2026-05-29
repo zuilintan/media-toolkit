@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import unicodedata
 
-from mt.core.models import CoverPlan, MangaInfo, MetadataPlan, SourcefilePlan
+from mt.core.models import CoverPlan, MangaInfo, MetadataPlan, PackPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
 from mt.infra.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
@@ -262,4 +262,59 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
         len(plans),
         [('计划处理', len(changed)), ('替换现有', len(replaced)),
          ('无需处理', len(unchanged)), ('跳过', len(failed))],
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Pack 预览（结构对齐 sourcefile / metadata / cover）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def print_pack_preview(plans: list[PackPlan]) -> None:
+    """打印目录打包计划，逐卡片渲染。
+
+    卡片骨架：
+      ``   📄 [N] {name}{ 🔁 覆盖现有 zip}``      (3 空格)
+      ``     图片: {n_total}，改名: {n_renamed}``  (5 空格)
+      ``     zip:  {zip_path}``
+      ``     首末: 0001.ext ... 0123.ext``       (有 ≥2 张时)
+      ``     🟡 跳过非图片 N 项: ...``            (有 extras 时)
+
+    只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。
+    """
+    writable = [p for p in plans if p.writable]
+    failed   = [p for p in plans if not p.writable]
+    replaced = [p for p in writable if p.zip_exists]
+
+    _print_preview_header('预览')
+
+    if writable:
+        emit()
+        for idx, p in enumerate(writable, 1):
+            note = ' 🔁 覆盖现有 zip' if p.zip_exists else ''
+            emit(f'   📄 [{idx}] {p.name}{note}')
+            emit(f'     图片: {len(p.renames)}，改名: {p.n_renamed}')
+            emit(f'     zip:  {p.zip_path}')
+            if len(p.renames) >= 2:
+                first_new = p.renames[0][1]
+                last_new  = p.renames[-1][1]
+                emit(f'     首末: {first_new} … {last_new}')
+            elif p.renames:
+                emit(f'     首末: {p.renames[0][1]}')
+            if p.extras:
+                preview_extras = ', '.join(p.extras[:5])
+                more = f'，… 等 {len(p.extras)} 项' if len(p.extras) > 5 else ''
+                emit(f'     🟡 跳过非图片 {len(p.extras)} 项: {preview_extras}{more}')
+            emit()
+    else:
+        emit('\n没有需要打包的目录。')
+
+    if failed:
+        emit(f'⛔ 跳过 ({len(failed)} 个):')
+        for p in failed:
+            emit(f'   • {p.name} — {p.error or "无图片"}')
+
+    _print_preview_footer(
+        len(plans),
+        [('计划处理', len(writable)), ('覆盖现有', len(replaced)),
+         ('跳过',     len(failed))],
     )

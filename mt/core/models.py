@@ -289,3 +289,45 @@ class CoverPlan:
     def changed(self) -> bool:
         """是否需要实际写入：无现有版本，或现有字节与目标不一致。"""
         return self.existing_bytes is None or self.existing_bytes != self.webp_bytes
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PackPlan（pack 子命令：图片目录 → 序号化重命名 + STORED zip 打包）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class PackPlan:
+    """单个图片目录的「序号化重命名 + 打包」计划。
+
+    plan 阶段只扫描文件、计算目标名、收集非图片文件，不动盘；apply 阶段
+    先做两阶段重命名（→ tmp → 目标）以避免名称冲突，然后用
+    ``zipfile.ZIP_STORED`` 写入同级 ``<dir>.zip``。
+
+    Attributes:
+        src_dir:    待处理目录路径。
+        zip_path:   目标 zip 路径（``<src_dir.parent>/<src_dir.name>.zip``）。
+        renames:    ``(old_name, new_name)`` 列表；按目标编号升序。
+        extras:     非图片文件名（不参与重命名也不会进 zip，仅提示）。
+        zip_exists: 目标 zip 已存在（apply 时会覆盖）。
+        error:      plan 阶段发现的阻断性问题（如目录不存在 / 无图片）。
+    """
+    src_dir:    str
+    zip_path:   str
+    renames:    list[tuple[str, str]]
+    extras:     list[str]
+    zip_exists: bool = False
+    error:      str  = ""
+
+    @property
+    def name(self) -> str:
+        return os.path.basename(self.src_dir)
+
+    @property
+    def writable(self) -> bool:
+        """是否可执行：无错误且至少有一张图片。"""
+        return not self.error and bool(self.renames)
+
+    @property
+    def n_renamed(self) -> int:
+        """实际会发生改名的文件数（已是目标名的不计）。"""
+        return sum(1 for o, n in self.renames if o != n)

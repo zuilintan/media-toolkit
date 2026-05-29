@@ -40,6 +40,7 @@ from mt.infra.console import setup_logging
 from mt.cli.sourcefile import cmd_sourcefile, add_sourcefile_args
 from mt.cli.metadata   import cmd_metadata,   add_metadata_args
 from mt.cli.cover      import cmd_cover,      add_cover_args
+from mt.cli.pack       import cmd_pack,       add_pack_args
 from mt.cli.doctor     import cmd_doctor,     add_doctor_args
 
 
@@ -126,6 +127,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_cover_args(p_cover)
     p_cover.set_defaults(func=cmd_cover)
+
+    # pack
+    p_pack = sub.add_parser(
+        'pack',
+        help='图片目录序号化重命名 + STORED zip 打包',
+        description='把目录内的图片按 <Inc NrDir:0001> 规则重命名为 '
+                    '0001.ext / 0002.ext …，再以 zip 存储模式（不压缩）'
+                    '打包到同级 <dir>.zip',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
+            '示例:\n'
+            '  manga-toolkit-cli pack --drag\n'
+            '  manga-toolkit-cli pack --drag --move-to /sorted\n'
+            '  manga-toolkit-cli pack --root ./albums\n'
+            '  manga-toolkit-cli pack --root ./albums --apply\n'
+            '  manga-toolkit-cli pack --root ./albums --apply --move-to /sorted\n'
+        ),
+    )
+    add_pack_args(p_pack)
+    p_pack.set_defaults(func=cmd_pack)
 
     # doctor
     p_doctor = sub.add_parser(
