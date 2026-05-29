@@ -99,7 +99,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
 def add_pack_args(p: argparse.ArgumentParser) -> None:
     """挂载 pack 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
-                   help='待处理根目录（其下每个直接子目录为一本相册/漫画）')
+                   help='待处理根目录（其下每个直接子目录视为一本漫画）')
     p.add_argument('--move-to', default='', dest='move_to',
                    metavar='DIR',
                    help='处理完成后将生成的 zip 移动到此目录'

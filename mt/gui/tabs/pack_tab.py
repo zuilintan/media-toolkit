@@ -38,8 +38,8 @@ class PackTab(BaseTab):
     apply_btn_text   = '打包'
     confirm_verb     = '打包并删除源目录'
     no_change_msg    = '没有可打包的目录'
-    root_label       = '相册根目录:'
-    root_placeholder = '其下每个直接子目录视为一本相册/漫画'
+    root_label       = '图片根目录:'
+    root_placeholder = '其下每个直接子目录视为一本漫画'
 
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()
