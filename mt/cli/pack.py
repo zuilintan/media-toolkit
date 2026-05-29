@@ -46,7 +46,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
     plans = plan_packs(str(root), jobs=args.jobs)
 
     if not plans:
-        emit('\n  没有需要处理的目录。')
+        emit('\n  没有识别出可打包的单位。')
         emit(SEP2)
         return 0
 
@@ -75,12 +75,12 @@ def cmd_pack(args: argparse.Namespace) -> int:
 
     # ── 写入分支 ──────────────────────────────────────────────────────────────
     if not n_writable:
-        emit('  没有可执行的目录。')
+        emit('  没有可执行的单位。')
         emit(SEP2)
         return 0
 
     if not confirm(
-        f'\n🟡 确认对 {n_writable} 个目录执行打包并删除源目录？按 Enter 继续: '
+        f'\n🟡 确认对 {n_writable} 个单位执行打包并删除源目录？按 Enter 继续: '
     ):
         emit('  操作已取消。')
         return 0
@@ -99,7 +99,8 @@ def cmd_pack(args: argparse.Namespace) -> int:
 def add_pack_args(p: argparse.ArgumentParser) -> None:
     """挂载 pack 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
-                   help='待处理根目录（其下每个直接子目录视为一本漫画）')
+                   help='待处理根目录（递归识别图片目录单位：「仅图片」'
+                        '或「仅含图片子目录」即视为一本漫画）')
     p.add_argument('--move-to', default='', dest='move_to',
                    metavar='DIR',
                    help='处理完成后将生成的 zip 移动到此目录'

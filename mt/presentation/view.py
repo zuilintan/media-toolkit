@@ -270,29 +270,32 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_pack_preview(plans: list[PackPlan]) -> None:
-    """打印目录打包计划，逐卡片渲染。
+    """打印打包计划，逐卡片渲染。
 
     卡片骨架：
-      ``   📄 [N] {name}{ 🔁 覆盖现有 zip}``      (3 空格)
-      ``     图片: {n_total}，改名: {n_renamed}``  (5 空格)
+      ``   📄 [N] {name}  [单层|嵌套×K]{ 🔁 覆盖现有 zip}``  (3 空格)
+      ``     图片: {n_total}（改名 {n_renamed}）``           (5 空格)
       ``     zip:  {zip_path}``
-      ``     首末: 0001.ext ... 0123.ext``       (有 ≥2 张时)
-      ``     🟡 跳过非图片 N 项: ...``            (有 extras 时)
+      ``     首末: 0001.ext … 0123.ext``                    (≥ 2 张时)
+      ``     🟡 N 项非图片不进 zip，将随源目录一并删除: …``  (有 extras 时)
 
     只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。
     """
     writable = [p for p in plans if p.writable]
     failed   = [p for p in plans if not p.writable]
     replaced = [p for p in writable if p.zip_exists]
+    nested   = [p for p in writable if p.kind == 'nested']
 
     _print_preview_header('预览')
 
     if writable:
         emit()
         for idx, p in enumerate(writable, 1):
+            kind_tag = (f'[嵌套×{p.n_subdirs}]' if p.kind == 'nested'
+                        else '[单层]')
             note = ' 🔁 覆盖现有 zip' if p.zip_exists else ''
-            emit(f'   📄 [{idx}] {p.name}{note}')
-            emit(f'     图片: {len(p.renames)}，改名: {p.n_renamed}')
+            emit(f'   📄 [{idx}] {p.name}  {kind_tag}{note}')
+            emit(f'     图片: {len(p.renames)}（改名 {p.n_renamed}）')
             emit(f'     zip:  {p.zip_path}')
             if len(p.renames) >= 2:
                 first_new = p.renames[0][1]
@@ -307,7 +310,7 @@ def print_pack_preview(plans: list[PackPlan]) -> None:
                      f'将随源目录一并删除: {preview_extras}{more}')
             emit()
     else:
-        emit('\n没有需要打包的目录。')
+        emit('\n没有需要打包的单位。')
 
     if failed:
         emit(f'⛔ 跳过 ({len(failed)} 个):')
@@ -316,6 +319,6 @@ def print_pack_preview(plans: list[PackPlan]) -> None:
 
     _print_preview_footer(
         len(plans),
-        [('计划处理', len(writable)), ('覆盖现有', len(replaced)),
-         ('跳过',     len(failed))],
+        [('计划处理', len(writable)), ('嵌套', len(nested)),
+         ('覆盖现有', len(replaced)), ('跳过', len(failed))],
     )

@@ -1,23 +1,32 @@
 """
 pack.py — 图片目录序号化重命名 + STORED zip 打包（pack 子命令工作流层）
 
-每个目录视为一本「漫画/相册」，将其内的图片文件按字典序重命名为
-``0001.<ext>``、``0002.<ext>`` …（对齐 ReNamer 的 ``<Inc NrDir:0001>``
-规则），并以 ``zipfile.ZIP_STORED``（不压缩）打包到同级 ``<dir>.zip``，
-打包成功后删除源目录。
+把识别出的「打包单位」按 ``<Inc NrDir:0001>`` 规则改名为
+``0001.<ext>``、``0002.<ext>`` …，再以 ``zipfile.ZIP_STORED`` 打包到同级
+``<dir>.zip``；打包成功后整树 ``shutil.rmtree``。
 
 `<Inc NrDir:0001>` 语义:
   - 每个目录独立计数（递归不跨目录），从 0001 起步
-  - 4 位零填充；图片数超过 9999 时自动扩展位数（保证字典序与编号一致）
+  - 4 位零填充；图片数 ≥ 10000 时扩位，确保字典序 = 数字序
 
-流程:
-  1. 列出目录内的图片文件（PAGE_EXTS），按字典序定序；若含子目录则拒绝
-     （避免 rmtree 误删 plan 未感知的内容）
-  2. 计算目标名 ``{i:0Wd}{ext}``（ext 转小写，保留原后缀；含 .jpeg 等）
-  3. apply: 直接以原路径 → 新 arcname 写 zip（ZIP_STORED；已存在覆盖），
-     不在盘上做改名 —— zip 写完源目录就会整体删除，盘上改名属浪费
-  4. apply: 源目录连同非图片 extras 一并 ``shutil.rmtree``
-  5. 可选 ``move-to``：将生成的 zip 移动至目标目录
+打包单位识别（``_find_units``，递归自 root）:
+  - ``'flat'``  直接含 ≥ ``MIN_IMAGES`` 张图、无子目录
+  - ``'nested'`` 仅含子目录，且每个子目录都是 ``'flat'``（zip 内保留
+                 子目录名作为路径前缀；每个子目录独立编号）
+  - ``MIXED``    图+目录同层 → 跳过该目录，不下钻
+  - ``CONTAINER`` 仅子目录但不全是 flat → 下钻 children 继续找
+  - ``EMPTY`` / ``TOO_FEW`` → 跳过
+
+> NESTED 只允许 1 层子目录（子目录里再有子目录就退化为 CONTAINER），
+> 故「漫画/卷/话/imgs」三层结构会自动停在卷级 —— 每卷独立一 zip，
+> 与项目里「卷不可合一档」的约定一致。
+
+apply 阶段:
+  1. 以 ZIP_STORED 写入 ``<unit>.zip``（已存在覆盖）；
+     源文件按原路径读、新名作 arcname 写 —— 不在盘上做改名
+     （反正下一步整树要删）
+  2. ``shutil.rmtree`` 删除整个单位目录（含非图 extras）
+  3. 可选 ``move-to`` 将 zip 移到目标目录
 
 依赖: models / config / utils / console / parallel / drag
 """
@@ -38,8 +47,13 @@ from mt.infra.parallel import run_plans
 from mt.infra.utils import guard_path
 
 
+# ── 常量 ─────────────────────────────────────────────────────────────────────
+MIN_IMAGES: int = 3   # FLAT 单位的最少图片数；不足视为噪声跳过
+MAX_DEPTH:  int = 8   # 递归扫描的最大层级（防符号链接 / 异常目录）
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# 单目录 plan
+# 通用工具
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _pad_width(n: int) -> int:
@@ -47,63 +61,202 @@ def _pad_width(n: int) -> int:
     return max(4, len(str(n)))
 
 
-def plan_pack(src_dir_path: str) -> PackPlan:
-    """构建单个目录的打包计划（picklable，可用于并行）。
+def _split_dir_content(d: Path) -> tuple[list[Path], list[str]]:
+    """目录的直接内容拆分为 ``(images, extras_filenames)``；不递归、忽略子目录。
 
-    错误（路径不存在 / 无图片）被吸收进 plan.error，调用方据此过滤；不抛。
+    images 按字典序排好，可直接喂给 ``<Inc NrDir>`` 编号；extras 是相对
+    该目录的文件名（无路径前缀）。
     """
-    src_dir  = Path(src_dir_path)
-    zip_path = str(src_dir.parent / f'{src_dir.name}.zip')
-    if not src_dir.is_dir():
-        return PackPlan(
-            src_dir=src_dir_path, zip_path=zip_path,
-            renames=[], extras=[], zip_exists=False,
-            error='目录不存在',
-        )
+    images: list[Path] = []
+    extras: list[str]  = []
+    for e in sorted(d.iterdir()):
+        if not e.is_file():
+            continue
+        if e.suffix.lower() in PAGE_EXTS:
+            images.append(e)
+        else:
+            extras.append(e.name)
+    return images, extras
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 打包单位识别
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _is_flat(d: Path) -> bool:
+    """``d`` 的直接内容是「≥ MIN_IMAGES 张图 + 无子目录」？
+
+    用于 NESTED 判定时检查每个子目录是否合格。非图片文件不影响判定
+    （会作为 extras 处理）。
+    """
+    n = 0
+    for e in d.iterdir():
+        if e.is_dir():
+            return False
+        if e.is_file() and e.suffix.lower() in PAGE_EXTS:
+            n += 1
+    return n >= MIN_IMAGES
+
+
+def _find_units_in_root(root: Path) -> list[tuple[Path, str]]:
+    """批量模式入口：``--root`` 已被用户声明为「容器」，**不**把 root 自身
+    当作 NESTED 单位。
+
+    规则:
+      - root 只有图、无子目录 → 把 root 当 FLAT（少见但合理）
+      - 否则遍历直接子目录，逐个走 ``_find_units`` 递归
+
+    这样可避免「root 下若干个 FLAT 子目录」被误识别为
+    「root 是 NESTED 包含若干子目录」，导致全部塞进 root.zip。
+    """
+    images:  list[Path] = []
+    subdirs: list[Path] = []
+    for e in sorted(root.iterdir()):
+        if e.is_dir():
+            subdirs.append(e)
+        elif e.is_file() and e.suffix.lower() in PAGE_EXTS:
+            images.append(e)
+
+    # root 自身是 FLAT
+    if images and not subdirs:
+        if len(images) >= MIN_IMAGES:
+            return [(root, 'flat')]
+        info(f'  ⏭️  跳过（仅 {len(images)} 张图 < {MIN_IMAGES}）: {root}')
+        return []
+
+    if images and subdirs:
+        info(f'  ⏭️  根目录图片与子目录混合，仅扫子目录: {root}')
+
+    # 容器：递归每个子目录（注意是 _find_units，子目录可以是 NESTED）
+    result: list[tuple[Path, str]] = []
+    for d in subdirs:
+        result.extend(_find_units(d))
+    return result
+
+
+def _find_units(dir_path: Path, _depth: int = 0) -> list[tuple[Path, str]]:
+    """从 ``dir_path`` 递归识别打包单位，返回 ``[(unit_dir, kind)]``。
+
+    kind ∈ ``{'flat', 'nested'}``。跳过的目录（含混合 / 图不足 / 空 /
+    超深）会经 ``info()`` 打印一条提示，便于用户排查。
+
+    drag 模式入口；batch 模式请改用 ``_find_units_in_root`` 以避免把 root
+    自身当 NESTED。
+    """
+    if _depth > MAX_DEPTH:
+        info(f'  ⏭️  跳过（嵌套层级 > {MAX_DEPTH}）: {dir_path}')
+        return []
 
     images:  list[Path] = []
-    extras:  list[str]  = []
-    subdirs: list[str]  = []
-    for f in sorted(src_dir.iterdir()):
-        if f.is_dir():
-            subdirs.append(f.name)
-        elif f.is_file():
-            if f.suffix.lower() in PAGE_EXTS:
-                images.append(f)
-            else:
-                extras.append(f.name)
+    subdirs: list[Path] = []
+    for e in sorted(dir_path.iterdir()):
+        if e.is_dir():
+            subdirs.append(e)
+        elif e.is_file() and e.suffix.lower() in PAGE_EXTS:
+            images.append(e)
 
-    # 子目录会被 rmtree 一并清掉，但 plan 不感知其内容，拒绝以避免误删
+    # FLAT: 仅图片
+    if images and not subdirs:
+        if len(images) >= MIN_IMAGES:
+            return [(dir_path, 'flat')]
+        info(f'  ⏭️  跳过（仅 {len(images)} 张图 < {MIN_IMAGES}）: {dir_path}')
+        return []
+
+    # MIXED: 图与目录同层 → 拒绝，不下钻（语义模糊：用户究竟想打包谁？）
+    if images and subdirs:
+        info(f'  ⏭️  跳过（图片与子目录混合）: {dir_path}')
+        return []
+
+    # 仅子目录
     if subdirs:
-        sample = ', '.join(subdirs[:3]) + (' …' if len(subdirs) > 3 else '')
-        return PackPlan(
-            src_dir=src_dir_path, zip_path=zip_path,
-            renames=[], extras=extras, zip_exists=Path(zip_path).exists(),
-            error=f'包含 {len(subdirs)} 个子目录（{sample}），'
-                  f'请先手动整理为纯图片目录',
-        )
+        if all(_is_flat(d) for d in subdirs):
+            return [(dir_path, 'nested')]
+        # CONTAINER: 下钻
+        result: list[tuple[Path, str]] = []
+        for d in subdirs:
+            result.extend(_find_units(d, _depth + 1))
+        return result
 
-    if not images:
-        return PackPlan(
-            src_dir=src_dir_path, zip_path=zip_path,
-            renames=[], extras=extras, zip_exists=Path(zip_path).exists(),
-            error='未找到图片文件',
-        )
+    # EMPTY
+    return []
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 单 unit 的 plan
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _plan_flat(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
+    images, extras = _split_dir_content(unit_dir)
     pad = _pad_width(len(images))
     renames = [
         (img.name, f'{i:0{pad}d}{img.suffix.lower()}')
         for i, img in enumerate(images, 1)
     ]
+    return renames, extras
+
+
+def _plan_nested(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
+    """NESTED unit：每个直接子目录独立编号，arcname 加子目录名前缀。"""
+    renames: list[tuple[str, str]] = []
+    extras:  list[str]             = []
+    # 顶层非图片文件（NESTED 单位顶层照理只有子目录，但容忍 thumbs.db 这类）
+    for e in sorted(unit_dir.iterdir()):
+        if e.is_file() and e.suffix.lower() not in PAGE_EXTS:
+            extras.append(e.name)
+    # 每子目录独立编号
+    for sub in sorted(unit_dir.iterdir()):
+        if not sub.is_dir():
+            continue
+        sub_images, sub_extras = _split_dir_content(sub)
+        pad = _pad_width(len(sub_images))
+        for i, img in enumerate(sub_images, 1):
+            renames.append((
+                f'{sub.name}/{img.name}',
+                f'{sub.name}/{i:0{pad}d}{img.suffix.lower()}',
+            ))
+        for ex in sub_extras:
+            extras.append(f'{sub.name}/{ex}')
+    return renames, extras
+
+
+def plan_unit(unit_dir_str: str, kind: str) -> PackPlan:
+    """构建单个打包单位的 PackPlan（picklable worker，可走并行）。"""
+    unit_dir = Path(unit_dir_str)
+    zip_path = str(unit_dir.parent / f'{unit_dir.name}.zip')
+
+    if not unit_dir.is_dir():
+        return PackPlan(
+            src_dir=unit_dir_str, zip_path=zip_path,
+            renames=[], extras=[], zip_exists=False, kind=kind,
+            error='目录不存在',
+        )
+
+    if kind == 'flat':
+        renames, extras = _plan_flat(unit_dir)
+    else:
+        renames, extras = _plan_nested(unit_dir)
+
+    if not renames:
+        return PackPlan(
+            src_dir=unit_dir_str, zip_path=zip_path,
+            renames=[], extras=extras, zip_exists=Path(zip_path).exists(),
+            kind=kind, error='未找到图片文件',
+        )
+
     return PackPlan(
-        src_dir=src_dir_path, zip_path=zip_path,
+        src_dir=unit_dir_str, zip_path=zip_path,
         renames=renames, extras=extras,
-        zip_exists=Path(zip_path).exists(),
+        zip_exists=Path(zip_path).exists(), kind=kind,
     )
 
 
+def _plan_unit_item(item: tuple[str, str]) -> PackPlan:
+    """run_plans worker：解包 (unit_dir_str, kind) 元组。"""
+    return plan_unit(item[0], item[1])
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# 单目录 apply
+# 单 unit 的 apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _stored_zinfo(arcname: str, src_path: Path) -> zipfile.ZipInfo:
@@ -128,12 +281,16 @@ def _write_stored_zip(
 ) -> None:
     """以 ``ZIP_STORED`` 模式打包到 zip_path（覆盖已存在）。
 
-    源文件按原名读取，以新名作 arcname 写入 —— 不在盘上做改名，因为
-    打包成功后整个源目录就会被删除，盘上改名是浪费。
+    源文件按原路径读取，以新 arcname 写入 —— 不在盘上做改名，因为
+    打包成功后整个 unit 目录就会被 rmtree。
 
     手动构造 ZipInfo + ``writestr`` 而非 ``zf.write(path)``，目的是
     清除默认 ``ZipInfo.from_file`` 写入的 Unix mode 高位，让条目显示为
     纯 DOS 属性（与 Bandizip 对齐）。
+
+    nested 模式下 renames 的字符串带子目录前缀（``Ch01/x.jpg`` →
+    ``Ch01/0001.jpg``）；Path 在 Windows 上能正确解析正斜杠，zip arcname
+    本身也用正斜杠，二者天然兼容。
     """
     guard_path(zip_path)
     with zipfile.ZipFile(
@@ -146,7 +303,7 @@ def _write_stored_zip(
 
 
 def apply_pack_plan(plan: PackPlan) -> str:
-    """执行单个 plan：写 STORED zip → 删除源目录。
+    """执行单个 plan：写 STORED zip → 删除整个 unit 目录树。
 
     源目录删除失败不视为整体失败：zip 已落盘，仅警告并 ``ok`` 返回，
     用户可自行清理（典型原因：杀软/索引器/网盘客户端临时占用句柄）。
@@ -162,15 +319,14 @@ def apply_pack_plan(plan: PackPlan) -> str:
         error(f'{plan.name} — 打包失败: {e}')
         return 'error'
 
+    suffix = f'（{len(plan.renames)} 张 → {zip_path.name}）'
     try:
         guard_path(src_dir)
         shutil.rmtree(src_dir)
-        emit(f'   ✅ {plan.name} — 已打包并删除源目录'
-             f'（{len(plan.renames)} 张 → {zip_path.name}）')
+        emit(f'   ✅ {plan.name} — 已打包并删除源目录{suffix}')
     except Exception as e:
         warn(f'{plan.name} — zip 已生成，但源目录删除失败: {e}')
-        emit(f'   ✅ {plan.name} — 已打包'
-             f'（{len(plan.renames)} 张 → {zip_path.name}）')
+        emit(f'   ✅ {plan.name} — 已打包{suffix}')
     return 'ok'
 
 
@@ -179,20 +335,23 @@ def apply_pack_plan(plan: PackPlan) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _progress_line(idx: int, total: int, plan: PackPlan) -> str:
-    icon = ('*' if plan.writable
-            else '!')
+    icon = ('*' if plan.writable else '!')
     return f'   {icon} [{idx}/{total}] {plan.name}'
 
 
 def plan_packs(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[PackPlan]:
-    """扫描 root 下的直接子目录，每个子目录产出一个 PackPlan。
+    """从 root 递归识别打包单位，每单位产出一个 PackPlan。
 
-    与 sourcefile 单层扫描语义一致：不递归更深。
+    与 sourcefile 的「root 是高层容器」语义对齐，但走的是结构化递归：
+    遇到 FLAT / NESTED 立即视作一个单位（不再下钻），其它情况继续递归。
 
     Args:
-        jobs: 1=串行；>1=并行；0=自动 ``min(cpu,4)``；< 4 个目录强制串行。
+        jobs: 1=串行；>1=并行 plan_unit；0=自动 ``min(cpu,4)``。
+              识别本身（_find_units）始终在主进程串行执行，并行的只是
+              已识别单位的 PackPlan 构建 —— 通常是字符串处理，并行收益
+              有限，主要作用是统一接口。
         on_progress: 每完成一项即回调 ``f(done, total)``。
         cancel_token: threading.Event，已 set 时提前退出。
     """
@@ -200,10 +359,19 @@ def plan_packs(
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
-    target_dirs = [str(d) for d in sorted(root_path.iterdir()) if d.is_dir()]
-    emit(f'  找到目录: {len(target_dirs)} 个')
+
+    units = _find_units_in_root(root_path)
+    if not units:
+        emit('  未识别出任何打包单位')
+        return []
+
+    flat_n   = sum(1 for _, k in units if k == 'flat')
+    nested_n = sum(1 for _, k in units if k == 'nested')
+    emit(f'  识别打包单位: {len(units)} 个（单层 {flat_n}，嵌套 {nested_n}）')
+
+    items: list[tuple[str, str]] = [(str(d), k) for d, k in units]
     return run_plans(
-        target_dirs, plan_pack, jobs=jobs, progress_line=_progress_line,
+        items, _plan_unit_item, jobs=jobs, progress_line=_progress_line,
         on_progress=on_progress, cancel_token=cancel_token,
     )
 
@@ -271,11 +439,20 @@ def move_zip(zip_path: Path, target: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def process_pack_dir(src_dir: Path, target: str) -> None:
-    """drag 模式入口：plan → preview → confirm → apply → 可选移动 zip。"""
+    """drag 模式入口：在拖入的目录下识别单位 → preview → confirm → apply →
+    可选移动 zip。
+
+    与批量模式共用 _find_units：拖入的目录本身可能是 FLAT/NESTED 单位
+    （单本/分话漫画），也可能是包含多本的容器，统一处理。
+    """
     from mt.presentation.view import print_pack_preview   # 延迟导入避免循环
     emit(f'\n{SEP}')
     emit(f'📂 目录: {src_dir}')
-    plans = [plan_pack(str(src_dir))]
+    units = _find_units(src_dir)
+    if not units:
+        emit('  未识别出任何打包单位')
+        return
+    plans = [plan_unit(str(d), k) for d, k in units]
     print_pack_preview(plans)
     if not any(p.writable for p in plans):
         return
@@ -287,4 +464,4 @@ def process_pack_dir(src_dir: Path, target: str) -> None:
             if p.writable:
                 move_zip(Path(p.zip_path), target)
     elif fail > 0:
-        warn(f'{fail} 个目录处理失败，zip 未移动，请修复后重试。')
+        warn(f'{fail} 个单位处理失败，zip 未移动，请修复后重试。')

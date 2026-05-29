@@ -39,7 +39,7 @@ class PackTab(BaseTab):
     confirm_verb     = '打包并删除源目录'
     no_change_msg    = '没有可打包的目录'
     root_label       = '图片根目录:'
-    root_placeholder = '其下每个直接子目录视为一本漫画'
+    root_placeholder = '递归识别打包单位（单层 / 嵌套分话）'
 
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()
@@ -71,10 +71,12 @@ class PackTab(BaseTab):
         return sum(1 for p in plans if p.writable)
 
     def _classify_plans(self, plans: list[PackPlan]) -> dict[str, int]:
-        writable = sum(1 for p in plans if p.writable)
+        flat     = sum(1 for p in plans if p.writable and p.kind == 'flat')
+        nested   = sum(1 for p in plans if p.writable and p.kind == 'nested')
         replaced = sum(1 for p in plans if p.writable and p.zip_exists)
-        skipped  = len(plans) - writable
-        return {'可打包': writable, '覆盖现有 zip': replaced, '跳过': skipped}
+        skipped  = sum(1 for p in plans if not p.writable)
+        return {'单层': flat, '嵌套': nested,
+                '覆盖现有 zip': replaced, '跳过': skipped}
 
     def _mover(self):
         return _pack_mover

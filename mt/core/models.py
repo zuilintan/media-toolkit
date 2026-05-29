@@ -297,25 +297,32 @@ class CoverPlan:
 
 @dataclass
 class PackPlan:
-    """单个图片目录的「序号化重命名 + 打包」计划。
+    """单个「打包单位」的序号化重命名 + 打包计划。
 
-    plan 阶段只扫描文件、计算目标名、收集非图片文件，不动盘；apply 阶段
-    先做两阶段重命名（→ tmp → 目标）以避免名称冲突，然后用
-    ``zipfile.ZIP_STORED`` 写入同级 ``<dir>.zip``。
+    打包单位由 workflow.pack._find_units 递归识别，分两种:
+      - ``'flat'``：直接含图片、无子目录（zip 内平铺）
+      - ``'nested'``：仅含子目录且每个子目录都是 flat（zip 内保留子目录路径）
+
+    plan 阶段只扫描 / 算目标名 / 收集非图片，不动盘；apply 阶段以
+    ``zipfile.ZIP_STORED`` 写入同级 ``<dir>.zip``，写完整树 ``rmtree``。
 
     Attributes:
-        src_dir:    待处理目录路径。
+        src_dir:    打包单位的根目录路径。
         zip_path:   目标 zip 路径（``<src_dir.parent>/<src_dir.name>.zip``）。
-        renames:    ``(old_name, new_name)`` 列表；按目标编号升序。
-        extras:     非图片文件名（不参与重命名也不会进 zip，仅提示）。
+        renames:    ``(old_rel, new_rel)`` 列表；flat 模式只有文件名；
+                    nested 模式带子目录前缀（如 ``Ch01/0001.jpg``，用 /）。
+        extras:     非图片文件（相对 src_dir 的路径字符串，用 /）；
+                    不进 zip，但会随源目录被 rmtree 一并删除。
         zip_exists: 目标 zip 已存在（apply 时会覆盖）。
-        error:      plan 阶段发现的阻断性问题（如目录不存在 / 无图片）。
+        kind:       ``'flat'`` / ``'nested'``；驱动预览展示与统计分组。
+        error:      plan 阶段发现的阻断性问题；非空则该计划不会被执行。
     """
     src_dir:    str
     zip_path:   str
     renames:    list[tuple[str, str]]
     extras:     list[str]
     zip_exists: bool = False
+    kind:       str  = 'flat'
     error:      str  = ""
 
     @property
@@ -331,3 +338,10 @@ class PackPlan:
     def n_renamed(self) -> int:
         """实际会发生改名的文件数（已是目标名的不计）。"""
         return sum(1 for o, n in self.renames if o != n)
+
+    @property
+    def n_subdirs(self) -> int:
+        """nested 模式下涉及的子目录数；flat 模式恒为 0。"""
+        if self.kind != 'nested':
+            return 0
+        return len({old.split('/', 1)[0] for old, _ in self.renames})
