@@ -4,7 +4,7 @@ main_window.py — 主窗口：上方 QTabWidget，下方每 Tab 独立日志面
 布局
 ----
 QSplitter (Vertical)
-├── QTabWidget       — sourcefile / cover / metadata 三个 Tab
+├── QTabWidget       — pack / sourcefile / cover / metadata 四个 Tab
 └── log_panel        — QStackedWidget：每个 Tab 各有一个 LogView
 
 每个 Tab 持有自己的 QtSink（BaseTab._sink）；Tab 上的用户操作（扫描/写入）
@@ -25,6 +25,7 @@ from mt import __version__
 from mt.gui.gui_config import get_config
 from mt.gui.tabs.cover_tab import CoverTab
 from mt.gui.tabs.metadata_tab import MetadataTab
+from mt.gui.tabs.pack_tab import PackTab
 from mt.gui.tabs.sourcefile_tab import SourcefileTab
 from mt.gui.widgets.log_view import LogView
 from mt.infra.console import set_output
@@ -41,17 +42,19 @@ class MainWindow(QMainWindow):
         self._busy_count = 0
 
         # ── Tab ──────────────────────────────────────────────────────
-        tab0 = SourcefileTab()
-        tab1 = CoverTab()
-        tab2 = MetadataTab()
-        self._tab_list = [tab0, tab1, tab2]
+        tab0 = PackTab()
+        tab1 = SourcefileTab()
+        tab2 = CoverTab()
+        tab3 = MetadataTab()
+        self._tab_list = [tab0, tab1, tab2, tab3]
         for tab in self._tab_list:
             tab.busy_changed.connect(self._on_tab_busy)
 
         self._tabs = QTabWidget()
-        self._tabs.addTab(tab0, '1. sourcefile')
-        self._tabs.addTab(tab1, '2. cover')
-        self._tabs.addTab(tab2, '3. metadata')
+        self._tabs.addTab(tab0, '1. pack')
+        self._tabs.addTab(tab1, '2. sourcefile')
+        self._tabs.addTab(tab2, '3. cover')
+        self._tabs.addTab(tab3, '4. metadata')
 
         # ── 每 Tab 独立 LogView，叠放在 QStackedWidget ────────────────
         self._log_stack = QStackedWidget()

@@ -141,6 +141,11 @@ class BaseTab(QWidget):
         """print_run_banner 的副标题；默认为空，子类可覆盖。"""
         return ''
 
+    def _mover(self) -> Callable[[list, str, str], None] | None:
+        """apply 成功后的移动策略；返回 None 走 apply_and_move 默认
+        （搬 root 下顶层子目录）。pack 这类「产物是 zip 文件」的场景覆盖此方法。"""
+        return None
+
     # ── 通用回调 ───────────────────────────────────────────────────────
     def _on_scan(self) -> None:
         root = self._root_picker.path()
@@ -204,6 +209,9 @@ class BaseTab(QWidget):
 
         self._actionable_n = n
         self._status.setText('写入中...')
+        run_kwargs: dict[str, Any] = {}
+        if (mover := self._mover()) is not None:
+            run_kwargs['mover'] = mover
         self._run(
             apply_and_move,
             self._apply_fn(),
@@ -212,6 +220,7 @@ class BaseTab(QWidget):
             self._move_picker.path(),
             on_finished=self._on_applied,
             on_failed=self._on_task_failed,
+            **run_kwargs,
         )
 
     def _on_applied(self, fail: int) -> None:
