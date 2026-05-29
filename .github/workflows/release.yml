@@ -31,12 +31,13 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.3
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+      - name: Install Poetry (via pipx)
+        # 用 pipx 而非 snok/install-poetry：snok 在 windows-latest 下偶发 PATH
+        # 注入不生效；pipx 是 runner 自带，装上即在 PATH，所有 shell 都能用。
+        run: pipx install poetry==1.8.3
+
+      - name: Configure Poetry to use in-project venv
+        run: poetry config virtualenvs.in-project true
 
       - name: Cache Poetry venv
         uses: actions/cache@v4
