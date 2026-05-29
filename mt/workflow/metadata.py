@@ -303,6 +303,7 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
                 replaced = True
                 break
         zf.writestr(_comicinfo_zinfo(attr), xml_bytes)
+        zf.NameToInfo[COMICINFO_FILENAME].flag_bits |= 0x800
     return replaced
 
 

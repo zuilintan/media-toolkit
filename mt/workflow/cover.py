@@ -200,6 +200,7 @@ def write_cover(cbz_path: str, dst_name: str, webp_bytes: bytes) -> bool:
                     replaced = True
                 zf.filelist.remove(zf.NameToInfo.pop(key))
         zf.writestr(_cover_zinfo(dst_name, attr), webp_bytes)
+        zf.NameToInfo[dst_name].flag_bits |= 0x800
     return replaced
 
 

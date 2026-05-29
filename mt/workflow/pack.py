@@ -458,6 +458,9 @@ def _write_stored_zip(
             src = src_dir / old
             with open(src, 'rb') as fp:
                 zf.writestr(_stored_zinfo(new, src), fp.read())
+        # 统一设置 UTF-8 flag (bit 11)，确保 ASCII 与非 ASCII 文件名一致
+        for zi in zf.filelist:
+            zi.flag_bits |= 0x800
 
 
 def apply_pack_plan(plan: PackPlan) -> str:
