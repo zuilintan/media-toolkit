@@ -6,7 +6,9 @@ fs.py — 文件/路径安全操作原语
   - is_smb_path                 — SMB 路径识别（Windows 专有）
   - execute_rename / try_rename — 安全重命名（含 SMB 大小写两步法）
   - safe_unlink / safe_rmdir    — 带深度守卫的删除
-  - move_dir                    — 目录搬移（同名目标存在则逐项合并覆盖）
+  - safe_rmtree                 — 带深度守卫的递归删除
+  - move_dir                    — src 作为子放入 target 目录（同名合并覆盖）
+  - merge_into                  — src 的内容递归 move 到 dst 内（不嵌套）
 
 设计原则:
   - 仅依赖标准库，不引入任何业务模块
@@ -110,6 +112,12 @@ def safe_rmdir(p: Path) -> None:
     p.rmdir()
 
 
+def safe_rmtree(p: Path) -> None:
+    """带深度守卫的递归删除（含非空目录与全部子内容）。"""
+    guard_path(p)
+    shutil.rmtree(p)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 目录搬移
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -174,3 +182,58 @@ def move_dir(
                  f'{len(remaining)} 个文件未能移动，源目录保留: {src}')
     reporter('info', f'  合并完成: 成功 {ok_n} | 失败 {fail}')
     return fail == 0
+
+
+def merge_into(
+    src: Path,
+    dst: Path,
+    *,
+    reporter: Reporter = _default_reporter,
+) -> dict:
+    """把 src 内的所有内容递归 move 到 dst 内（不嵌套 src.name）。
+
+    与 ``move_dir`` 的区别:
+      - ``move_dir(src, target)`` 把 src 作为子放入 target，即
+        ``target/src.name``
+      - ``merge_into(src, dst)`` 把 src 的内容直接合并到 dst 中
+        （src 本身不出现在 dst 内）
+
+    冲突策略:
+      - 文件冲突 → 删旧覆盖（safe_unlink + shutil.move）
+      - 子目录冲突 → 递归合并
+
+    源目录是否清空由调用方决定（本函数只做合并，不删 src 本身）；可读
+    返回值 ``moved == src.iterdir() count`` 推断。
+
+    Args:
+        src:      源目录。
+        dst:      目标目录；不存在会自动创建。
+        reporter: 进度/警告输出回调。
+
+    Returns:
+        ``{'moved': N, 'overwritten': M, 'failed': K}``
+    """
+    dst.mkdir(parents=True, exist_ok=True)
+    moved = overwritten = failed = 0
+    for item in sorted(src.iterdir()):
+        target = dst / item.name
+        try:
+            if item.is_dir() and target.exists() and target.is_dir():
+                # 子目录冲突 → 递归合并；合并完成后若 item 已空则删之
+                stats = merge_into(item, target, reporter=reporter)
+                moved       += stats['moved']
+                overwritten += stats['overwritten']
+                failed      += stats['failed']
+                if not any(item.iterdir()):
+                    safe_rmdir(item)
+            elif target.exists():
+                safe_unlink(target)
+                shutil.move(str(item), str(target))
+                overwritten += 1
+            else:
+                shutil.move(str(item), str(target))
+                moved += 1
+        except Exception as e:
+            reporter('error', f'{item.name} — {e}')
+            failed += 1
+    return {'moved': moved, 'overwritten': overwritten, 'failed': failed}

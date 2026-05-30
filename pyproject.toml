@@ -40,7 +40,11 @@ dev = [
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["mt", "base"]
+packages = ["mt", "ft", "base"]
+
+# 把 ft/config_template.json 一并打进 wheel（load_config 失败提示要指向它）
+[tool.hatch.build.targets.wheel.force-include]
+"ft/config_template.json" = "ft/config_template.json"
 
 [build-system]
 requires = ["hatchling"]

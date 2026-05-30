@@ -1,0 +1,24 @@
+{
+  "ft.workdirs": [
+    {
+      "path": "M:\\MK\\MMD\\作者",
+      "search_url_template": "https://www.iwara.tv/search?query={author}&type=users"
+    },
+    {
+      "path": "M:\\MK\\HMV\\作者",
+      "search_url_template": "https://www.iwara.tv/search?query={author}&type=users"
+    },
+    {
+      "path": "M:\\MK\\Gallery\\Virtual - 作者",
+      "search_url_template": ""
+    },
+    {
+      "path": "N:\\MK\\MMD\\作者",
+      "search_url_template": "https://www.iwara.tv/search?query={author}&type=users"
+    },
+    {
+      "path": "N:\\MK\\HMV\\作者",
+      "search_url_template": "https://www.iwara.tv/search?query={author}&type=users"
+    }
+  ]
+}
