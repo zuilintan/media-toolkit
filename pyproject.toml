@@ -28,6 +28,7 @@ gui = [
 manga-toolkit-cli = "mt.manga_toolkit_cli:main"
 manga-toolkit-gui = "mt.gui.app:main"
 ft-cli            = "ft.file_toolkit_cli:main"
+ft-gui            = "ft.gui.app:main"
 
 # dev 组（PEP 735）：`uv sync --group dev`；不会被发布到 wheel/PyPI extras
 [dependency-groups]
