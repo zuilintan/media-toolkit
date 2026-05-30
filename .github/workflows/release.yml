@@ -60,7 +60,7 @@ jobs:
             --name "manga-toolkit-gui-${{ steps.tag.outputs.name }}" `
             --add-data "mt/data/examples.json;mt/data" `
             --collect-submodules mt `
-            mt/gui/app.py
+            mt/gui/__main__.py
 
       - name: Smoke test exe (启动后立即结束即视为失败)
         shell: pwsh

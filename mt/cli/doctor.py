@@ -24,7 +24,7 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from base.console import emit
 
 
-# 与 mt/gui/app.py 保持一致：PySide6 上游 wheel 覆盖范围
+# 与 base.gui.app_check 保持一致：PySide6 上游 wheel 覆盖范围
 PYSIDE6_PY_MIN = (3, 10)
 PYSIDE6_PY_MAX_EXCL = (3, 14)
 

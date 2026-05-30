@@ -246,19 +246,17 @@ GUI 完全复用 `mt.workflow.{sourcefile,metadata,cover}` 的 `plan_*` / `apply
 mt/
 ├── __init__.py
 ├── __main__.py                  — 适配 `python -m mt` 的转发层
-├── manga_toolkit_cli.py         — 统一 CLI 实现（sourcefile + metadata 子命令）
-├── cli/                         — 子命令调度层
+├── cli/                         — CLI 入口 + 子命令调度层（main = mt-cli）
 │   ├── sourcefile.py            — sourcefile 子命令
 │   ├── metadata.py              — metadata 子命令
 │   ├── cover.py                 — cover 子命令
 │   └── examples.py              — 内置示例（sourcefile / metadata 共用）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
-│   ├── app.py                   — QApplication 入口（mt-gui）
-│   ├── main_window.py           — Tab + 共享 LogView
-│   ├── qt_sink.py               — 接管 console.emit 到 Qt 信号
-│   ├── tabs/                    — 三个子命令各自 Tab
-│   ├── workers/                 — QThread 阻塞任务包装
-│   └── widgets/                 — LogView / PathPicker
+│   ├── __init__.py              — QApplication 入口（main = mt-gui）
+│   ├── __main__.py              — `python -m mt.gui` / PyInstaller 入口
+│   ├── module.py                — MangaModule（被 shell 装载）
+│   ├── tabs/                    — 四个子命令各自 Tab
+│   └── workers/                 — QThread 阻塞任务包装
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
 │   ├── config.py                — 全局默认配置
 │   ├── models.py                — Chapter / Volume / MangaInfo
@@ -282,7 +280,7 @@ mt/
 ```
 
 > 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
-> `pyproject.toml` 中 `mt-cli = "mt.manga_toolkit_cli:main"` 即为两者的桥接。
+> `pyproject.toml` 中 `mt-cli = "mt.cli:main"` 即为两者的桥接。
 
 依赖关系（低层 → 高层）：
 
@@ -304,7 +302,7 @@ workflow/sourcefile← core/models · core/config · naming/* · infra/{utils,co
 workflow/metadata  ← core/models · core/config · core/patterns · infra/{console,parallel} · naming/parser · presentation · workflow/drag
 workflow/cover     ← core/models · core/config · infra/{console,parallel} · presentation · workflow/drag
         ↓
-mt/cli/{sourcefile,metadata,cover,examples}
+mt/cli/{sourcefile,metadata,cover,pack,examples}
         ↓
-mt/manga_toolkit_cli.py
+mt/cli/__init__.py  (main → mt-cli)
 ```

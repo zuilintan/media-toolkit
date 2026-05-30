@@ -10,12 +10,13 @@ manga-toolkit — 漫画文件整理工具集
     data/      — 随包数据（examples.json）
 
 CLI 入口:
-    manga_toolkit_cli.py        — 统一命令行入口（参数解析与调度）
-    cli/                        — 各子命令具体实现
+    cli/__init__.py             — main() 与 build_parser() 主入口
+    cli/<subcmd>.py             — 各子命令具体实现
     __main__.py                 — 适配 `python -m mt` 调用
 
 console 命令:
-    mt-cli           — 由 pyproject.toml 注册，指向 mt.manga_toolkit_cli:main
+    mt-cli           — 由 pyproject.toml 注册，指向 mt.cli:main
+    mt-gui           — 由 pyproject.toml 注册，指向 mt.gui:main
 
 子命令:
     rename     — 批量重命名漫画文件 / 目录
