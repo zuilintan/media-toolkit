@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from mt.core.models import CoverPlan
-from mt.gui.gui_config import get_config
+from base.gui.config import get_config
 from mt.gui.tabs.base_tab import BaseTab
 from mt.presentation.view import print_cover_preview
 from mt.workflow.cover import (

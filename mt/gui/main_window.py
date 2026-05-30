@@ -22,12 +22,12 @@ from PySide6.QtWidgets import (
 )
 
 from mt import __version__
-from mt.gui.gui_config import get_config
+from base.gui.config import get_config
 from mt.gui.tabs.cover_tab import CoverTab
 from mt.gui.tabs.metadata_tab import MetadataTab
 from mt.gui.tabs.pack_tab import PackTab
 from mt.gui.tabs.sourcefile_tab import SourcefileTab
-from mt.gui.widgets.log_view import LogView
+from base.gui.log_view import LogView
 from mt.infra.console import set_output
 
 

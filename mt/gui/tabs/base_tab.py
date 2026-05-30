@@ -22,11 +22,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from mt.gui.gui_config import get_config
-from mt.gui.qt_sink import QtSink
-from mt.gui.widgets.path_picker import PathPicker
+from base.gui.config import get_config
+from base.gui.path_picker import PathPicker
+from base.gui.qt_sink import QtSink
+from base.gui.worker import Worker
 from mt.gui.workers.apply import apply_and_move
-from mt.gui.workers.plan_worker import Worker
 from mt.infra.console import SEP2, emit, set_output
 from mt.presentation.view import print_run_banner
 

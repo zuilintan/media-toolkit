@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QWidget,
 )
 
-from mt.gui.gui_config import get_config
+from base.gui.config import get_config
 
 
 class PathPicker(QWidget):

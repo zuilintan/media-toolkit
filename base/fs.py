@@ -9,7 +9,7 @@ fs.py — 文件/路径安全操作原语
 
 设计原则:
   - 仅依赖标准库，不引入任何业务模块
-  - 调试日志走标准 logging（logger 名 ``ft.fs``）
+  - 调试日志走标准 logging（logger 名 ``base.fs``）
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from ft.fs import safe_unlink, safe_rmdir
+from base.fs import safe_unlink, safe_rmdir
 from mt.infra.console import SEP2, emit, warn, error
 
 

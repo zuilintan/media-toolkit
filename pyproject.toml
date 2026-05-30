@@ -40,7 +40,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["mt", "ft"]
+packages = ["mt", "base"]
 
 [build-system]
 requires = ["hatchling"]
