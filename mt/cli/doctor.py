@@ -10,7 +10,7 @@ doctor.py — 环境体检子命令
     zhconv:    1.4.3        ✅
     Pillow:    12.2.0       ✅
     smartcrop: 0.5.0        ✅
-    PySide6:   未安装        ⚠️  poetry install --with gui
+    PySide6:   未安装        ⚠️  uv sync --extra gui
 
 依赖: 仅标准库 + mt.infra.console
 """
@@ -31,10 +31,10 @@ PYSIDE6_PY_MAX_EXCL = (3, 14)
 # 体检项：(显示名, distribution 名, 所属组, 安装提示)
 # distribution 名按 PyPI 的规范名（大小写敏感处用 importlib.metadata 处理）
 _CHECKS: list[tuple[str, str, str, str]] = [
-    ('zhconv',    'zhconv',    'CLI/GUI 必选', 'poetry install'),
-    ('Pillow',    'Pillow',    'CLI/GUI 必选', 'poetry install'),
-    ('smartcrop', 'smartcrop', 'CLI/GUI 必选', 'poetry install'),
-    ('PySide6',   'PySide6',   'GUI 可选',     'poetry install --with gui'),
+    ('zhconv',    'zhconv',    'CLI/GUI 必选', 'uv sync'),
+    ('Pillow',    'Pillow',    'CLI/GUI 必选', 'uv sync'),
+    ('smartcrop', 'smartcrop', 'CLI/GUI 必选', 'uv sync'),
+    ('PySide6',   'PySide6',   'GUI 可选',     'uv sync --extra gui'),
 ]
 
 

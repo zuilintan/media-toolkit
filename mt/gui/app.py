@@ -10,7 +10,7 @@ app.py — PySide6 桌面入口
 4. 构造 MainWindow，把 sink 注入它，由它连接到 LogView
 5. 启动事件循环
 
-可通过 `poetry run manga-toolkit-gui` 启动（见 pyproject scripts）。
+可通过 `uv run manga-toolkit-gui` 启动（见 pyproject scripts）。
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _check_pyside6() -> None:
 
     分两种失败场景给出不同指引：
     1) 当前 Python 不在 PySide6 wheel 覆盖范围 → 引导切 venv
-    2) Python 在范围内但 PySide6 没装 → 引导 ``poetry install --with gui``
+    2) Python 在范围内但 PySide6 没装 → 引导 ``uv sync --extra gui``
     """
     try:
         import PySide6  # noqa: F401
@@ -48,25 +48,23 @@ def _check_pyside6() -> None:
         # 场景 2：版本 OK，只是没装
         sys.stderr.write(
             f'\n❌ 未检测到 PySide6（当前 Python {py}）\n\n'
-            '原因: 你忘了带 `--with gui` 安装可选依赖组。\n\n'
+            '原因: 你忘了带 `--extra gui` 安装可选依赖组。\n\n'
             '解决:\n'
-            '  poetry install --with gui\n'
-            '  poetry run manga-toolkit-gui\n\n'
-            '体检命令: poetry run manga-toolkit-cli doctor\n'
+            '  uv sync --extra gui\n'
+            '  uv run manga-toolkit-gui\n\n'
+            '体检命令: uv run manga-toolkit-cli doctor\n'
         )
     else:
         # 场景 1：版本超出 PySide6 支持区间
         sys.stderr.write(
             f'\n❌ 未检测到 PySide6（当前 Python {py}）\n\n'
             f'原因: PySide6 官方 wheel 仅覆盖 Python {lo}–{hi}，\n'
-            f'你当前环境是 {py}，`poetry install --with gui` 时被静默跳过。\n\n'
-            f'解决: 换用 {lo}–{hi} 的 Python 重建 venv，例如 Python 3.13：\n'
-            '  scoop bucket add versions\n'
-            '  scoop install versions/python313\n'
-            '  poetry env use "$(scoop prefix python313)/python.exe"\n'
-            '  poetry install --with gui\n'
-            '  poetry run manga-toolkit-gui\n\n'
-            '体检命令: poetry run manga-toolkit-cli doctor\n'
+            f'你当前环境是 {py}，`uv sync --extra gui` 时被静默跳过。\n\n'
+            f'解决: 用 uv 切到 {lo}–{hi} 区间内的 Python 重建 venv，例如 Python 3.13：\n'
+            '  uv python install 3.13\n'
+            '  uv sync --extra gui --python 3.13\n'
+            '  uv run manga-toolkit-gui\n\n'
+            '体检命令: uv run manga-toolkit-cli doctor\n'
         )
     sys.exit(2)
 

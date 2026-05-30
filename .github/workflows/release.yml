@@ -28,27 +28,20 @@ jobs:
           # git-cliff 需要完整 commit/tag 历史界定 --latest 的范围
           fetch-depth: 0
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        # setup-uv 自带 PATH 注入与跨平台缓存，比手动 pipx 装 uv 稳。
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.13'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
 
-      - name: Install Poetry (via pipx)
-        # 用 pipx 而非 snok/install-poetry：snok 在 windows-latest 下偶发 PATH
-        # 注入不生效；pipx 是 runner 自带，装上即在 PATH，所有 shell 都能用。
-        run: pipx install poetry==1.8.3
-
-      - name: Configure Poetry to use in-project venv
-        run: poetry config virtualenvs.in-project true
-
-      - name: Cache Poetry venv
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: poetry-${{ runner.os }}-py3.13-${{ hashFiles('poetry.lock') }}
+      - name: Install Python 3.13
+        # 用 uv 管理 Python；pyproject 里 requires-python = ">=3.11"，但 GUI
+        # 受 PySide6 wheel 限制 3.13 是当前最稳的版本。
+        run: uv python install 3.13
 
       - name: Install dependencies (gui + dev)
-        run: poetry install --with gui --with dev --no-interaction
+        run: uv sync --extra gui --group dev --python 3.13
 
       - name: Resolve version tag
         id: tag
@@ -63,7 +56,7 @@ jobs:
 
       - name: Build GUI exe (PyInstaller, onefile windowed)
         run: |
-          poetry run pyinstaller --noconfirm --windowed --onefile `
+          uv run pyinstaller --noconfirm --windowed --onefile `
             --name "manga-toolkit-gui-${{ steps.tag.outputs.name }}" `
             --add-data "mt/data/examples.json;mt/data" `
             --collect-submodules mt `

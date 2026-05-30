@@ -1,43 +1,47 @@
-[tool.poetry]
+[project]
 name = "manga-toolkit"
 version = "0.1.5"
 description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
-authors = ["Lin Tan"]
-license = "MIT"
+authors = [{ name = "Lin Tan" }]
+license = { text = "MIT" }
 readme = "README.md"
-packages = [{include = "mt"}]
+requires-python = ">=3.11"
+dependencies = [
+    # 繁简转换（译名繁体→简体，必选）
+    "zhconv>=1.4.0",
+    # 封面图像处理（cover 子命令必选）
+    "Pillow>=10.0",
+    # smartcrop 显著性裁剪（cover --smart 模式）
+    "smartcrop>=0.3.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-# 繁简转换（译名繁体→简体，必选）
-zhconv = ">=1.4.0"
-# 封面图像处理（cover 子命令必选）
-Pillow = ">=10.0"
-# smartcrop 显著性裁剪（cover --smart 模式）
-smartcrop = ">=0.3.2"
+# 可选 GUI extras：`uv sync --extra gui` 才装；CLI 用户零负担。
+# PySide6 当前 wheel 仅覆盖 Python 3.10–3.13；marker 约束写在依赖项而非主
+# requires-python，避免影响仅装 CLI 的用户。
+[project.optional-dependencies]
+gui = [
+    "PySide6>=6.6 ; python_version < '3.14'",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">=8.0"
-# 仅 CI 打包 Windows 单文件 exe 时使用；pyinstaller wheel 仅覆盖 Python <3.15
-pyinstaller = { version = "^6.20.0", python = ">=3.11,<3.15" }
-
-# 可选 GUI 组：`poetry install --with gui` 才装；CLI 用户零负担
-[tool.poetry.group.gui]
-optional = true
-
-[tool.poetry.group.gui.dependencies]
-# PySide6 当前 wheel 仅覆盖 Python 3.9–3.13；约束写在依赖项而非主 python，
-# 避免影响仅装 CLI 的用户。
-PySide6 = { version = ">=6.6", python = ">=3.11,<3.14" }
-
-[tool.poetry.scripts]
+[project.scripts]
 # CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
 manga-toolkit-cli = "mt.manga_toolkit_cli:main"
 manga-toolkit-gui = "mt.gui.app:main"
 
+# dev 组（PEP 735）：`uv sync --group dev`；不会被发布到 wheel/PyPI extras
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    # 仅 CI 打包 Windows 单文件 exe 时使用；pyinstaller wheel 仅覆盖 Python <3.15
+    "pyinstaller>=6.20.0,<7 ; python_version < '3.15'",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["mt"]
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
