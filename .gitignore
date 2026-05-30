@@ -1,18 +1,18 @@
-# 忽略 Python 缓存文件
-__pycache__/
-*.py[cod]
-
-# 忽略 JetBrains IDE 项目配置
+# JetBrains IDE 项目配置
 .idea/
 *.iml
 
-# 忽略 Claude 独立树
+# Claude 独立树
 .claude
 
-# 项目产物
-/rename_sessions.json
+# Python 缓存文件
+__pycache__/
+*.py[cod]
 
-# PyInstaller 本地构建产物（CI 才是权威发布源）
+# Python 虚拟环境
+/.venv/
+
+# PyInstaller 构建产物（CI 才是权威发布源）
 /build/
 /dist/
 *.spec
