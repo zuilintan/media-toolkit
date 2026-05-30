@@ -7,16 +7,16 @@ cover.py — CBZ 封面生成（cover 子命令工作流层）
 
 目标文件名取决于源图：
   - 源 ``0001.*`` → 写入 ``0000.webp``（字典序在最前，作为新增封面）
-  - 源 ``cover.*`` → 写入 ``cover.webp``（替换原 cover.*，统一为 WebP）
+  - 源 ``cover.*`` → 写入 ``0000.webp``，并从 ZIP 中删除原 ``cover.*``
 
 流程:
   1. 在 CBZ 根目录依次寻找 ``cover.*`` / ``0001.*`` 作为源图
   2. 居中裁剪到 2:3（默认）或 smartcrop 显著性裁剪
   3. 缩放至 ≤ 1000×1500（保持比例）
   4. 编码为 WebP
-  5. ZIP 追加写入目标文件；写入前清理根目录同 stem（如 cover.png）的
-     旧文件，避免与新目标共存（参考 ComicInfo.xml 的追加替换方式，
-     不重建整个压缩包）
+  5. ZIP 追加写入 ``0000.webp``；写入前清理同 stem 旧条目；源为
+     ``cover.*`` 时额外删除所有 ``cover.*`` 条目（参考 ComicInfo.xml
+     的追加替换方式，不重建整个压缩包）
 
 依赖: Pillow / smartcrop（可选） / models / config / console / drag
 """
@@ -47,7 +47,7 @@ DEFAULT_QUALITY: int           = 85
 SOURCE_PRIORITY: tuple[str, ...] = ('cover', '0001')
 # 源 stem → 目标文件名
 DST_FOR: dict[str, str] = {
-    'cover': 'cover.webp',     # 替换原 cover.*
+    'cover': '0000.webp',      # 生成 0000.webp 并删除原 cover.*
     '0001':  '0000.webp',      # 追加新封面，排在 0001 之前
 }
 
@@ -172,12 +172,17 @@ def _inherit_attr(infos: list[zipfile.ZipInfo]) -> int:
     return 0x20  # DOS Archive 默认
 
 
-def write_cover(cbz_path: str, dst_name: str, webp_bytes: bytes) -> bool:
+def write_cover(
+    cbz_path: str,
+    dst_name: str,
+    webp_bytes: bytes,
+    also_delete_stem: str | None = None,
+) -> bool:
     """以追加模式写入 ``dst_name``，根目录下同 stem 的旧条目（任何扩展名）
     从内存目录摘除（死空间 < 1 个图像）。
 
-    清理同 stem 而非仅同名是为了避免 ``cover.png`` 与新写入的
-    ``cover.webp`` 共存。子目录条目不动。
+    ``also_delete_stem`` 不为 None 时，同样摘除根目录下该 stem 的所有条目
+    （用于 cover.* → 0000.webp 时删除原 cover.*）。
 
     与 ``workflow.metadata.write_comicinfo`` 同构。
 
@@ -195,9 +200,12 @@ def write_cover(cbz_path: str, dst_name: str, webp_bytes: bytes) -> bool:
         for key in list(zf.NameToInfo.keys()):
             if '/' in key:
                 continue
-            if os.path.splitext(key)[0].lower() == dst_stem:
+            key_stem = os.path.splitext(key)[0].lower()
+            if key_stem == dst_stem:
                 if key.lower() == dst_name.lower():
                     replaced = True
+                zf.filelist.remove(zf.NameToInfo.pop(key))
+            elif also_delete_stem and key_stem == also_delete_stem:
                 zf.filelist.remove(zf.NameToInfo.pop(key))
         zf.writestr(_cover_zinfo(dst_name, attr), webp_bytes)
         zf.NameToInfo[dst_name].flag_bits |= 0x800
@@ -286,13 +294,17 @@ def plan_cover(
 def apply_cover_plan(plan: CoverPlan) -> str:
     """写入单个 CBZ 的目标封面（plan.dst_name）。
 
+    源为 cover.* 时，写入后同步从 ZIP 删除所有 cover.* 条目（自身）。
+
     Returns:
         'ok' / 'error'（无源图等情况由调用方过滤，此处不再判定）。
     """
     filename = plan.filename
     try:
         assert plan.webp_bytes is not None and plan.dst_name is not None
-        write_cover(plan.cbz_path, plan.dst_name, plan.webp_bytes)
+        src_stem = os.path.splitext(plan.src_name)[0].lower() if plan.src_name else None
+        also_delete = src_stem if src_stem == 'cover' else None
+        write_cover(plan.cbz_path, plan.dst_name, plan.webp_bytes, also_delete_stem=also_delete)
         emit(f'   ✅ {filename} — 已处理')
         return 'ok'
     except Exception as e:

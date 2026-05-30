@@ -221,8 +221,8 @@ def print_metadata_diff_table(
 def print_cover_preview(plans: list[CoverPlan]) -> None:
     """打印封面写入计划，逐卡片渲染。
 
-    目标文件名取决于源图：源 ``0001.*`` → ``0000.webp``；源 ``cover.*``
-    → ``cover.webp``。
+    目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``
+    （cover.* 写入后会从 ZIP 中删除自身）。
 
     卡片骨架：
       ``   📄 [N] {filename}{ 🔁 替换}``  (3 空格)

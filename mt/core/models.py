@@ -255,8 +255,8 @@ class CoverPlan:
         src_size:       源图像 (W, H)；无源图时 None。
         dst_size:       输出 (W, H)；无源图或失败时 None。
         mode:           'center' | 'smart'，本次使用的裁剪算法。
-        dst_name:       目标文件名（依源图推导：源 cover.* → cover.webp；
-                        源 0001.* → 0000.webp）；无源图时 None。
+        dst_name:       目标文件名（依源图推导：源 cover.* 或 0001.* →
+                        0000.webp）；无源图时 None。
         webp_bytes:     待写入的 WebP 二进制；无源图或失败时 None。
         existing_bytes: CBZ 内已有同名目标文件的原始字节；不存在时 None。
         error:          plan 阶段发生的错误（如源图损坏 / 解码失败）；正常时 ''。
