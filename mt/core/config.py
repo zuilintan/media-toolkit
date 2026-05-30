@@ -19,7 +19,7 @@ FILE_EXTS: frozenset[str] = frozenset({".zip", ".cbz"})
 
 # ── ComicInfo 工具 ─────────────────────────────────────────────────────────
 
-SCRIPT_NAME: str    = "manga-toolkit-cli"
+SCRIPT_NAME: str    = "mt-cli"
 SCRIPT_VERSION: str = __version__
 
 # ComicInfo.xml 文件名（ZIP 内）

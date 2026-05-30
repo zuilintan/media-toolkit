@@ -1,17 +1,15 @@
 """
-app.py — PySide6 桌面入口（file-toolkit）
+app.py — PySide6 桌面入口（file-toolkit 单模块视图）
 
 启动顺序
 --------
 1. 体检 PySide6（共用 base.gui.app_check）
-2. 设置默认 GUI 配置目录名（base.gui.config）— 必须早于任何 PathPicker
+2. 设置默认 GUI 配置目录名（base.gui.config）
 3. 创建 QApplication
-4. 构造 MainWindow（内部 set_output(QtSink) 接管输出到日志框）
+4. 构造 Shell + 注册 FtModule
 5. 启动事件循环
 
-可通过 ``uv run ft-gui`` 启动（pyproject scripts）。
-
-阶段 D 会把 MainWindow 重构为 ModuleWidget，被顶层单窗口 shell 装载。
+可通过 ``uv run ft-gui`` 启动。
 """
 
 from __future__ import annotations
@@ -31,15 +29,18 @@ def main(argv: list[str] | None = None) -> int:
 
     from base.console import setup_logging
     from base.gui.config import set_default_app_dir_name
-    from ft.gui.main_window import MainWindow
+    from base.gui.shell import Shell
+    from ft.gui.module import FtModule
 
     set_default_app_dir_name('file-toolkit')
 
     app = QApplication(argv if argv is not None else sys.argv)
     setup_logging(debug=False)
 
-    win = MainWindow()
-    win.show()
+    shell = Shell(title='file-toolkit', config_key_prefix='ft-only')
+    module = FtModule()
+    shell.register_module('files', module, default_sink=module.default_sink())
+    shell.show()
     return app.exec()
 
 

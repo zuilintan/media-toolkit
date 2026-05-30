@@ -25,10 +25,11 @@ gui = [
 
 [project.scripts]
 # CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
-manga-toolkit-cli = "mt.manga_toolkit_cli:main"
-manga-toolkit-gui = "mt.gui.app:main"
+mt-cli            = "mt.manga_toolkit_cli:main"
+mt-gui            = "mt.gui.app:main"
 ft-cli            = "ft.file_toolkit_cli:main"
 ft-gui            = "ft.gui.app:main"
+media-toolkit-gui = "app.gui:main"
 
 # dev 组（PEP 735）：`uv sync --group dev`；不会被发布到 wheel/PyPI extras
 [dependency-groups]
@@ -42,7 +43,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["mt", "ft", "base"]
+packages = ["mt", "ft", "base", "app"]
 
 # 把 ft/config_template.json 一并打进 wheel（load_config 失败提示要指向它）
 [tool.hatch.build.targets.wheel.force-include]

@@ -32,8 +32,8 @@ def check_pyside6(
     Args:
         app_name:    应用显示名（出现在 emoji 行后），用于错误提示开头。
         install_cmd: 推荐的安装命令（如 ``uv sync --extra gui``）。
-        run_cmd:     成功安装后的启动命令（如 ``uv run manga-toolkit-gui``）。
-        doctor_cmd:  可选诊断命令（如 ``uv run manga-toolkit-cli doctor``）。
+        run_cmd:     成功安装后的启动命令（如 ``uv run mt-gui``）。
+        doctor_cmd:  可选诊断命令（如 ``uv run mt-cli doctor``）。
 
     分两种失败场景给出不同指引：
       1) 当前 Python 不在 PySide6 wheel 覆盖范围 → 引导切 Python 版本

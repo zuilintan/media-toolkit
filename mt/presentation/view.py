@@ -42,7 +42,7 @@ def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) ->
     由调用方在 banner 之后自行追加。
     """
     emit(SEP2)
-    emit(f'  manga-toolkit-cli  —  {cmd} ({subtitle})')
+    emit(f'  mt-cli  —  {cmd} ({subtitle})')
     emit(SEP2)
     emit(f'  根目录:   {root}')
     emit(f'  模式:     '

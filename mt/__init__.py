@@ -15,7 +15,7 @@ CLI 入口:
     __main__.py                 — 适配 `python -m mt` 调用
 
 console 命令:
-    manga-toolkit-cli           — 由 pyproject.toml 注册，指向 mt.manga_toolkit_cli:main
+    mt-cli           — 由 pyproject.toml 注册，指向 mt.manga_toolkit_cli:main
 
 子命令:
     rename     — 批量重命名漫画文件 / 目录
