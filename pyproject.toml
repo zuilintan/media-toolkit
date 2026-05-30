@@ -1,7 +1,7 @@
 [project]
-name = "manga-toolkit"
-version = "0.2.0"
-description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
+name = "media-toolkit"
+version = "1.0.0"
+description = "媒体文件整理工具集：漫画重命名 / ComicInfo.xml / 按作者归类"
 authors = [{ name = "Lin Tan" }]
 license = { text = "MIT" }
 readme = "README.md"

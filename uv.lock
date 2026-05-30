@@ -42,8 +42,8 @@ wheels = [
 ]
 
 [[package]]
-name = "manga-toolkit"
-version = "0.2.0"
+name = "media-toolkit"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },

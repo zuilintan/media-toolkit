@@ -1,28 +1,32 @@
-# manga-toolkit
+# media-toolkit
 
-> 从网络下载的漫画文件，命名混乱、格式不一，时间一长就变得难以管理，几乎不可能直接导入 Booklore（现 Grimmory）。  
-> 该项目旨在通过正则匹配批量规范文件名、填充标准元数据，并生成统一比例封面，让你的漫画收藏更加整洁、专业。
+> 媒体文件整理工具集，含两个业务包：
+>
+> - **mt**（漫画整理）：批量规范文件名、写 ComicInfo.xml、生成统一比例封面、序号化打包 STORED zip。  
+>   入口：CLI `mt-cli` / GUI `mt-gui`（PySide6）。
+> - **ft**（文件归类）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
+>   入口：CLI `ft-cli classify` / GUI `ft-gui`；首次启动需按 `ft/config_template.json` 创建本地配置。
+>
+> 双模块单窗口入口：`app-gui`（同窗口装载 mt + ft 两个 module）。
 
-**如何快速判断该项目是否适合你？**
+**如何快速判断 mt 是否适合你？**
 
 直接查看示例对比：  
 [`mt/data/examples.json`](mt/data/examples.json)  
 其中 `i`（input）为原始文件名，`e`（expected）为本项目处理后的预期结果。
 
+下文按 mt 子命令分节描述漫画整理；ft 业务文档见 `ft/`（待补充）。
+
 ---
 
-漫画文件整理工具集，提供：
-
-- 统一 CLI `mt-cli`
-- 可选桌面 GUI `mt-gui`（PySide6）
-
-含三个子命令：
+mt 含四个子命令：
 
 | 子命令 | 功能 |
 |---|---|
 | `sourcefile` | 批量重命名源文件（.zip / .cbz），统一格式 |
 | `metadata` | 向 CBZ 写入 ComicInfo.xml 元数据 |
 | `cover` | 为 CBZ 写入 2:3 封面（源 `0001.*` → `0000.webp`；源 `cover.*` → `cover.webp`） |
+| `pack` | 图片目录序号化重命名 + STORED zip 打包 |
 
 ---
 

@@ -57,7 +57,7 @@ jobs:
       - name: Build GUI exe (PyInstaller, onefile windowed)
         run: |
           uv run pyinstaller --noconfirm --windowed --onefile `
-            --name "manga-toolkit-gui-${{ steps.tag.outputs.name }}" `
+            --name "media-toolkit-gui-${{ steps.tag.outputs.name }}" `
             --add-data "mt/data/examples.json;mt/data" `
             --collect-submodules mt `
             mt/gui/__main__.py
@@ -65,7 +65,7 @@ jobs:
       - name: Smoke test exe (启动后立即结束即视为失败)
         shell: pwsh
         run: |
-          $exe = "dist/manga-toolkit-gui-${{ steps.tag.outputs.name }}.exe"
+          $exe = "dist/media-toolkit-gui-${{ steps.tag.outputs.name }}.exe"
           $p = Start-Process -FilePath $exe -PassThru
           Start-Sleep -Seconds 10
           if ($p.HasExited) {
@@ -95,4 +95,4 @@ jobs:
           body: ${{ steps.changelog.outputs.content }}
           # 允许更新已存在的 release（手动重跑时不报错）
           fail_on_unmatched_files: true
-          files: dist/manga-toolkit-gui-${{ steps.tag.outputs.name }}.exe
+          files: dist/media-toolkit-gui-${{ steps.tag.outputs.name }}.exe
