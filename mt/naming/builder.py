@@ -14,14 +14,14 @@ builder.py — 新文件名构建
   2. 合集类（总集篇）作为 [总集篇] tag 输出，与 [zh] 同位（在语言标签前）
   3. 番外篇 / 后日谈 / 上篇 / 中篇 / 下篇 与 CH. 同级且互斥
 
-依赖: models / patterns / utils
+依赖: models / patterns / naming.text
 """
 
 from __future__ import annotations
 
 from mt.core.models import MangaInfo
 from mt.core import patterns as P
-from mt.infra.utils import dot, norm_punct
+from mt.naming.text import dot, norm_punct
 
 
 def build_new_name(info: MangaInfo) -> str:

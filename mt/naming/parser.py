@@ -3,7 +3,7 @@ parser.py — 文件名解析
 
 核心入口: parse_name(author, name) → MangaInfo
 
-依赖: models / patterns / utils / console
+依赖: models / patterns / naming.text / console
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import TypeVar
 
 from mt.core.models import Chapter, Volume, MangaInfo
 from mt.core import patterns as P
-from mt.infra.utils import (
+from mt.naming.text import (
     norm_punct, trad_to_simp,
     extract_flag, to_circle, conv_roman_suffix,
     similar,

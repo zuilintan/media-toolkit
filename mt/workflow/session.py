@@ -17,7 +17,7 @@ from pathlib import Path
 
 from mt.core.models import SourcefilePlan
 from mt.core.config import SESSIONS_FILE
-from mt.infra.utils import try_rename
+from ft.fs import try_rename
 from mt.infra.console import print_op_result, SEP, warn, error, info, emit
 
 

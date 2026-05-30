@@ -13,7 +13,7 @@ from mt.core.models import SourcefilePlan
 from mt.core.config import FILE_EXTS
 from mt.naming.parser import parse_name
 from mt.naming.builder import build_new_name
-from mt.infra.utils import try_rename
+from ft.fs import try_rename
 from mt.infra.console import print_op_result, SEP, warn, error, info, emit, confirm
 from mt.infra.parallel import run_plans
 from mt.presentation.view import print_sourcefile_preview

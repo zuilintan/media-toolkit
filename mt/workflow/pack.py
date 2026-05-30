@@ -55,7 +55,7 @@ from mt.infra.console import (
     SEP, emit, error, info, warn, confirm, print_op_result,
 )
 from mt.infra.parallel import run_plans
-from mt.infra.utils import guard_path
+from ft.fs import guard_path
 
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
