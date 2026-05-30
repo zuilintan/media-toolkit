@@ -1,6 +1,6 @@
 [project]
 name = "manga-toolkit"
-version = "0.1.5"
+version = "0.2.0"
 description = "漫画文件整理工具集：重命名 & ComicInfo.xml 生成"
 authors = [{ name = "Lin Tan" }]
 license = { text = "MIT" }
