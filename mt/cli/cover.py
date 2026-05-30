@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 
 from base.drag_loop import run_drag_loop
-from mt.infra.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_cover_preview, print_run_banner
 from mt.workflow.cover import (
     plan_covers, apply_cover_plans, make_process_cover_dir,
@@ -34,12 +34,9 @@ def cmd_cover(args: argparse.Namespace) -> int:
 
     # ── 旁路: drag ───────────────────────────────────────────────────────────
     if args.drag:
-        emit(f'\n{SEP2}')
-        emit('🔁  cover 循环拖入模式（支持同时拖入多个目录）')
-        emit('    Ctrl+C 退出')
-        emit(SEP2)
         run_drag_loop(
             process_one=make_process_cover_dir(mode, args.quality, args.jobs),
+            title='cover',
         )
         return 0
 

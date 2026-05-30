@@ -12,8 +12,8 @@ drag_loop.py — CLI 拖入循环工具
   （目标目录、配置等）一律通过闭包绑定，避免本工具与业务参数耦合。
 - 进度/警告通过可选 ``reporter`` 回调输出，缺省走 stdout/stderr；
   GUI 路由由调用方注入。
-- 启动 banner（标题、模式说明、退出提示）由调用方自行打印；本函数只负责
-  "读 → 解析 → 派发 → Ctrl+C 处理"的循环骨架。
+- 启动 banner 由 ``title`` 参数控制：传入显示名（如 ``'classify'``）即自动
+  打印统一格式 4 行 banner；不传则不打印（脚本化 / 嵌入场景）。
 
 依赖: 仅标准库
 """
@@ -24,6 +24,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from base.fs import Reporter, _default_reporter
+
+_BANNER_SEP = '═' * 72
 
 
 def _parse_drag_paths(raw: str) -> tuple[list[Path], list[str]]:
@@ -49,13 +51,22 @@ def _parse_drag_paths(raw: str) -> tuple[list[Path], list[str]]:
 def run_drag_loop(
     *,
     process_one: Callable[[Path], None],
+    title:       str | None = None,
     prompt:      str = '📂 拖入目录，Enter 处理: ',
     reporter:    Reporter = _default_reporter,
 ) -> None:
     """循环拖入模式：持续读 stdin，解析路径，逐个调 process_one。
 
-    Ctrl+C / EOF 退出。启动 banner 由调用方自行打印。
+    Args:
+        title: 非 None 时打印统一启动 banner（"🔁  {title} 循环拖入模式…"）。
+
+    Ctrl+C / EOF 退出。
     """
+    if title is not None:
+        reporter('info', f'\n{_BANNER_SEP}')
+        reporter('info', f'🔁  {title} 循环拖入模式（支持同时拖入多个目录）')
+        reporter('info', '    Ctrl+C 退出')
+        reporter('info', _BANNER_SEP)
     while True:
         reporter('info', '')
         try:

@@ -17,7 +17,7 @@ import unicodedata
 
 from mt.core.models import CoverPlan, MangaInfo, MetadataPlan, PackPlan, SourcefilePlan
 from mt.core.config import COMICINFO_TAGS
-from mt.infra.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
+from base.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from mt.naming.parser import emit_parse_debug
 
 

@@ -1,7 +1,7 @@
 """
-qt_sink.py — 把 mt.infra.console.emit 的输出引流到 Qt 信号
+qt_sink.py — 把 base.console.emit 的输出引流到 Qt 信号
 
-mt.infra.console.set_output(stream) 接受任何带 write/flush 的对象。
+base.console.set_output(stream) 接受任何带 write/flush 的对象。
 QtSink 实现这两个方法，并把每次写入通过 Qt 信号转交到 GUI 线程的
 日志框；后台 worker 线程里的 emit() 调用因此线程安全地到达 GUI。
 

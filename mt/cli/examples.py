@@ -20,7 +20,7 @@ from mt.core.config import COMICINFO_TAGS
 from mt.naming.parser import parse_name, emit_parse_debug
 from mt.naming.builder import build_new_name
 from mt.workflow.metadata import collect_fields, _extract_publisher_name
-from mt.infra.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
+from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from mt.presentation.view import print_metadata_diff_table
 
 # 示例数据文件（随包分发）

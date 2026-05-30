@@ -26,7 +26,7 @@ from base.gui.config import get_config
 from base.gui.path_picker import PathPicker
 from base.gui.qt_sink import QtSink
 from base.gui.worker import Worker
-from mt.infra.console import SEP2, emit, set_output
+from base.console import SEP2, emit, set_output
 from mt.presentation.view import print_run_banner
 
 

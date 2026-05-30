@@ -29,7 +29,7 @@ from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import TypeVar
 
-from mt.infra.console import emit
+from base.console import emit
 
 T = TypeVar('T')   # 输入项
 R = TypeVar('R')   # plan 结果

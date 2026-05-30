@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 
 from base.drag_loop import run_drag_loop
-from mt.infra.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_metadata_preview, print_run_banner
 from mt.workflow.metadata import (
     plan_metadatas, apply_metadata_plans, make_process_metadata_dir,
@@ -28,12 +28,9 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     if args.examples:
         return 0 if run_metadata_examples() == 0 else 1
     if args.drag:
-        emit(f'\n{SEP2}')
-        emit('🔁  metadata 循环拖入模式（支持同时拖入多个目录）')
-        emit('    Ctrl+C 退出')
-        emit(SEP2)
         run_drag_loop(
             process_one=make_process_metadata_dir(args.jobs),
+            title='metadata',
         )
         return 0
 

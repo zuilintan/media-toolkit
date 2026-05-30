@@ -13,7 +13,7 @@ mt.cli — 命令行子命令实现
 from __future__ import annotations
 from pathlib import Path
 
-from mt.infra.console import emit
+from base.console import emit
 
 
 def validate_root(root_arg: str) -> Path | None:

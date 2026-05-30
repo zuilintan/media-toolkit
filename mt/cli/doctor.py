@@ -12,7 +12,7 @@ doctor.py — 环境体检子命令
     smartcrop: 0.5.0        ✅
     PySide6:   未安装        ⚠️  uv sync --extra gui
 
-依赖: 仅标准库 + mt.infra.console
+依赖: 仅标准库 + base.console
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import argparse
 import sys
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
-from mt.infra.console import emit
+from base.console import emit
 
 
 # 与 mt/gui/app.py 保持一致：PySide6 上游 wheel 覆盖范围

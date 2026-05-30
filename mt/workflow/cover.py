@@ -33,7 +33,7 @@ from PIL import Image
 
 from mt.core.models import CoverPlan
 from mt.core.config import PAGE_EXTS
-from mt.infra.console import (
+from base.console import (
     SEP, emit, error, debug, info, warn, confirm, print_op_result,
 )
 from mt.infra.parallel import run_plans

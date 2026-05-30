@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 
 from base.drag_loop import run_drag_loop
-from mt.infra.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_pack_preview, print_run_banner
 from mt.workflow.pack import (
     plan_packs, apply_pack_plans, process_pack_dir,
@@ -24,11 +24,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
     """pack 子命令调度。"""
     # ── 旁路: drag ───────────────────────────────────────────────────────────
     if args.drag:
-        emit(f'\n{SEP2}')
-        emit('🔁  pack 循环拖入模式（支持同时拖入多个目录）')
-        emit('    Ctrl+C 退出')
-        emit(SEP2)
-        run_drag_loop(process_one=process_pack_dir)
+        run_drag_loop(process_one=process_pack_dir, title='pack')
         return 0
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────

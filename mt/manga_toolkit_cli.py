@@ -36,7 +36,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from mt.infra.console import setup_logging
+from base.console import setup_logging
 from mt.cli.sourcefile import cmd_sourcefile, add_sourcefile_args
 from mt.cli.metadata   import cmd_metadata,   add_metadata_args
 from mt.cli.cover      import cmd_cover,      add_cover_args

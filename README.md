@@ -235,7 +235,7 @@ uv run manga-toolkit-gui
 4. 确认无误后点「执行」→ QMessageBox 二次确认 → 后台跑 apply → 可选移动
 
 GUI 完全复用 `mt.workflow.{sourcefile,metadata,cover}` 的 `plan_*` / `apply_*`
-函数，通过 `mt.infra.console.set_output()` 接管文本输出到日志框，与 CLI 共用
+函数，通过 `base.console.set_output()` 接管文本输出到日志框，与 CLI 共用
 所有渲染逻辑（`mt.presentation.view`）。
 
 ---
@@ -292,14 +292,14 @@ core/config · core/models
 core/patterns      ← core/models
         ↓
 infra/utils        ← core/patterns
-infra/console      ← core/models
-infra/parallel     ← infra/console
+base/console      ← core/models
+infra/parallel     ← base/console
         ↓
-naming/parser      ← core/models · core/patterns · infra/utils · infra/console
+naming/parser      ← core/models · core/patterns · infra/utils · base/console
 naming/builder     ← core/models · core/patterns · infra/utils
         ↓
-workflow/drag      ← infra/utils · infra/console
-workflow/session   ← core/models · core/config · infra/utils · infra/console
+workflow/drag      ← infra/utils · base/console
+workflow/session   ← core/models · core/config · infra/utils · base/console
 workflow/sourcefile← core/models · core/config · naming/* · infra/{utils,console,parallel} · presentation · workflow/drag
 workflow/metadata  ← core/models · core/config · core/patterns · infra/{console,parallel} · naming/parser · presentation · workflow/drag
 workflow/cover     ← core/models · core/config · infra/{console,parallel} · presentation · workflow/drag

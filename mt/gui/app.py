@@ -6,7 +6,7 @@ app.py — PySide6 桌面入口（manga-toolkit）
 1. 体检：PySide6 是否安装；未装则打印中文指引退出（避免裸 ImportError 让用户懵）
 2. 创建 QApplication
 3. 设置默认 GUI 配置目录名（base.gui.config）
-4. 创建 QtSink，**先** 调用 mt.infra.console.set_output(sink)，把后续所有
+4. 创建 QtSink，**先** 调用 base.console.set_output(sink)，把后续所有
    emit() 的目的地切到 GUI；这必须在创建 MainWindow / 任何 plan 调用前完成
 5. 构造 MainWindow，把 sink 注入它，由它连接到 LogView
 6. 启动事件循环
@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from base.gui.config import set_default_app_dir_name
     from mt.gui.main_window import MainWindow
-    from mt.infra.console import setup_logging
+    from base.console import setup_logging
 
     # 让下游 get_config()（path_picker、base_tab、main_window 等）拿到正确的
     # 配置目录；必须在创建 MainWindow / 任何 PathPicker 之前调用。

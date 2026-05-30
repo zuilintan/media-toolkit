@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 
 from base.drag_loop import run_drag_loop
-from mt.infra.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_sourcefile_preview, print_run_banner
 from mt.workflow.sourcefile import (
     plan_sourcefiles, apply_sourcefile_plans, process_sourcefile_dir,
@@ -35,11 +35,7 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
         rollback(args.session)
         return 0
     if args.drag:
-        emit(f'\n{SEP2}')
-        emit('🔁  sourcefile 循环拖入模式（支持同时拖入多个目录）')
-        emit('    Ctrl+C 退出')
-        emit(SEP2)
-        run_drag_loop(process_one=process_sourcefile_dir)
+        run_drag_loop(process_one=process_sourcefile_dir, title='sourcefile')
         return 0
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────

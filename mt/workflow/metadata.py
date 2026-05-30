@@ -28,7 +28,7 @@ from mt.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
 from mt.naming.parser import parse_name
-from mt.infra.console import (
+from base.console import (
     SEP, print_op_result, error, debug, info, warn, emit, confirm,
 )
 from mt.infra.parallel import run_plans

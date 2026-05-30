@@ -18,7 +18,7 @@ from mt.naming.text import (
     extract_flag, to_circle, conv_roman_suffix,
     similar,
 )
-from mt.infra.console import debug, CYAN, RESET
+from base.console import debug, CYAN, RESET
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

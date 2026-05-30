@@ -28,7 +28,7 @@ from mt.gui.tabs.metadata_tab import MetadataTab
 from mt.gui.tabs.pack_tab import PackTab
 from mt.gui.tabs.sourcefile_tab import SourcefileTab
 from base.gui.log_view import LogView
-from mt.infra.console import set_output
+from base.console import set_output
 
 
 class MainWindow(QMainWindow):
