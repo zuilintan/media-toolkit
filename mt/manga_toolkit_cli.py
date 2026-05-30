@@ -13,7 +13,6 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
 
 用法示例:
   manga-toolkit-cli sourcefile --drag                          # 循环拖入模式（推荐）
-  manga-toolkit-cli sourcefile --drag --move-to /sorted        # 拖入后移动到指定目录
   manga-toolkit-cli sourcefile --root /path/to/manga           # 批量预览
   manga-toolkit-cli sourcefile --root /path/to/manga --apply   # 批量执行
   manga-toolkit-cli sourcefile --rollback                      # 回退上次操作
@@ -27,6 +26,7 @@ manga_toolkit_cli.py — manga-toolkit 统一命令行入口
   manga-toolkit-cli cover --root /path/to/cbz                  # 预览
   manga-toolkit-cli cover --root /path/to/cbz --apply          # 写入封面 webp
   manga-toolkit-cli cover --root /path/to/cbz --apply --smart  # smartcrop 模式
+  manga-toolkit-cli cover --drag                               # 循环拖入模式
 
 兼容性: 也可使用 `python -m mt <subcommand> ...`。
 """
@@ -52,7 +52,6 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             '示例:\n'
             '  manga-toolkit-cli sourcefile --drag\n'
-            '  manga-toolkit-cli sourcefile --drag --move-to /sorted\n'
             '  manga-toolkit-cli sourcefile --root /path/to/manga --apply\n'
             '  manga-toolkit-cli sourcefile --rollback\n'
             '  manga-toolkit-cli sourcefile --examples\n'
@@ -82,7 +81,6 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-toolkit-cli sourcefile --root <dir>         # 批量预览\n'
             '  manga-toolkit-cli sourcefile --root <dir> --apply # 批量执行\n'
             '  manga-toolkit-cli sourcefile --drag               # 循环拖入模式（推荐）\n'
-            '  manga-toolkit-cli sourcefile --drag --move-to <dir> # 拖入后移动至目录\n'
             '  manga-toolkit-cli sourcefile --examples           # 内置解析示例\n'
         ),
     )
@@ -122,7 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-toolkit-cli cover --root ./manga\n'
             '  manga-toolkit-cli cover --root ./manga --apply\n'
             '  manga-toolkit-cli cover --root ./manga --apply --smart\n'
-            '  manga-toolkit-cli cover --drag --move-to /sorted\n'
+            '  manga-toolkit-cli cover --drag\n'
         ),
     )
     add_cover_args(p_cover)
@@ -140,10 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
             '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
             '示例:\n'
             '  manga-toolkit-cli pack --drag\n'
-            '  manga-toolkit-cli pack --drag --move-to /sorted\n'
             '  manga-toolkit-cli pack --root ./albums\n'
             '  manga-toolkit-cli pack --root ./albums --apply\n'
-            '  manga-toolkit-cli pack --root ./albums --apply --move-to /sorted\n'
         ),
     )
     add_pack_args(p_pack)

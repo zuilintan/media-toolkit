@@ -33,7 +33,6 @@ from mt.infra.console import (
 )
 from mt.infra.parallel import run_plans
 from mt.presentation.view import print_metadata_preview
-from mt.workflow.drag import move_dir
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
 WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
@@ -473,7 +472,7 @@ def apply_metadata_plans(
 
 def make_process_metadata_dir(jobs: int = 1):
     """构造一个绑定 jobs 的 process_metadata_dir 函数（供 drag 注入）。"""
-    def process_metadata_dir(target_dir: Path, move_to: str) -> None:
+    def process_metadata_dir(target_dir: Path) -> None:
         emit(f'\n{SEP}')
         emit(f'📂 目录: {target_dir}')
         plans = plan_metadatas(str(target_dir), jobs=jobs)
@@ -482,11 +481,7 @@ def make_process_metadata_dir(jobs: int = 1):
             return
         if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
             return
-        fail = apply_metadata_plans(plans, dry_run=False)
-        if fail == 0 and move_to:
-            move_dir(target_dir, move_to)
-        elif fail > 0:
-            warn(f'{fail} 个写入失败，目录未移动，请修复后重试。')
+        apply_metadata_plans(plans, dry_run=False)
     return process_metadata_dir
 
 

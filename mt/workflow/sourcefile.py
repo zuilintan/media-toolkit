@@ -17,7 +17,6 @@ from base.fs import try_rename
 from mt.infra.console import print_op_result, SEP, warn, error, info, emit, confirm
 from mt.infra.parallel import run_plans
 from mt.presentation.view import print_sourcefile_preview
-from mt.workflow.drag import move_dir
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -155,16 +154,12 @@ def apply_sourcefile_plans(
 # 单作者目录处理（drag 模式回调）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def process_sourcefile_dir(author_dir: Path, target: str) -> None:
-    """drag 模式下处理单个作者目录：plan → preview → confirm → apply → 可选移动。"""
+def process_sourcefile_dir(author_dir: Path) -> None:
+    """drag 模式下处理单个作者目录：plan → preview → confirm → apply。"""
     emit(f'\n{SEP}')
     emit(f'📂 作者目录: {author_dir}')
     plans = scan_author_dir(author_dir)
     print_sourcefile_preview(plans)
     if not confirm('\n🟡 确认执行重命名？按 Enter 继续: '):
         return
-    fail = apply_sourcefile_plans(plans, dry_run=False)
-    if fail == 0 and target:
-        move_dir(author_dir, target)
-    elif fail > 0:
-        warn(f'{fail} 个重命名失败，目录未移动，请修复后重试。')
+    apply_sourcefile_plans(plans, dry_run=False)

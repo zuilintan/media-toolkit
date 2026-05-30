@@ -90,11 +90,8 @@ issue 前自查或脚本判断。
 ## sourcefile 子命令
 
 ```bash
-# 循环拖入模式（推荐日常使用，默认不移动）
+# 循环拖入模式（推荐日常使用）
 manga-toolkit-cli sourcefile --drag
-
-# 拖入后自动移动到整理目录（仅当显式指定 --move-to 时启用移动）
-manga-toolkit-cli sourcefile --drag --move-to /path/to/sorted
 
 # 批量预览（不修改文件）
 manga-toolkit-cli sourcefile --root /path/to/manga
@@ -130,7 +127,7 @@ manga-toolkit-cli metadata --root /path/to/cbz
 manga-toolkit-cli metadata --root /path/to/cbz --apply
 
 # 循环拖入模式
-manga-toolkit-cli metadata --drag --move-to /path/to/sorted
+manga-toolkit-cli metadata --drag
 
 # 内置示例
 manga-toolkit-cli metadata --examples
@@ -197,7 +194,7 @@ manga-toolkit-cli cover --root /path/to/cbz --apply --jobs 4
 manga-toolkit-cli cover --root /path/to/cbz --apply --jobs 0   # 自动 min(cpu, 4)
 
 # 循环拖入
-manga-toolkit-cli cover --drag --move-to /path/to/sorted
+manga-toolkit-cli cover --drag
 ```
 
 每处理一个 cbz 即打印进度行 `✅ [12/345] 文件名`，便于大批量任务跟踪。

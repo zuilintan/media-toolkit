@@ -26,9 +26,15 @@ from base.gui.config import get_config
 from base.gui.path_picker import PathPicker
 from base.gui.qt_sink import QtSink
 from base.gui.worker import Worker
-from mt.gui.workers.apply import apply_and_move
 from mt.infra.console import SEP2, emit, set_output
 from mt.presentation.view import print_run_banner
+
+
+def _run_apply(apply_fn: Callable[..., int], plans: list, **kwargs) -> int:
+    """Worker 入口：吃掉 Worker 注入的 on_progress（apply 不用），
+    透传 cancel_token，调用 ``apply_fn(plans, dry_run=False, ...)``。"""
+    kwargs.pop('on_progress', None)
+    return apply_fn(plans, False, **kwargs)
 
 
 class BaseTab(QWidget):
@@ -56,14 +62,9 @@ class BaseTab(QWidget):
             self.root_label, self.root_placeholder,
             history_key=f'{self.cmd_name}.root',
         )
-        self._move_picker = PathPicker(
-            '处理后移动到:', '可选；留空则不移动',
-            history_key=f'{self.cmd_name}.move',
-        )
         dir_box = QGroupBox('目录')
         dir_lay = QVBoxLayout(dir_box)
         dir_lay.addWidget(self._root_picker)
-        dir_lay.addWidget(self._move_picker)
 
         self._scan_btn  = QPushButton('预览')
         self._scan_btn.setToolTip('预览 [Enter]')
@@ -141,11 +142,6 @@ class BaseTab(QWidget):
         """print_run_banner 的副标题；默认为空，子类可覆盖。"""
         return ''
 
-    def _mover(self) -> Callable[[list, str, str], None] | None:
-        """apply 成功后的移动策略；返回 None 走 apply_and_move 默认
-        （搬 root 下顶层子目录）。pack 这类「产物是 zip 文件」的场景覆盖此方法。"""
-        return None
-
     # ── 通用回调 ───────────────────────────────────────────────────────
     def _on_scan(self) -> None:
         root = self._root_picker.path()
@@ -209,18 +205,12 @@ class BaseTab(QWidget):
 
         self._actionable_n = n
         self._status.setText('写入中...')
-        run_kwargs: dict[str, Any] = {}
-        if (mover := self._mover()) is not None:
-            run_kwargs['mover'] = mover
         self._run(
-            apply_and_move,
+            _run_apply,
             self._apply_fn(),
             self._plans,
-            self._root_picker.path(),
-            self._move_picker.path(),
             on_finished=self._on_applied,
             on_failed=self._on_task_failed,
-            **run_kwargs,
         )
 
     def _on_applied(self, fail: int) -> None:

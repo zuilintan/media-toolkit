@@ -1,15 +1,11 @@
 """
 pack_tab.py — pack 子命令的 GUI Tab
 
-复用 mt.workflow.pack 的 plan_packs / apply_pack_plans / move_zip。
-
-与其他 Tab 不同点：apply 成功后源目录已被删除，``--move-to`` 移动的是
-打包产物 zip 文件而非目录，所以覆盖 ``_mover()`` 提供自定义策略。
+复用 mt.workflow.pack 的 plan_packs / apply_pack_plans。
 """
 
 from __future__ import annotations
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
@@ -19,18 +15,7 @@ from PySide6.QtWidgets import (
 from mt.core.models import PackPlan
 from mt.gui.tabs.base_tab import BaseTab
 from mt.presentation.view import print_pack_preview
-from mt.workflow.pack import apply_pack_plans, move_zip, plan_packs
-
-
-def _pack_mover(plans: list[PackPlan], root: str, move_to: str) -> None:
-    """pack 专用 mover：把每个 plan 的产物 zip 移动到 move_to。
-
-    源目录在 apply 阶段已被 rmtree，因此不再适用「移 root 下子目录」的
-    默认策略。
-    """
-    for p in plans:
-        if p.writable:
-            move_zip(Path(p.zip_path), move_to)
+from mt.workflow.pack import apply_pack_plans, plan_packs
 
 
 class PackTab(BaseTab):
@@ -77,6 +62,3 @@ class PackTab(BaseTab):
         skipped  = sum(1 for p in plans if not p.writable)
         return {'单层': flat, '嵌套': nested,
                 '覆盖现有 zip': replaced, '跳过': skipped}
-
-    def _mover(self):
-        return _pack_mover

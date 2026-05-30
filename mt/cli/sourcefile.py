@@ -1,10 +1,10 @@
 """
 sourcefile.py — sourcefile 子命令：源文件（.zip / .cbz）批量重命名
 
-流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入 → 可选移动。
+流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
 与 cli/metadata.py 结构对称。
 
-依赖: workflow.sourcefile / workflow.drag / workflow.session / infra.console
+依赖: workflow.sourcefile / workflow.session / base.drag_loop / infra.console
       / presentation / cli.examples
 """
 
@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import argparse
 
+from base.drag_loop import run_drag_loop
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_sourcefile_preview, print_run_banner
 from mt.workflow.sourcefile import (
     plan_sourcefiles, apply_sourcefile_plans, process_sourcefile_dir,
 )
-from mt.workflow.drag import run_drag_loop, move_dir
 from mt.workflow.session import list_sessions, rollback
 from mt.cli import validate_root
 from mt.cli.examples import run_sourcefile_examples
@@ -35,16 +35,12 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
         rollback(args.session)
         return 0
     if args.drag:
-        run_drag_loop(
-            title='sourcefile 循环拖入模式',
-            target=args.move_to,
-            process_one=process_sourcefile_dir,
-        )
+        emit(f'\n{SEP2}')
+        emit('🔁  sourcefile 循环拖入模式（支持同时拖入多个目录）')
+        emit('    Ctrl+C 退出')
+        emit(SEP2)
+        run_drag_loop(process_one=process_sourcefile_dir)
         return 0
-
-    if args.move_to and not args.apply:
-        emit('❌ --move-to 需配合 --drag 或 --apply 使用')
-        return 2
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
@@ -96,10 +92,6 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
         return 0
 
     apply_sourcefile_plans(plans, dry_run=False)
-    if args.move_to:
-        for author_dir in sorted(root.iterdir()):
-            if author_dir.is_dir():
-                move_dir(author_dir, args.move_to)
     emit(SEP2)
     return 0
 
@@ -108,9 +100,6 @@ def add_sourcefile_args(p: argparse.ArgumentParser) -> None:
     """挂载 sourcefile 子命令的参数。"""
     p.add_argument('--root',          default='',
                    help='漫画根目录（批量模式，目录下按作者目录组织）')
-    p.add_argument('--move-to',       default='', dest='move_to',
-                   metavar='DIR',
-                   help='处理完成后将作者目录移动至此目录（需配合 --drag 或 --apply）')
     p.add_argument('--apply',         action='store_true',
                    help='执行重命名（批量模式）')
     p.add_argument('--drag',          action='store_true',

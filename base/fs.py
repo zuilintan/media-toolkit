@@ -6,15 +6,20 @@ fs.py — 文件/路径安全操作原语
   - is_smb_path                 — SMB 路径识别（Windows 专有）
   - execute_rename / try_rename — 安全重命名（含 SMB 大小写两步法）
   - safe_unlink / safe_rmdir    — 带深度守卫的删除
+  - move_dir                    — 目录搬移（同名目标存在则逐项合并覆盖）
 
 设计原则:
   - 仅依赖标准库，不引入任何业务模块
   - 调试日志走标准 logging（logger 名 ``base.fs``）
+  - 面向用户的状态信息通过可选 ``reporter`` 回调输出，默认走 print；
+    宿主应用（mt/ft）可注入自身的 emit / warn / error 实现 GUI 日志路由
 """
 
 from __future__ import annotations
 import logging
 import os
+import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -103,3 +108,69 @@ def safe_unlink(p: Path) -> None:
 def safe_rmdir(p: Path) -> None:
     guard_path(p)
     p.rmdir()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 目录搬移
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# reporter 协议：(level, message) → None；level ∈ {'info', 'warn', 'error'}
+Reporter = Callable[[str, str], None]
+
+
+def _default_reporter(level: str, msg: str) -> None:
+    """缺省 reporter：info → stdout，warn/error → stderr。"""
+    import sys
+    (sys.stdout if level == 'info' else sys.stderr).write(msg + '\n')
+
+
+def move_dir(
+    src: Path,
+    target: str,
+    *,
+    reporter: Reporter = _default_reporter,
+) -> bool:
+    """将目录 src 移动到 target，已存在同名目录则逐项合并并覆盖。
+
+    Args:
+        src:      源目录。
+        target:   目标父目录路径；不存在会自动创建。
+        reporter: 进度/警告输出回调。默认走 stdout/stderr；GUI 场景
+                  可注入 ``lambda lvl, msg: emit(msg)`` 类闭包路由到日志框。
+
+    Returns:
+        移动/合并成功（无失败）返回 True。
+    """
+    target_path = Path(target)
+    target_path.mkdir(parents=True, exist_ok=True)
+    dest = target_path / src.name
+
+    if not dest.exists():
+        shutil.move(str(src), str(dest))
+        reporter('info', f'📦 已移动: {src.name}\n   → {dest}')
+        return True
+
+    reporter('warn', f'目标目录已存在，逐项移动并覆盖同名文件: {dest}')
+    ok_n = fail = 0
+    for item in sorted(src.iterdir()):
+        item_dest = dest / item.name
+        try:
+            if item_dest.exists():
+                safe_unlink(item_dest)
+                reporter('info', f'  🗑  删除已存在文件: {item_dest.name}')
+            shutil.move(str(item), str(item_dest))
+            ok_n += 1
+            reporter('info', f'  ✅ 移动: {item.name}')
+        except Exception as e:
+            reporter('error', f'{item.name} — {e}')
+            fail += 1
+
+    remaining = list(src.iterdir())
+    if not remaining:
+        safe_rmdir(src)
+        reporter('info', f'  🗑  源目录已清空并删除: {src}')
+    else:
+        reporter('warn',
+                 f'{len(remaining)} 个文件未能移动，源目录保留: {src}')
+    reporter('info', f'  合并完成: 成功 {ok_n} | 失败 {fail}')
+    return fail == 0

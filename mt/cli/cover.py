@@ -8,23 +8,23 @@ cover.py — cover 子命令：为 CBZ 写入 2:3 封面
 目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``；
 源为 ``cover.*`` 时写入后同步从 ZIP 删除原 cover.*。
 
-流程: scan → 全量 plan（含裁剪+编码）→ 预览 → 二次确认 → 整批写入 → 可选移动。
+流程: scan → 全量 plan（含裁剪+编码）→ 预览 → 二次确认 → 整批写入。
 与 cli/metadata.py 结构对称。
 
-依赖: workflow.cover / workflow.drag / infra.console / presentation
+依赖: workflow.cover / base.drag_loop / infra.console / presentation
 """
 
 from __future__ import annotations
 
 import argparse
 
+from base.drag_loop import run_drag_loop
 from mt.infra.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_cover_preview, print_run_banner
 from mt.workflow.cover import (
     plan_covers, apply_cover_plans, make_process_cover_dir,
     DEFAULT_QUALITY,
 )
-from mt.workflow.drag import run_drag_loop, move_dir
 from mt.cli import validate_root
 
 
@@ -34,16 +34,14 @@ def cmd_cover(args: argparse.Namespace) -> int:
 
     # ── 旁路: drag ───────────────────────────────────────────────────────────
     if args.drag:
+        emit(f'\n{SEP2}')
+        emit('🔁  cover 循环拖入模式（支持同时拖入多个目录）')
+        emit('    Ctrl+C 退出')
+        emit(SEP2)
         run_drag_loop(
-            title='cover 循环拖入模式',
-            target=args.move_to,
             process_one=make_process_cover_dir(mode, args.quality, args.jobs),
         )
         return 0
-
-    if args.move_to and not args.apply:
-        emit('❌ --move-to 需配合 --drag 或 --apply 使用')
-        return 2
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
@@ -96,10 +94,6 @@ def cmd_cover(args: argparse.Namespace) -> int:
         return 0
 
     apply_cover_plans(plans, dry_run=False)
-    if args.move_to:
-        for sub in sorted(root.iterdir()):
-            if sub.is_dir():
-                move_dir(sub, args.move_to)
     emit(SEP2)
     return 0
 
@@ -108,10 +102,6 @@ def add_cover_args(p: argparse.ArgumentParser) -> None:
     """挂载 cover 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
-    p.add_argument('--move-to', default='', dest='move_to',
-                   metavar='DIR',
-                   help='处理完成后将根目录下的子目录移动至此目录'
-                        '（需配合 --drag 或 --apply）')
     p.add_argument('--apply',   action='store_true',
                    help='实际写入封面（不加此参数则仅预览）')
     p.add_argument('--drag',    action='store_true',

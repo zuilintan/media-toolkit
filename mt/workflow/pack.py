@@ -37,9 +37,8 @@ apply 阶段:
      源文件按原路径读、新名作 arcname 写 —— 不在盘上做改名
      （反正下一步整树要删）
   2. ``shutil.rmtree`` 删除整个单位目录（含非图 extras）
-  3. 可选 ``move-to`` 将 zip 移到目标目录
 
-依赖: models / config / utils / console / parallel / drag
+依赖: models / config / utils / console / parallel
 """
 
 from __future__ import annotations
@@ -571,37 +570,11 @@ def apply_pack_plans(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# move-to：移动产物 zip（与 sourcefile/cover 移动目录的语义不同）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def move_zip(zip_path: Path, target: str) -> bool:
-    """将打包产物 zip 移动到 target 目录；同名已存在则覆盖。"""
-    target_path = Path(target)
-    target_path.mkdir(parents=True, exist_ok=True)
-    dest = target_path / zip_path.name
-    if dest.exists():
-        warn(f'目标 zip 已存在，将覆盖: {dest}')
-        try:
-            dest.unlink()
-        except Exception as e:
-            error(f'删除已存在 zip 失败: {dest} — {e}')
-            return False
-    try:
-        shutil.move(str(zip_path), str(dest))
-        emit(f'📦 已移动: {zip_path.name}\n   → {dest}')
-        return True
-    except Exception as e:
-        error(f'移动失败: {zip_path.name} — {e}')
-        return False
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # 单目录处理（drag 模式回调）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def process_pack_dir(src_dir: Path, target: str) -> None:
-    """drag 模式入口：在拖入的目录下识别单位 → preview → confirm → apply →
-    可选移动 zip。
+def process_pack_dir(src_dir: Path) -> None:
+    """drag 模式入口：在拖入的目录下识别单位 → preview → confirm → apply。
 
     与批量模式共用 _find_units：拖入的目录本身可能是 FLAT/NESTED 单位
     （单本/分话漫画），也可能是包含多本的容器，统一处理。
@@ -619,10 +592,4 @@ def process_pack_dir(src_dir: Path, target: str) -> None:
         return
     if not confirm('\n🟡 确认打包并删除源目录？按 Enter 继续: '):
         return
-    fail = apply_pack_plans(plans, dry_run=False)
-    if fail == 0 and target:
-        for p in plans:
-            if p.writable:
-                move_zip(Path(p.zip_path), target)
-    elif fail > 0:
-        warn(f'{fail} 个单位处理失败，zip 未移动，请修复后重试。')
+    apply_pack_plans(plans, dry_run=False)

@@ -37,7 +37,6 @@ from mt.infra.console import (
     SEP, emit, error, debug, info, warn, confirm, print_op_result,
 )
 from mt.infra.parallel import run_plans
-from mt.workflow.drag import move_dir
 
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
@@ -406,7 +405,7 @@ def make_process_cover_dir(mode: str, quality: int, jobs: int = 1):
     """构造一个绑定 mode/quality/jobs 的 process_cover_dir 函数（供 drag 注入）。"""
     from mt.presentation.view import print_cover_preview   # 延迟导入避免循环
 
-    def process_cover_dir(target_dir: Path, move_to: str) -> None:
+    def process_cover_dir(target_dir: Path) -> None:
         emit(f'\n{SEP}')
         emit(f'📂 目录: {target_dir}')
         plans = plan_covers(str(target_dir), mode=mode, quality=quality, jobs=jobs)
@@ -415,10 +414,6 @@ def make_process_cover_dir(mode: str, quality: int, jobs: int = 1):
             return
         if not confirm('\n🟡 确认写入封面？按 Enter 继续: '):
             return
-        fail = apply_cover_plans(plans, dry_run=False)
-        if fail == 0 and move_to:
-            move_dir(target_dir, move_to)
-        elif fail > 0:
-            warn(f'{fail} 个写入失败，目录未移动，请修复后重试。')
+        apply_cover_plans(plans, dry_run=False)
 
     return process_cover_dir
