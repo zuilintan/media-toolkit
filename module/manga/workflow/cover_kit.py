@@ -1,24 +1,22 @@
-"""
-cover_kit.py — CBZ 封面生成（cover-kit 子命令工作流层）
+"""cover-kit 工作流层：在 CBZ 内写入 2:3 / ≤ 1000×1500 WebP 封面。
 
-目的: grimmory 在生成封面时若第一张图超过 2000 万像素会触发
+目的: grimmory 生成封面时若第一张图超过 2000 万像素会触发
 ``Rejected image: dimensions ... — possible decompression bomb`` 报错。
-本工作流在 CBZ 内写入一张 2:3 / ≤ 1000×1500 的 WebP，grimmory 即可直接采用。
+本工作流提前生成一张合规的小封面，grimmory 即可直接采用。
 
 目标文件名取决于源图：
-  - 源 ``0001.*`` → 写入 ``0000.webp``（字典序在最前，作为新增封面）
-  - 源 ``cover.*`` → 写入 ``0000.webp``，并从 ZIP 中删除原 ``cover.*``
+
+- 源 ``0001.*``  → 写入 ``0000.webp``（字典序在最前，作为新增封面）
+- 源 ``cover.*`` → 写入 ``0000.webp``，并从 ZIP 删除原 ``cover.*``
 
 流程:
-  1. 在 CBZ 根目录依次寻找 ``cover.*`` / ``0001.*`` 作为源图
-  2. 居中裁剪到 2:3（默认）或 smartcrop 显著性裁剪
-  3. 缩放至 ≤ 1000×1500（保持比例）
-  4. 编码为 WebP
-  5. ZIP 追加写入 ``0000.webp``；写入前清理同 stem 旧条目；源为
-     ``cover.*`` 时额外删除所有 ``cover.*`` 条目（参考 ComicInfo.xml
-     的追加替换方式，不重建整个压缩包）
 
-依赖: Pillow / smartcrop（可选） / models / config / console
+1. CBZ 根目录依次寻找 ``cover.*`` / ``0001.*`` 作为源图
+2. 居中裁剪到 2:3（默认）或 smartcrop 显著性裁剪
+3. 缩放至 ≤ 1000×1500（保持比例）
+4. 编码为 WebP
+5. ZIP 追加写入 ``0000.webp``；写入前清理同 stem 旧条目；源为 ``cover.*``
+   时额外删除所有 ``cover.*`` 条目（追加模式，不重建整个压缩包）。
 """
 
 from __future__ import annotations
@@ -56,10 +54,10 @@ DST_FOR: dict[str, str] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def find_source_image(zf: zipfile.ZipFile) -> str | None:
-    """在 zf 根目录按优先级查找源图：cover.* → 0001.*。
+    """在 ``zf`` 根目录按优先级查找源图：``cover.*`` → ``0001.*``。
 
-    仅扫根目录；同优先级若有多个扩展名，取字典序最小者（确定性）。
-    扩展名以 PAGE_EXTS 为准（与 PageCount 一致）。
+    仅扫根目录；同优先级多扩展名取字典序最小者（确定性）。扩展名以
+    :data:`~module.manga.core.config.PAGE_EXTS` 为准（与 ``<PageCount>`` 一致）。
     """
     buckets: dict[str, list[str]] = {k: [] for k in SOURCE_PRIORITY}
     for name in zf.namelist():
@@ -82,7 +80,7 @@ def find_source_image(zf: zipfile.ZipFile) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def crop_center(img: Image.Image, ratio: float = TARGET_RATIO) -> Image.Image:
-    """居中裁剪到指定 W/H 比例；保持比例，超出部分舍弃。"""
+    """居中裁剪到指定 ``W/H`` 比例；保持比例，超出部分舍弃。"""
     W, H = img.size
     if W / H > ratio:           # 太宽 → 裁宽
         new_W = int(round(H * ratio))
@@ -96,11 +94,11 @@ def crop_center(img: Image.Image, ratio: float = TARGET_RATIO) -> Image.Image:
 
 
 def crop_smart(img: Image.Image, ratio: float = TARGET_RATIO) -> Image.Image:
-    """smartcrop 显著性裁剪到指定 W/H 比例。
+    """smartcrop 显著性裁剪到指定 ``W/H`` 比例。
 
-    smartcrop 库基于边缘 / 饱和度 / 肤色综合打分挑选最佳子矩形；
-    在横向跨页 / 主体偏置的封面上比 center 裁剪更可能保留主体。
-    依赖未安装时回退到 :func:`crop_center` 并记 debug。
+    smartcrop 库基于边缘 / 饱和度 / 肤色综合打分挑选最佳子矩形；在横向跨页
+    / 主体偏置的封面上比 :func:`crop_center` 更可能保留主体。依赖未安装时回退到
+    :func:`crop_center` 并记 DEBUG。
     """
     try:
         import smartcrop          # noqa: WPS433 — 懒加载，依赖可选
@@ -121,12 +119,12 @@ def crop_smart(img: Image.Image, ratio: float = TARGET_RATIO) -> Image.Image:
 
 
 def resize_to_target(img: Image.Image, target: tuple[int, int] = MAX_SIZE) -> Image.Image:
-    """缩到精确 target 尺寸；源小于 target 则保持原尺寸不放大。
+    """缩到精确 ``target`` 尺寸；源小于 ``target`` 则保持原尺寸不放大。
 
-    前提：调用方已通过 :func:`crop_center` 校正过比例，img 比例与 target 几乎
-    一致。smartcrop 的整数步长可能引入亚像素级偏差（如源 2666×3999 vs target
-    1000×1500 = 0.03% 形变），直接 resize 到 target 比输出 999×1500 在视觉上
-    更整齐，肉眼无法察觉形变。
+    前提：调用方已通过 :func:`crop_center` 校正过比例，``img`` 比例与 ``target``
+    几乎一致。smartcrop 的整数步长可能引入亚像素级偏差（如 2666×3999 vs
+    1000×1500 ≈ 0.03% 形变），直接 resize 到 ``target`` 比输出 999×1500 在视觉
+    上更整齐，肉眼无法察觉形变。
     """
     W, H        = img.size
     tW, tH      = target
@@ -150,7 +148,7 @@ def encode_webp(img: Image.Image, quality: int = DEFAULT_QUALITY) -> bytes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CBZ 追加写入（参考 workflow.meta_kit.write_comicinfo）
+# CBZ 追加写入（与 :func:`~module.manga.workflow.meta_kit.write_comicinfo` 同构）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _cover_zinfo(filename: str, inherited_attr: int) -> zipfile.ZipInfo:
@@ -177,16 +175,14 @@ def write_cover(
     webp_bytes: bytes,
     also_delete_stem: str | None = None,
 ) -> bool:
-    """以追加模式写入 ``dst_name``，根目录下同 stem 的旧条目（任何扩展名）
-    从内存目录摘除（死空间 < 1 个图像）。
+    """追加写入 ``dst_name``；根目录下同 stem 旧条目从内存目录摘除（死空间 < 1 张图）。
 
-    ``also_delete_stem`` 不为 None 时，同样摘除根目录下该 stem 的所有条目
-    （用于 cover.* → 0000.webp 时删除原 cover.*）。
+    ``also_delete_stem`` 不为 ``None`` 时，同样摘除根目录下该 stem 的所有条目
+    （用于 ``cover.*`` → ``0000.webp`` 时删除原 ``cover.*``）。
 
-    与 ``workflow.meta_kit.write_comicinfo`` 同构。
+    与 :func:`~module.manga.workflow.meta_kit.write_comicinfo` 同构。
 
-    Returns:
-        True 表示替换了旧版（dst_name 本身已存在），False 表示首次写入。
+    :return: ``True`` 表示替换了旧版（``dst_name`` 本身已存在），``False`` 表示首次写入。
     """
     dst_stem = os.path.splitext(dst_name)[0].lower()
     with zipfile.ZipFile(cbz_path, 'a') as zf:
@@ -222,7 +218,8 @@ def preview_plan(
 ) -> CoverKitPlan:
     """构建单个 CBZ 的封面写入计划（plan 阶段即完成裁剪 + 编码）。
 
-    任何步骤异常都被吸收进 plan.error，调用方据此过滤；不会抛出。
+    任何步骤异常都被吸收进 :attr:`~module.manga.core.models.CoverKitPlan.error`，
+    调用方据此过滤；本函数不抛出。
     """
     existing: bytes | None = None
     try:
@@ -291,12 +288,11 @@ def preview_plan(
 
 
 def apply_plan(plan: CoverKitPlan) -> str:
-    """写入单个 CBZ 的目标封面（plan.dst_name）。
+    """写入单个 CBZ 的目标封面（:attr:`~module.manga.core.models.CoverKitPlan.dst_name`）。
 
-    源为 cover.* 时，写入后同步从 ZIP 删除所有 cover.* 条目（自身）。
+    源为 ``cover.*`` 时，写入后同步从 ZIP 删除所有 ``cover.*`` 条目（自身）。
 
-    Returns:
-        'ok' / 'error'（无源图等情况由调用方过滤，此处不再判定）。
+    :return: ``'ok'`` / ``'error'``。无源图等情况由调用方过滤，此处不再判定。
     """
     filename = plan.filename
     try:
@@ -330,15 +326,11 @@ def preview_plans(
     on_progress=None,
     cancel_token=None,
 ) -> list[CoverKitPlan]:
-    """递归扫描 root 下所有 .cbz，返回 plan 列表。
+    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
 
-    Args:
-        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动选 min(cpu,4)。
-              ≥ 4 个文件时才启用并行（避免 spawn 启动成本超过收益）。
-        on_progress: 每完成一项即回调 ``f(done, total)``。
-        cancel_token: threading.Event，已 set 时提前退出。
-
-    每完成一个文件即打印进度行，便于大批量任务跟踪。
+    :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。≥ 4 个文件才启用并行。
+    :param on_progress: 每完成一项即回调 ``f(done, total)``。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
     """
     root_path = Path(root)
     if not root_path.exists():
@@ -361,13 +353,9 @@ def apply_plans(
 ) -> int:
     """整批写入封面。
 
-    Args:
-        plans:   预览阶段产出的 CoverKitPlan 列表。
-        dry_run: True 时仅提示。
-        cancel_token: threading.Event，已 set 时提前退出。
-
-    Returns:
-        失败数量（dry_run 时 0）。
+    :param dry_run: ``True`` 时仅提示。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
+    :return: 失败数量（``dry_run`` 时为 0）。
     """
     if dry_run:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')

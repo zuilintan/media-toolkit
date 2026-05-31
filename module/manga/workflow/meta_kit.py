@@ -1,16 +1,13 @@
-"""
-meta_kit.py — ComicInfo.xml 生成、读取与写入（meta-kit 子命令的工作流层）
+"""meta-kit 工作流层：:class:`~module.manga.core.models.MangaInfo`
+→ ComicInfo v2.1 XML → 写入 CBZ。
 
-将 MangaInfo 转换为 ComicInfo v2.1 XML 并写入 CBZ/ZIP 文件。
+``<Number>`` 字段规则（与 ``CH.`` 同级且互斥）:
 
-Number 字段规则（与 CH. 同级且互斥）:
-  - chapter 不为 None  → 数字格式，如 "01-05+番外篇"
-  - chapter 为 None，part_tag 是附录/结构类 → 分编词原文，如 "番外篇"/"后日谈"/"上篇"
-  - 否则              → ''（留空，不显式指定）
+- ``chapter`` 不为 ``None`` → 数字格式（如 ``01-05+番外篇``）
+- ``chapter`` 为 ``None``，``part_tag`` 是附录 / 结构类 → 分编词原文（``番外篇`` / ``后日谈`` / ``上篇`` …）
+- 否则 → ``''``（留空，不显式指定）
 
-Format 字段：part_tag 是合集类（总集篇等）时写入；否则空。
-
-依赖: models / patterns / config / parser / console / presentation
+``<Format>`` 字段: ``part_tag`` 是合集类（``总集篇`` 等）时写入；否则空。
 """
 
 from __future__ import annotations
@@ -44,7 +41,7 @@ FCOLON      = '\uff1a'   # ：  全角冒号  （社团文件分隔符）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def extract_author(filename: str) -> str:
-    """从 CBZ 文件名中提取作者名（第一个 [xxx] 括号）。"""
+    """从 CBZ 文件名第一个 ``[xxx]`` 括号提取作者名。"""
     m = re.match(r'^\[(.+?)\]', Path(filename).stem)
     return m.group(1).strip() if m else ''
 
@@ -54,12 +51,12 @@ def extract_author(filename: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _undot(s: str | None) -> str | None:
-    """・ → 空格；None 透传。"""
+    """``・`` → 空格；``None`` 透传。"""
     return s.replace(MIDDLE_DOT, ' ') if s else s
 
 
 def build_title(info: MangaInfo) -> str:
-    """<Title>：移除 [...] 和 (...) 块，保留其余所有内容。"""
+    """``<Title>``：移除 ``[...]`` / ``(...)`` 块，保留其余内容。"""
     s = info.original
     s = re.sub(r'\[.+?\]', '', s)
     s = re.sub(r'\(.+?\)', '', s)
@@ -67,11 +64,9 @@ def build_title(info: MangaInfo) -> str:
 
 
 def build_number(info: MangaInfo) -> str:
-    """<Number>：话号或独立分编词（附录/结构类），与 CH. 同级且互斥。
+    """``<Number>``：话号或独立分编词（附录 / 结构类），与 ``CH.`` 同级且互斥。
 
-    - chapter 不为 None → 数字格式（不含 'CH.' 前缀），如 "01-05+番外篇"
-    - chapter 为 None，part_tag 是附录/结构类 → 分编词原文
-    - 否则 → ''（留空，不显式指定；合集类走 build_format）
+    合集类（``总集篇`` 等）走 :func:`build_format`。
     """
     if info.chapter is not None:
         return info.chapter.number_str()
@@ -82,19 +77,19 @@ def build_number(info: MangaInfo) -> str:
 
 
 def build_format(info: MangaInfo) -> str:
-    """<Format>：合集类分编词（总集篇等）的归宿；否则空。"""
+    """``<Format>``：合集类分编词（``总集篇`` 等）的归宿；否则空。"""
     return info.part_tag if info.part_tag in P.COMPILATION_PARTS else ''
 
 
 def build_volume(info: MangaInfo) -> str:
-    """<Volume>：两位补零卷号字符串，无卷时为空。"""
+    """``<Volume>``：两位补零卷号字符串，无卷时为空。"""
     if info.volume is None:
         return ''
     return fmt_num(info.volume.start)
 
 
 def build_genre(info: MangaInfo) -> str:
-    """<Genre>：内容标签（uncensored / colorized / ongoing），逗号分隔。"""
+    """``<Genre>``：内容标签（``uncensored`` / ``colorized`` / ``ongoing``），逗号分隔。"""
     parts = []
     if info.is_uncensored: parts.append('uncensored')
     if info.is_colorized:  parts.append('colorized')
@@ -108,7 +103,7 @@ def collect_fields(
     existing_tags: str = '',
     page_count: int = 0,
 ) -> dict[str, str]:
-    """按 COMICINFO_TAGS 顺序返回 {tag: value_str}。"""
+    """按 :data:`~module.manga.core.config.COMICINFO_TAGS` 顺序返回 ``{tag: value}``。"""
     return {
         'Publisher':   publisher or '',
         'Writer':      _undot(info.author) or '',
@@ -125,7 +120,7 @@ def collect_fields(
     }
 
 
-# 「metadata creator」Notes 形态：识别仅本工具自动产出的版本号差异
+#: ``"metadata creator"`` Notes 形态，识别仅本工具自动产出的版本号差异
 _METADATA_CREATOR_RE = re.compile(
     rf'^"metadata creator":\s*"{re.escape(SCRIPT_NAME)}\s+\S+"$'
 )
@@ -134,9 +129,10 @@ _METADATA_CREATOR_RE = re.compile(
 def _only_creator_version_differs(
     existing: dict[str, str], new: dict[str, str],
 ) -> bool:
-    """旧/新字段除 Notes 外完全相同，且双方 Notes 都是「metadata creator」形态。
+    """旧 / 新字段除 ``Notes`` 外完全相同，且双方 ``Notes`` 都是 metadata creator 形态。
 
-    用于避免本工具版本升级导致仅 Notes 中 SCRIPT_VERSION 变动的无意义改写。
+    用于避免本工具版本升级导致仅 ``Notes`` 中 :data:`~module.manga.core.config.SCRIPT_VERSION`
+    变动的无意义改写。
     """
     for tag in COMICINFO_TAGS:
         if tag == 'Notes':
@@ -154,7 +150,7 @@ def _only_creator_version_differs(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _serialize_xml(fields: dict[str, str]) -> bytes:
-    """按 COMICINFO_TAGS 顺序将 {tag: value} 序列化为 ComicInfo v2.1 UTF-8 XML。"""
+    """按 :data:`~module.manga.core.config.COMICINFO_TAGS` 顺序序列化为 ComicInfo v2.1 UTF-8 XML。"""
     root = Element('ComicInfo')
     root.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
     root.set('xmlns:xsd', 'http://www.w3.org/2001/XMLSchema')
@@ -171,7 +167,7 @@ def build_comicinfo_xml(
     existing_tags: str = '',
     page_count: int = 0,
 ) -> bytes:
-    """生成 ComicInfo v2.1 XML，返回 UTF-8 bytes。"""
+    """生成 ComicInfo v2.1 XML，返回 UTF-8 ``bytes``。"""
     return _serialize_xml(collect_fields(info, publisher, existing_tags, page_count))
 
 
@@ -191,12 +187,13 @@ def _extract_publisher_name(filename: str) -> str | None:
 
 
 def find_publisher(cbz_path: str) -> tuple[str | None, list[str] | None]:
-    """在 cbz 所在目录中搜索 [社团]：XX.txt。
+    """在 CBZ 所在目录搜索 ``[社团]：XX.txt``。
 
-    Returns:
-        (name, None)        — 找到唯一社团文件
-        (None, None)        — 未找到
-        (None, [paths…])    — 多文件冲突
+    :return:
+
+        - ``(name, None)``     — 找到唯一社团文件
+        - ``(None, None)``     — 未找到
+        - ``(None, [paths…])`` — 多文件冲突
     """
     hits: list[tuple[str, str]] = []
     for f in Path(cbz_path).parent.iterdir():
@@ -215,14 +212,15 @@ def find_publisher(cbz_path: str) -> tuple[str | None, list[str] | None]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def read_cbz_meta(cbz_path: str) -> tuple[int, str, bytes | None]:
-    """单次打开 CBZ，返回 (图片页数, 现有 Tags, 现有 ComicInfo.xml 原始 bytes)。
+    """单次打开 CBZ，返回 ``(图片页数, 现有 Tags, 现有 ComicInfo.xml 原始 bytes)``。
 
-    - 页数：按 PAGE_EXTS 过滤，目录条目与 ComicInfo.xml 不计入。
-    - Tags：读取根级 ComicInfo.xml 的 <Tags>（外部程序维护，本工具只读不改）；
-            无则空串。内嵌 XML 损坏时只丢 Tags，不影响页数。
-    - 现有 bytes：根级 ComicInfo.xml 的原始字节，用于 plan 阶段 diff 判定。
-                  没有内嵌或整包损坏时为 None。
-    - 整包打不开时按 (0, '', None) 处理并记 debug。
+    - 页数: 按 :data:`~module.manga.core.config.PAGE_EXTS` 过滤，目录条目与
+      ``ComicInfo.xml`` 不计入。
+    - Tags: 读取根级 ``ComicInfo.xml`` 的 ``<Tags>``（外部程序维护，本工具只读不改）。
+      内嵌 XML 损坏时只丢 Tags，不影响页数。
+    - bytes: 根级 ``ComicInfo.xml`` 原始字节，供 plan 阶段 diff 判定。
+      无内嵌或整包损坏时为 ``None``。
+    - 整包打不开时按 ``(0, '', None)`` 处理并记 DEBUG。
     """
     comicinfo_lc = COMICINFO_FILENAME.lower()
     page_count   = 0
@@ -262,7 +260,7 @@ def read_cbz_meta(cbz_path: str) -> tuple[int, str, bytes | None]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _comicinfo_zinfo(inherited_attr: int) -> zipfile.ZipInfo:
-    """构建 ComicInfo.xml 的 ZipInfo：ZIP_STORED + 当前时间 + 继承属性。"""
+    """构建 ``ComicInfo.xml`` 的 ``ZipInfo``：``ZIP_STORED`` + 当前时间 + 继承属性。"""
     t = time.localtime()
     zi = zipfile.ZipInfo(
         COMICINFO_FILENAME,
@@ -281,12 +279,11 @@ def _inherit_attr(infos: list[zipfile.ZipInfo]) -> int:
 
 
 def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
-    """写入 ComicInfo.xml（追加模式，不重建整个压缩包）。
+    """以追加模式写入 ``ComicInfo.xml``（不重建整个压缩包）。
 
     替换旧条目时只从内存目录中摘除，旧本地数据成为死空间（< 1 KB，可忽略）。
 
-    Returns:
-        True 表示替换了旧版，False 表示首次写入。
+    :return: ``True`` 表示替换了旧版，``False`` 表示首次写入。
     """
     with zipfile.ZipFile(cbz_path, 'a') as zf:
         attr = _inherit_attr(
@@ -309,9 +306,10 @@ def write_comicinfo(cbz_path: str, xml_bytes: bytes) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _parse_existing_fields(xml_bytes: bytes | None) -> dict[str, str]:
-    """从现有 ComicInfo.xml 提取 ``{tag: value}``，缺失或解析失败按空串。
+    """从现有 ``ComicInfo.xml`` 提取 ``{tag: value}``；缺失或解析失败按空串。
 
-    返回值始终包含 COMICINFO_TAGS 全部 key，便于 diff 表格直接对位渲染。
+    返回值始终包含 :data:`~module.manga.core.config.COMICINFO_TAGS` 全部 key，
+    便于 diff 表格直接对位渲染。
     """
     out: dict[str, str] = {tag: '' for tag in COMICINFO_TAGS}
     if not xml_bytes:
@@ -328,12 +326,12 @@ def _parse_existing_fields(xml_bytes: bytes | None) -> dict[str, str]:
 
 
 def preview_plan(cbz_path: str) -> MetaKitPlan | None:
-    """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，不产生任何输出）。
+    """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，无输出副作用）。
 
-    Returns:
-        ``None`` — 文件名无法提取作者（跳过）；
-        否则返回 MetaKitPlan；``plan.writable`` 标识能否写入、
-        ``plan.changed`` 标识是否需要实际写入。
+    :return: ``None`` 表示文件名无法提取作者（跳过）；否则返回
+        :class:`~module.manga.core.models.MetaKitPlan`，由
+        :attr:`~module.manga.core.models.MetaKitPlan.writable` /
+        :attr:`~module.manga.core.models.MetaKitPlan.changed` 标识是否可写 / 需写。
     """
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
@@ -367,10 +365,9 @@ def preview_plan(cbz_path: str) -> MetaKitPlan | None:
 
 
 def apply_plan(plan: MetaKitPlan) -> str:
-    """执行单个 CBZ 的 ComicInfo.xml 写入（plan.new_xml 已在 plan 阶段构建）。
+    """执行单个 CBZ 的写入（:attr:`~module.manga.core.models.MetaKitPlan.new_xml` 已在 plan 阶段构建）。
 
-    Returns:
-        ``'ok'`` / ``'error'``（不可写 / 无变化由调用方过滤，此处不再判定）
+    :return: ``'ok'`` / ``'error'``。不可写 / 无变化由调用方过滤，此处不再判定。
     """
     filename = os.path.basename(plan.cbz_path)
     try:
@@ -398,16 +395,13 @@ def _progress_line(idx: int, total: int, plan: MetaKitPlan | None) -> str:
 def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[MetaKitPlan]:
-    """递归扫描 root 下所有 .cbz，返回 plan 列表。
+    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
 
-    Args:
-        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
-              ≥ 4 个文件时才启用并行。
-        on_progress: 每完成一项即回调 ``f(done, total)``。
-        cancel_token: threading.Event，已 set 时提前退出。
+    无作者的文件（:func:`preview_plan` 返回 ``None``）静默丢弃。
 
-    无作者的文件（preview_plan 返回 None）静默丢弃；状态由调用方根据
-    ``plan.writable`` 自行判定。每完成一个即打印进度行。
+    :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。≥ 4 个文件才启用并行。
+    :param on_progress: 每完成一项即回调 ``f(done, total)``。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
     """
     root_path = Path(root)
     if not root_path.exists():
@@ -425,15 +419,12 @@ def preview_plans(
 def apply_plans(
     plans: list[MetaKitPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
-    """整批写入 ComicInfo.xml。
+    """整批写入 ``ComicInfo.xml``。
 
-    Args:
-        plans:   预览阶段产出的 MetaKitPlan 列表（含 writable / 不可写两类）。
-        dry_run: True 时仅预览提示，不实际写入。
-        cancel_token: threading.Event，已 set 时提前退出。
-
-    Returns:
-        失败数量（dry_run 时返回 0）。
+    :param plans:   预览阶段产出的 plan 列表（含 writable / 不可写两类）。
+    :param dry_run: ``True`` 时仅预览提示，不实际写入。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
+    :return: 失败数量（``dry_run`` 时为 0）。
     """
     if dry_run:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')

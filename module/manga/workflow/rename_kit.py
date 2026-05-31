@@ -1,10 +1,4 @@
-"""
-rename_kit.py — 源文件扫描与重命名（rename-kit 子命令的工作流层）
-
-只处理 .zip / .cbz 源文件；按作者目录组织。
-
-依赖: models / config / parser / builder / utils / console / presentation
-"""
+"""rename-kit 工作流层：扫描作者目录下的 ``.zip`` / ``.cbz`` 源文件并重命名。"""
 
 from __future__ import annotations
 from pathlib import Path
@@ -23,10 +17,10 @@ from module.manga.infra.parallel import run_plans
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _plan_one(item: tuple[str, str]) -> RenameKitPlan:
-    """模块级 worker（picklable）：``(author, full_path_str)`` → RenameKitPlan。
+    """模块级 worker（picklable）：``(author, full_path_str)`` → :class:`~module.manga.core.models.RenameKitPlan`。
 
-    DEBUG 由 print_rename_kit_preview 在渲染卡片时统一触发，本函数无副作用，
-    安全用于子进程。
+    DEBUG 由 :func:`~module.manga.presentation.view.print_rename_kit_preview`
+    在渲染卡片时统一触发，本函数无副作用，安全用于子进程。
     """
     author, path_str = item
     file     = Path(path_str)
@@ -50,7 +44,7 @@ def _progress_line(idx: int, total: int, plan: RenameKitPlan) -> str:
 
 
 def _iter_rename_kit_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
-    """从作者目录列表展开为 ``(author, full_path)`` 列表（按 (作者, 文件名) 排序）。"""
+    """作者目录列表展开为 ``(author, full_path)``，按 ``(作者, 文件名)`` 排序。"""
     items: list[tuple[str, str]] = []
     for author_dir in author_dirs:
         author = author_dir.name
@@ -66,14 +60,13 @@ def preview_plans(
 ) -> list[RenameKitPlan]:
     """扫描根目录下所有作者目录，汇总重命名计划。
 
-    Args:
-        jobs: 1=串行；>1=ProcessPoolExecutor 并行；0=自动 min(cpu,4)。
-              ≥ 4 个文件时才启用并行。
-        on_progress: 每完成一项即回调 ``f(done, total)``。
-        cancel_token: threading.Event，已 set 时提前退出。
+    plan 阶段是纯字符串处理（毫秒级），并行收益有限，主要作用是统一接口
+    + 大规模目录下的进度反馈。
 
-    每完成一个文件即打印进度行。注意 plan 阶段是纯字符串处理（毫秒级），
-    并行收益有限，主要作用是统一接口 + 大规模目录下的进度反馈。
+    :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。
+        ≥ 4 个文件时才实际启用并行。
+    :param on_progress: 每完成一项即回调 ``f(done, total)``。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
     """
     root_path = Path(root)
     if not root_path.exists():
@@ -100,13 +93,9 @@ def apply_plans(
 ) -> int:
     """执行重命名计划。
 
-    Args:
-        plans:   重命名计划列表。
-        dry_run: True 时仅预览，不实际执行。
-        cancel_token: threading.Event，已 set 时提前退出。
-
-    Returns:
-        失败数量（dry_run 时返回 0）。
+    :param dry_run: ``True`` 时仅预览，不实际执行。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
+    :return: 失败数量（``dry_run`` 时为 0）。
     """
     if dry_run:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')

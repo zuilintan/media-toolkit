@@ -1,44 +1,43 @@
-"""
-pack_kit.py — 图片目录序号化重命名 + STORED zip 打包（pack-kit 子命令工作流层）
+"""pack-kit 工作流层：图片目录序号化重命名 + STORED zip 打包。
 
-把识别出的「打包单位」按 ``<Inc NrDir:0001>`` 规则改名为
-``0001.<ext>``、``0002.<ext>`` …，再以 ``zipfile.ZIP_STORED`` 打包到同级
-``<dir>.zip``；打包成功后整树 ``shutil.rmtree``。
+按 ``<Inc NrDir:0001>`` 规则改名为 ``0001.<ext>``、``0002.<ext>`` …，再以
+``zipfile.ZIP_STORED`` 打包到同级 ``<dir>.zip``；打包成功后整树 ``shutil.rmtree``。
 
-`<Inc NrDir:0001>` 语义:
-  - 每个目录独立计数（递归不跨目录），从 0001 起步
-  - 4 位零填充；图片数 ≥ 10000 时扩位，确保字典序 = 数字序
+``<Inc NrDir:0001>`` 语义:
 
-打包单位识别（``_find_units``，递归自 root）:
-  - ``'flat'``  直接含 ≥ ``MIN_IMAGES`` 张图、无子目录
-  - ``'nested'`` 仅含子目录、每个子目录都是「image leaf」（≥1 图、无子目录；
-                 不应用 MIN_IMAGES —— 章节合法可以很短）；zip 内保留子目录名
-                 作为路径前缀，每子目录独立编号。
-                 顶层允许伴随 ``cover.*`` / ``0000.*`` 元数据图与任意非图
-                 （ComicInfo.xml 等），原名原样写入 zip 顶层。
-  - ``MIXED``    图+目录同层且顶层图非 ``cover.*`` / ``0000.*`` → 跳过该目录，不下钻
-  - ``CONTAINER`` 仅子目录但不全是 image leaf → 下钻 children 继续找
-  - ``EMPTY`` / ``TOO_FEW`` → 跳过
+- 每个目录独立计数（递归不跨目录），从 ``0001`` 起步
+- 4 位零填充；图片数 ≥ 10000 时扩位，确保字典序 = 数字序
 
-  特例：仅子目录且 child 数 = 1（无 meta_kit 标记）→ 视为「包装层」
-  直接下钻（如「作者/漫画」中的作者目录），避免把 ``LSP.zip`` 当作
-  漫画。
-      特例 2：≥2 个 image leaf child → 通过目录名辨识用途：
-      - 任一子目录名像话号（Ch01/第01话/01…）→ NESTED（同一漫画分话）
-      - 都不像话号且每个 child 图数 ≥ MIN_IMAGES → CONTAINER（多本漫画，
-        如「作者/漫画A+漫画B」），下钻让每本成为独立 FLAT 单位
+打包单位识别（:func:`_find_units`，递归自 ``root``）:
 
-> NESTED 只允许 1 层子目录（子目录里再有子目录就退化为 CONTAINER），
-> 故「漫画/卷/话/imgs」三层结构会自动停在卷级 —— 每卷独立一 zip，
-> 与项目里「卷不可合一档」的约定一致。
+- ``'flat'``    直接含 ≥ :data:`MIN_IMAGES` 张图、无子目录
+- ``'nested'``  仅含子目录、每个子目录都是「image leaf」（≥1 图、无子目录；
+  不应用 :data:`MIN_IMAGES` —— 章节合法可以很短）；zip 内保留子目录名
+  作为路径前缀，每子目录独立编号。顶层允许伴随 ``cover.*`` / ``0000.*``
+  元数据图与任意非图（``ComicInfo.xml`` 等），原名原样写入 zip 顶层。
+- ``MIXED``     图+目录同层且顶层图非 ``cover.*`` / ``0000.*`` → 跳过，不下钻
+- ``CONTAINER`` 仅子目录但不全是 image leaf → 下钻 children 继续找
+- ``EMPTY`` / ``TOO_FEW`` → 跳过
+
+特例:
+
+- 仅子目录且 child 数 = 1（无 meta-kit 标记）→ 视为「包装层」直接下钻
+  （如「作者/漫画」中的作者目录），避免把 ``LSP.zip`` 当作漫画。
+- ≥ 2 个 image leaf child → 通过目录名辨识用途：
+
+  - 任一子目录名像话号（``Ch01`` / ``第01话`` / ``01`` …）→ NESTED（同一漫画分话）
+  - 都不像话号且每个 child 图数 ≥ :data:`MIN_IMAGES` → CONTAINER（多本漫画，
+    如「作者/漫画A+漫画B」），下钻让每本成为独立 FLAT 单位
+
+NESTED 只允许 1 层子目录（子目录里再有子目录就退化为 CONTAINER），故
+「漫画/卷/话/imgs」三层结构会自动停在卷级——每卷独立一 zip，与项目「卷不可
+合一档」约定一致。
 
 apply 阶段:
-  1. 以 ZIP_STORED 写入 ``<unit>.zip``（已存在覆盖）；
-     源文件按原路径读、新名作 arcname 写 —— 不在盘上做改名
-     （反正下一步整树要删）
-  2. ``shutil.rmtree`` 删除整个单位目录（含非图 extras）
 
-依赖: models / config / utils / console / parallel
+1. 以 ``ZIP_STORED`` 写入 ``<unit>.zip``（已存在覆盖）；源文件按原路径读、新名作
+   ``arcname`` 写——不在盘上做改名（反正下一步整树要删）；
+2. ``shutil.rmtree`` 删除整个单位目录（含非图 ``extras``）。
 """
 
 from __future__ import annotations
@@ -83,7 +82,7 @@ def _is_nested_top_image(p: Path) -> bool:
 def _is_os_junk(name: str) -> bool:
     """OS / 文件管理器生成的元数据，绝不进 zip。
 
-    包含: thumbs.db / desktop.ini / .DS_Store，以及 macOS AppleDouble
+    包含 ``thumbs.db`` / ``desktop.ini`` / ``.DS_Store``，以及 macOS AppleDouble
     资源派生文件（``._foo`` 形式）。
     """
     lower = name.lower()
@@ -91,13 +90,11 @@ def _is_os_junk(name: str) -> bool:
 
 
 def _looks_like_chapter(name: str) -> bool:
-    """检查目录名是否像话/章节号。
+    """目录名是否像话 / 章节号。
 
-    用于辨识「作者目录（内含多本漫画）」与「漫画目录（内含多话）」。
-    前者子目录名是漫画标题（天龙/海贼），后者是话号（Ch01/第01话）。
-
-    命中条件：纯数字（01/001）、CH./Chapter/Vol./EP. 前缀、
-    「第N話」格式。
+    用于辨识「作者目录（内含多本漫画）」vs「漫画目录（内含多话）」。
+    命中条件: 纯数字（``01`` / ``001``）、``CH.`` / ``Chapter`` / ``Vol.`` / ``EP.``
+    前缀、``第N話`` 格式。
     """
     lower = name.lower().strip()
     if lower.isdigit():
@@ -117,16 +114,15 @@ def _looks_like_chapter(name: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _pad_width(n: int) -> int:
-    """编号位数：默认 4 位；图片数 ≥ 10000 时扩展，确保字典序与数字序一致。"""
+    """编号位数：默认 4 位；图片数 ≥ 10000 时扩展，确保字典序 = 数字序。"""
     return max(4, len(str(n)))
 
 
 def _split_dir_content(d: Path) -> tuple[list[Path], list[str]]:
-    """目录的直接内容拆分为 ``(images, extras_filenames)``；不递归、忽略子目录。
+    """目录直接内容拆为 ``(images, extras_filenames)``；不递归、忽略子目录。
 
-    images 按字典序排好，可直接喂给 ``<Inc NrDir>`` 编号；extras 是相对
-    该目录的文件名（无路径前缀）。OS 垃圾（``thumbs.db`` / ``._*`` 等）
-    归入 extras，不参与编号。
+    ``images`` 按字典序排好；``extras`` 是相对该目录的文件名（无路径前缀）。
+    OS 垃圾（``thumbs.db`` / ``._*`` 等）归入 ``extras``，不参与编号。
     """
     images: list[Path] = []
     extras: list[str]  = []
@@ -141,7 +137,7 @@ def _split_dir_content(d: Path) -> tuple[list[Path], list[str]]:
 
 
 def _count_images(d: Path) -> int:
-    """返回目录中图片文件数量（不递归、不含 OS 垃圾）。
+    """目录中图片文件数量（不递归、不含 OS 垃圾）。
 
     用于判断 image leaf 是否够格作为独立 FLAT 单位。
     """
@@ -157,11 +153,11 @@ def _count_images(d: Path) -> int:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _is_image_leaf(d: Path) -> bool:
-    """``d`` 的直接内容是「≥ 1 张图 + 无子目录」？
+    """``d`` 的直接内容是否「≥ 1 张图 + 无子目录」。
 
-    用于 NESTED 子目录的合格判定 —— **不**应用 MIN_IMAGES 阈值，因为
-    章节合法可以很短（番外、小尾声、预览等）；MIN_IMAGES 仅在顶层
-    FLAT 判定中作噪声过滤。非图片文件不影响判定（会作为 extras 处理）。
+    用于 NESTED 子目录的合格判定——**不**应用 :data:`MIN_IMAGES` 阈值，因为章节
+    合法可以很短（番外、小尾声、预览等）；:data:`MIN_IMAGES` 仅在顶层 FLAT 判定
+    中作噪声过滤。非图片文件不影响判定（会作为 ``extras`` 处理）。
     """
     has_image = False
     for e in d.iterdir():
@@ -174,15 +170,15 @@ def _is_image_leaf(d: Path) -> bool:
 
 
 def _find_units_in_root(root: Path) -> list[tuple[Path, str]]:
-    """批量模式入口：``--root`` 已被用户声明为「容器」，**不**把 root 自身
-    当作 NESTED 单位。
+    """批量模式入口：``--root`` 已被用户声明为容器，**不**把 ``root`` 自身当 NESTED。
 
     规则:
-      - root 只有图、无子目录 → 把 root 当 FLAT（少见但合理）
-      - 否则遍历直接子目录，逐个走 ``_find_units`` 递归
 
-    这样可避免「root 下若干个 FLAT 子目录」被误识别为
-    「root 是 NESTED 包含若干子目录」，导致全部塞进 root.zip。
+    - ``root`` 只有图、无子目录 → 当 FLAT（少见但合理）
+    - 否则遍历直接子目录，逐个走 :func:`_find_units` 递归
+
+    避免「``root`` 下若干个 FLAT 子目录」被误识别为「``root`` 是 NESTED 包含若干
+    子目录」、导致全部塞进 ``root.zip``。
     """
     images:  list[Path] = []
     subdirs: list[Path] = []
@@ -215,15 +211,13 @@ def _find_units(
 ) -> list[tuple[Path, str]]:
     """从 ``dir_path`` 递归识别打包单位，返回 ``[(unit_dir, kind)]``。
 
-    kind ∈ ``{'flat', 'nested'}``。跳过的目录（含混合 / 图不足 / 空 /
-    超深）会经 ``info()`` 打印一条提示，便于用户排查。
+    ``kind`` ∈ ``{'flat', 'nested'}``。跳过的目录（含混合 / 图不足 / 空 / 超深）
+    会经 :func:`~base.console.info` 打印一条提示。batch 模式请改用
+    :func:`_find_units_in_root` 以避免把 ``root`` 自身当 NESTED。
 
-    batch 模式请改用 ``_find_units_in_root`` 以避免把 root 自身当 NESTED。
-
-    ``_in_container`` 由 CONTAINER 分支递归向下传递。在容器内部
-    （如 ``漫画/卷1/话1``）若遇到 1-child wrapper（卷下只有 1 话），
-    仍保留外层（卷）为 NESTED；否则（入口处的作者/包装目录）下钻到
-    child 把内层当真正的单位。
+    ``_in_container`` 由 CONTAINER 分支递归向下传递。容器内部（如
+    ``漫画/卷1/话1``）若遇到 1-child wrapper（卷下只有 1 话），仍保留外层（卷）
+    为 NESTED；否则（入口处的作者 / 包装目录）下钻到 child 把内层当真正的单位。
     """
     if _depth > MAX_DEPTH:
         info(f'  ⏭️  跳过（嵌套层级 > {MAX_DEPTH}）: {dir_path}')
@@ -307,10 +301,11 @@ def _plan_flat(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
 def _plan_nested(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
     """NESTED unit：
 
-    - 顶层文件（cover.* / 0000.* / ComicInfo.xml / 等）**原名原样**写入 zip，
-      作为 identity 改名（``(name, name)``）；不计入 n_renamed。
-    - 每个直接子目录独立编号，arcname 加子目录名前缀。
-    - 子目录内的非图片文件归入 ``extras``（不进 zip，随 rmtree 删除）。
+    - 顶层文件（``cover.*`` / ``0000.*`` / ``ComicInfo.xml`` 等）**原名原样**写入 zip，
+      作为 identity 改名（``(name, name)``）；不计入
+      :attr:`~module.manga.core.models.PackKitPlan.n_renamed`。
+    - 每个直接子目录独立编号，``arcname`` 加子目录名前缀。
+    - 子目录内的非图片文件归入 ``extras``（不进 zip，随 ``rmtree`` 删除）。
     """
     renames: list[tuple[str, str]] = []
     extras:  list[str]             = []
@@ -341,7 +336,7 @@ def _plan_nested(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
 
 
 def preview_plan_unit(unit_dir_str: str, kind: str) -> PackKitPlan:
-    """构建单个打包单位的 PackKitPlan（picklable worker，可走并行）。"""
+    """构建单个打包单位的 :class:`~module.manga.core.models.PackKitPlan`（picklable worker）。"""
     unit_dir = Path(unit_dir_str)
     zip_path = str(unit_dir.parent / f'{unit_dir.name}.zip')
 
@@ -372,7 +367,7 @@ def preview_plan_unit(unit_dir_str: str, kind: str) -> PackKitPlan:
 
 
 def preview_plan_unit_item(item: tuple[str, str]) -> PackKitPlan:
-    """run_plans worker：解包 (unit_dir_str, kind) 元组。"""
+    """:func:`~module.manga.infra.parallel.run_plans` worker：解包 ``(unit_dir_str, kind)``。"""
     return preview_plan_unit(item[0], item[1])
 
 
@@ -381,10 +376,10 @@ def preview_plan_unit_item(item: tuple[str, str]) -> PackKitPlan:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _stored_zinfo(arcname: str, src_path: Path) -> zipfile.ZipInfo:
-    """构造一个「DOS 属性」风格的 ZipInfo（与 cover_kit.py / Bandizip 输出对齐）。
+    """构造「DOS 属性」风格的 ``ZipInfo``（与 :mod:`~module.manga.workflow.cover_kit` / Bandizip 输出对齐）。
 
-    用源文件 mtime 作为条目时间；``external_attr`` 仅置 Archive bit (0x20)，
-    高 16 位的 Unix mode 留空，避免在查看器中显示出 ``-rw-rw-rw-``。
+    用源文件 mtime 作为条目时间；``external_attr`` 仅置 Archive bit (``0x20``)，
+    高 16 位的 Unix mode 留空，避免查看器显示 ``-rw-rw-rw-``。
     """
     t = time.localtime(src_path.stat().st_mtime)
     zi = zipfile.ZipInfo(
@@ -398,9 +393,7 @@ def _stored_zinfo(arcname: str, src_path: Path) -> zipfile.ZipInfo:
 
 
 def _stored_dir_zinfo(arcname: str, src_dir: Path) -> zipfile.ZipInfo:
-    """构造目录条目的 ZipInfo，属性置 DOS Subdirectory bit (0x10)，
-    时间取源目录 mtime。
-    """
+    """构造目录条目的 ``ZipInfo``：DOS Subdirectory bit (``0x10``) + 源目录 mtime。"""
     t = time.localtime(src_dir.stat().st_mtime)
     zi = zipfile.ZipInfo(
         arcname,
@@ -415,20 +408,17 @@ def _stored_dir_zinfo(arcname: str, src_dir: Path) -> zipfile.ZipInfo:
 def _write_stored_zip(
     zip_path: Path, src_dir: Path, renames: list[tuple[str, str]],
 ) -> None:
-    """以 ``ZIP_STORED`` 模式打包到 zip_path（覆盖已存在）。
+    """以 ``ZIP_STORED`` 模式打包到 ``zip_path``（覆盖已存在）。
 
-    源文件按原路径读取，以新 arcname 写入 —— 不在盘上做改名，因为
-    打包成功后整个 unit 目录就会被 rmtree。
+    源文件按原路径读取、新 ``arcname`` 写入——不在盘上做改名，因为打包成功后
+    整个 unit 目录会被 ``rmtree``。
 
-    手动构造 ZipInfo + ``writestr`` 而非 ``zf.write(path)``，目的是
-    清除默认 ``ZipInfo.from_file`` 写入的 Unix mode 高位，让条目显示为
-    纯 DOS 属性（与 Bandizip 对齐）。
+    手动构造 :class:`zipfile.ZipInfo` + ``writestr`` 而非 ``zf.write(path)``，
+    目的是清除 ``ZipInfo.from_file`` 默认写入的 Unix mode 高位，让条目显示为纯
+    DOS 属性（与 Bandizip 对齐）。
 
-    nested 模式下 renames 的字符串带子目录前缀（``Ch01/x.jpg`` →
-    ``Ch01/0001.jpg``）；Path 在 Windows 上能正确解析正斜杠，zip arcname
-    本身也用正斜杠，二者天然兼容。
-
-    对 nested 结构会先写入显式目录条目（``Ch01/``），使 Bandizip 等查看器
+    NESTED 模式下 ``renames`` 字符串带子目录前缀（``Ch01/x.jpg`` →
+    ``Ch01/0001.jpg``）。会先写入显式目录条目（``Ch01/``），使 Bandizip 等查看器
     能为话文件夹展示属性与修改日期。
     """
     # 收集需要写入的目录条目（arcname 含 / 的条目其父目录前缀）
@@ -464,11 +454,10 @@ def _write_stored_zip(
 def apply_plan(plan: PackKitPlan) -> str:
     """执行单个 plan：写 STORED zip → 删除整个 unit 目录树。
 
-    源目录删除失败不视为整体失败：zip 已落盘，仅警告并 ``ok`` 返回，
-    用户可自行清理（典型原因：杀软/索引器/网盘客户端临时占用句柄）。
+    源目录删除失败不视为整体失败：zip 已落盘，仅警告并 ``'ok'`` 返回，用户可
+    自行清理（典型原因：杀软 / 索引器 / 网盘客户端临时占用句柄）。
 
-    Returns:
-        'ok' / 'error'。'error' 表示 zip 未生成。
+    :return: ``'ok'`` / ``'error'``；``'error'`` 表示 zip 未生成。
     """
     src_dir  = Path(plan.src_dir)
     zip_path = Path(plan.zip_path)
@@ -501,18 +490,15 @@ def _progress_line(idx: int, total: int, plan: PackKitPlan) -> str:
 def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[PackKitPlan]:
-    """从 root 递归识别打包单位，每单位产出一个 PackKitPlan。
+    """从 ``root`` 递归识别打包单位，每单位产出一个 :class:`~module.manga.core.models.PackKitPlan`。
 
-    与 rename_kit 的「root 是高层容器」语义对齐，但走的是结构化递归：
-    遇到 FLAT / NESTED 立即视作一个单位（不再下钻），其它情况继续递归。
+    与 :mod:`~module.manga.workflow.rename_kit` 的「root 是高层容器」语义对齐，
+    但走结构化递归：遇到 FLAT / NESTED 立即视作单位（不再下钻），其它情况继续递归。
 
-    Args:
-        jobs: 1=串行；>1=并行 plan_unit；0=自动 ``min(cpu,4)``。
-              识别本身（_find_units）始终在主进程串行执行，并行的只是
-              已识别单位的 PackKitPlan 构建 —— 通常是字符串处理，并行收益
-              有限，主要作用是统一接口。
-        on_progress: 每完成一项即回调 ``f(done, total)``。
-        cancel_token: threading.Event，已 set 时提前退出。
+    :param jobs: 1=串行；>1=并行 plan；0=自动 ``min(cpu, 4)``。识别本身
+        （:func:`_find_units`）始终在主进程串行执行，并行的只是已识别单位的 plan 构建。
+    :param on_progress: 每完成一项即回调 ``f(done, total)``。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
     """
     root_path = Path(root)
     if not root_path.exists():
@@ -540,8 +526,7 @@ def apply_plans(
 ) -> int:
     """整批执行打包计划。
 
-    Returns:
-        失败数（dry_run 时 0）。
+    :return: 失败数（``dry_run`` 时为 0）。
     """
     if dry_run:
         info('\n🔍 预览模式 — 未做任何更改。使用 --apply 参数执行。')
