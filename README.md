@@ -38,7 +38,7 @@ mt 含四个子命令：
 # macOS / Linux：curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 安装项目（自动创建 .venv 并解析锁文件）
-cd manga-toolkit
+cd media-toolkit
 uv sync
 ```
 
