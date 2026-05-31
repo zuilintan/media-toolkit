@@ -1,8 +1,4 @@
-"""
-pack_kit_tab.py — pack-kit 子命令的 GUI Tab
-
-复用 manga.workflow.pack_kit 的 plan_packs / apply_pack_plans。
-"""
+"""``pack-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.pack_kit`。"""
 
 from __future__ import annotations
 from collections.abc import Callable

@@ -1,8 +1,4 @@
-"""
-cover_kit_tab.py — cover-kit 子命令的 GUI Tab
-
-复用 manga.workflow.cover_kit 的 plan_covers / apply_cover_plans。
-"""
+"""``cover-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.cover_kit`。"""
 
 from __future__ import annotations
 from collections.abc import Callable

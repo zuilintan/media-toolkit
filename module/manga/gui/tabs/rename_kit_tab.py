@@ -1,9 +1,4 @@
-"""
-rename_kit_tab.py — rename-kit 子命令的 GUI Tab
-
-复用 manga.workflow.rename_kit 的 plan / apply 函数；不调用 manga.cli.cmd_rename
-（cmd_* 内部用 input() 阻塞确认，与 GUI 互斥）。
-"""
+"""``rename-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.rename_kit`。"""
 
 from __future__ import annotations
 from collections.abc import Callable

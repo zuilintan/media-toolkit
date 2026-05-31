@@ -1,17 +1,17 @@
-"""
-module.py — manga-toolkit GUI 模块（被 base.gui.shell 装载）
+"""manga-toolkit GUI 模块（被 :class:`base.gui.shell.Shell` 装载）。
 
-布局
-----
-MangaModule (QWidget)
-└── QSplitter (Vertical)
-    ├── QTabWidget       — pack-kit / rename-kit / cover-kit / meta-kit 四个子 Tab
-    └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
+布局::
+
+    MangaModule (QWidget)
+    └── QSplitter (Vertical)
+        ├── QTabWidget       — pack-kit / rename-kit / cover-kit / meta-kit 四个子 Tab
+        └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
 
 注意:
-  - 窗口标题/几何由 shell 持有；本模块只管 splitter 状态持久化
-  - 业务键盘快捷键 (Enter/Ctrl+Enter/Ctrl+L) 用 WidgetWithChildrenShortcut
-    上下文，避免多模块共存时跨模块触发
+
+- 窗口标题 / 几何由 ``Shell`` 持有；本模块只管 splitter 状态持久化
+- 业务快捷键（Enter / Ctrl+Enter / Ctrl+L）用 ``WidgetWithChildrenShortcut`` 上下文，
+  避免多模块共存时跨模块触发
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from module.manga.gui.tabs.rename_kit_tab import RenameKitTab
 
 
 class MangaModule(QWidget):
-    """manga-toolkit 业务模块：装载 4 个子 Tab + 独立日志栈。"""
+    """业务模块：4 个子命令 Tab + 独立日志栈。"""
 
     busy_changed = Signal(bool)
 
@@ -99,7 +99,7 @@ class MangaModule(QWidget):
 
     # ── shell 集成点 ──────────────────────────────────────────────────
     def default_sink(self):
-        """供 shell 在首次注册时调 set_output 用的初始 sink。"""
+        """供 ``Shell`` 在首次注册时调 :func:`base.console.set_output` 的初始 sink。"""
         return self._tab_list[0]._sink
 
     # ── 状态 ──────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ class MangaModule(QWidget):
 
     # ── 快捷键 ────────────────────────────────────────────────────────
     def _install_shortcuts(self) -> None:
-        """Enter / Ctrl+Enter / Ctrl+L —— 限定 module 内（含子）。"""
+        """Enter / Ctrl+Enter / Ctrl+L —— 限定 ``WidgetWithChildrenShortcut`` 上下文。"""
         def _add(seq: str, cb) -> None:
             act = QAction(self)
             act.setShortcut(QKeySequence(seq))
@@ -156,5 +156,5 @@ class MangaModule(QWidget):
             self._splitter.setSizes(sizes)
 
     def save_state(self) -> None:
-        """由 shell 在 closeEvent 调用（也可由子类显式触发）。"""
+        """由 ``Shell`` 在 ``closeEvent`` 调用（也可由子类显式触发）。"""
         get_config().set('manga.splitter', self._splitter.sizes())

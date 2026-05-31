@@ -1,8 +1,4 @@
-"""
-meta_kit_tab.py — meta-kit 子命令的 GUI Tab
-
-复用 manga.workflow.meta_kit 的 preview_plans / apply_plans。
-"""
+"""``meta-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.meta_kit`。"""
 
 from __future__ import annotations
 from collections.abc import Callable

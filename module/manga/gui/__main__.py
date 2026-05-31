@@ -1,8 +1,4 @@
-"""
-__main__.py — 适配 `python -m manga.gui` 调用 / PyInstaller 入口。
-
-实际实现位于 manga.gui 包的 main()；此处仅做转发。
-"""
+"""``python -m module.manga.gui`` / PyInstaller 入口；转发到 :func:`module.manga.gui.main`。"""
 import sys
 
 from module.manga.gui import main

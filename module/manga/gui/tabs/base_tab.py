@@ -1,14 +1,14 @@
-"""
-base_tab.py — 四个子命令 Tab 的通用基类
+"""四个 *-kit Tab 的通用基类 :class:`BaseTab`。
 
-承担的共性
-----------
-- 装配通用 UI：根目录 / 移动目录 / 扫描+执行按钮 / 状态行
-- 后台 QThread + Worker 调度（含防 GC、自动清理）
-- 扫描 → 预览 → 二次确认 → 写入 → 重置 的完整状态机
+承担共性:
 
-子类只提供策略方法（``_plan_call`` / ``_apply_call`` / ``_render_preview``
-/ ``_count_actionable`` / ``_build_options_box`` 等）。
+- 装配通用 UI（根目录 / 扫描+执行按钮 / 状态行）
+- 后台 ``QThread`` + ``Worker`` 调度（含防 GC、自动清理）
+- 扫描 → 预览 → 二次确认 → 写入 → 重置 状态机
+
+子类只提供策略方法（:meth:`BaseTab._plan_call` / :meth:`BaseTab._apply_fn` /
+:meth:`BaseTab._render_preview` / :meth:`BaseTab._count_actionable` /
+:meth:`BaseTab._build_options_box` 等）。
 """
 
 from __future__ import annotations
@@ -31,14 +31,14 @@ from module.manga.presentation.view import print_run_banner
 
 
 def _run_apply(apply_fn: Callable[..., int], plans: list, **kwargs) -> int:
-    """Worker 入口：吃掉 Worker 注入的 on_progress（apply 不用），
-    透传 cancel_token，调用 ``apply_fn(plans, dry_run=False, ...)``。"""
+    """:class:`~base.gui.worker.Worker` 入口：吃掉 ``on_progress``（apply 不用），
+    透传 ``cancel_token``，调用 ``apply_fn(plans, False, ...)``。"""
     kwargs.pop('on_progress', None)
     return apply_fn(plans, False, **kwargs)
 
 
 class BaseTab(QWidget):
-    """子命令 Tab 的通用基类（UI 骨架 + 任务调度 + 状态机）。"""
+    """*-kit Tab 通用基类（UI 骨架 + 任务调度 + 状态机）。"""
 
     busy_changed = Signal(bool)
 
@@ -101,12 +101,14 @@ class BaseTab(QWidget):
 
     # ── 子类策略钩子 ───────────────────────────────────────────────────
     def _build_options_box(self) -> QWidget | None:
-        """返回放在「目录」组下方的选项组（QGroupBox）；无可省略选项可返回 None。"""
+        """返回放在「目录」组下方的选项组（``QGroupBox``）；无可返回 ``None``。"""
         return None
 
     def _load_settings(self) -> None:
-        """从持久化配置恢复控件状态；在 _build_options_box 之后调用。
-        基类处理 jobs（所有 Tab 共有）；子类可 super() 后追加自己的字段。"""
+        """从持久化配置恢复控件状态；在 :meth:`_build_options_box` 之后调用。
+
+        基类处理 ``jobs``（所有 Tab 共有）；子类可 ``super()`` 后追加自己的字段。
+        """
         if not hasattr(self, '_jobs'):
             return
         cfg = get_config()
@@ -118,7 +120,7 @@ class BaseTab(QWidget):
         )
 
     def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        """返回 ``(plan_fn, args, kwargs)``，BaseTab 据此在 worker 线程调用。"""
+        """返回 ``(plan_fn, args, kwargs)``，:class:`BaseTab` 据此在 worker 线程调用。"""
         raise NotImplementedError
 
     def _apply_fn(self) -> Callable[[list, bool], int]:
@@ -126,11 +128,11 @@ class BaseTab(QWidget):
         raise NotImplementedError
 
     def _render_preview(self, plans: list[Any]) -> None:
-        """在日志面板渲染预览（调用对应的 print_*_preview）。"""
+        """在日志面板渲染预览（调用对应的 ``print_*_preview``）。"""
         raise NotImplementedError
 
     def _count_actionable(self, plans: list[Any]) -> int:
-        """统计可执行项（用于按钮启用与确认对话框）。"""
+        """统计可执行项（驱动按钮启用与确认对话框）。"""
         raise NotImplementedError
 
     def _classify_plans(self, plans: list[Any]) -> dict[str, int]:
@@ -139,7 +141,8 @@ class BaseTab(QWidget):
         return {'可执行': n, '无需操作': len(plans) - n}
 
     def _banner_subtitle(self) -> str:
-        """print_run_banner 的副标题；默认为空，子类可覆盖。"""
+        """:func:`~module.manga.presentation.view.print_run_banner` 的副标题；
+        默认为空，子类可覆盖。"""
         return ''
 
     # ── 通用回调 ───────────────────────────────────────────────────────
@@ -250,7 +253,7 @@ class BaseTab(QWidget):
         on_failed:   Callable[[str], None] | None = None,
         **kwargs,
     ) -> bool:
-        """启动后台任务。返回 False 表示已有任务在跑（拒绝并发）。"""
+        """启动后台任务。返回 ``False`` 表示已有任务在跑（拒绝并发）。"""
         if self._thread is not None and self._thread.isRunning():
             return False
 

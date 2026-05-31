@@ -1,19 +1,10 @@
-"""
-manga.gui — PySide6 桌面前端（manga-toolkit 单模块视图）
+"""``manga-gui`` 入口（PySide6 桌面前端，单模块视图）。
 
-包入口 ``main()`` 对应 pyproject scripts 的 ``manga-gui``，启动顺序：
-  1. 体检 PySide6（共用 base.gui.app_check）
-  2. set_default_app_dir_name + setup_logging
-  3. 构造 Shell + 注册 MangaModule（首次注册自动 set_output 到默认 sink）
-  4. 启动事件循环
+启动顺序: 体检 PySide6 → 设置 app dir / logging → 构造 ``Shell`` + 注册
+:class:`~module.manga.gui.module.MangaModule` → 启动事件循环。
 
-完全复用 manga.workflow 的 plan/apply 函数，不再走 manga.cli.cmd_*
-（cmd_* 内部用 input() 阻塞确认，不适配 GUI）。
-
-模块布局:
-    module.py        — MangaModule（QSplitter + 4 子 Tab + 独立日志栈）
-    tabs/            — 4 个子命令独立 Tab
-    workers/         — QThread 后台任务包装
+完全复用 :mod:`~module.manga.workflow` 的 plan / apply；不调 ``cli.cmd_*``
+（后者用 ``input()`` 阻塞确认，与 GUI 互斥）。
 """
 
 from __future__ import annotations
