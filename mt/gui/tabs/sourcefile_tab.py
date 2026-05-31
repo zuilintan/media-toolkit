@@ -1,7 +1,7 @@
 """
-sourcefile_tab.py — sourcefile 子命令的 GUI Tab
+sourcefile_tab.py — name 子命令的 GUI Tab
 
-复用 mt.workflow.sourcefile 的 plan / apply 函数；不调用 mt.cli.cmd_sourcefile
+复用 mt.workflow.sourcefile 的 plan / apply 函数；不调用 mt.cli.cmd_name
 （cmd_* 内部用 input() 阻塞确认，与 GUI 互斥）。
 """
 
@@ -20,7 +20,7 @@ from mt.workflow.sourcefile import apply_sourcefile_plans, plan_sourcefiles
 
 
 class SourcefileTab(BaseTab):
-    cmd_name         = 'sourcefile'
+    cmd_name         = 'name'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有可执行的重命名'

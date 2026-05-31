@@ -1,8 +1,8 @@
 """
-sourcefile.py — sourcefile 子命令：源文件（.zip / .cbz）批量重命名
+name.py — name 子命令：源文件（.zip / .cbz）批量重命名
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
-与 cli/metadata.py 结构对称。
+与 cli/meta.py 结构对称。
 
 依赖: workflow.sourcefile / infra.console / presentation / cli.examples
 """
@@ -18,8 +18,8 @@ from mt.cli import validate_root
 from mt.cli.examples import run_sourcefile_examples
 
 
-def cmd_sourcefile(args: argparse.Namespace) -> int:
-    """sourcefile 子命令调度。"""
+def cmd_name(args: argparse.Namespace) -> int:
+    """name 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
         return 0 if run_sourcefile_examples() == 0 else 1
@@ -29,7 +29,7 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('sourcefile', '源文件批量重命名', root, args.apply)
+    print_run_banner('name', '源文件批量重命名', root, args.apply)
     plans = plan_sourcefiles(str(root), jobs=args.jobs)
 
     if not plans:
@@ -78,8 +78,8 @@ def cmd_sourcefile(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_sourcefile_args(p: argparse.ArgumentParser) -> None:
-    """挂载 sourcefile 子命令的参数。"""
+def add_name_args(p: argparse.ArgumentParser) -> None:
+    """挂载 name 子命令的参数。"""
     p.add_argument('--root',          default='',
                    help='漫画根目录（批量模式，目录下按作者目录组织）')
     p.add_argument('--apply',         action='store_true',

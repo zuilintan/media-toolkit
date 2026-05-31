@@ -1,5 +1,5 @@
 """
-metadata_tab.py — metadata 子命令的 GUI Tab
+metadata_tab.py — meta 子命令的 GUI Tab
 
 复用 mt.workflow.metadata 的 plan_metadatas / apply_metadata_plans。
 """
@@ -19,7 +19,7 @@ from mt.workflow.metadata import apply_metadata_plans, plan_metadatas
 
 
 class MetadataTab(BaseTab):
-    cmd_name         = 'metadata'
+    cmd_name         = 'meta'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的文件'

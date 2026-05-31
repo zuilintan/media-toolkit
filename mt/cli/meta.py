@@ -1,8 +1,8 @@
 """
-metadata.py — metadata 子命令：向 CBZ 写入 ComicInfo.xml 元数据
+meta.py — meta 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
-与 cli/sourcefile.py 结构对称。
+与 cli/name.py 结构对称。
 
 依赖: workflow.metadata / infra.console / presentation / cli.examples
 """
@@ -18,8 +18,8 @@ from mt.cli import validate_root
 from mt.cli.examples import run_metadata_examples
 
 
-def cmd_metadata(args: argparse.Namespace) -> int:
-    """metadata 子命令调度。"""
+def cmd_meta(args: argparse.Namespace) -> int:
+    """meta 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
         return 0 if run_metadata_examples() == 0 else 1
@@ -29,7 +29,7 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('metadata', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
+    print_run_banner('meta', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
     plans = plan_metadatas(str(root), jobs=args.jobs)
 
     if not plans:
@@ -79,8 +79,8 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_metadata_args(p: argparse.ArgumentParser) -> None:
-    """挂载 metadata 子命令的参数。"""
+def add_meta_args(p: argparse.ArgumentParser) -> None:
+    """挂载 meta 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',

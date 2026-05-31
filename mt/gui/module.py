@@ -5,7 +5,7 @@ module.py — manga-toolkit GUI 模块（被 base.gui.shell 装载）
 ----
 MangaModule (QWidget)
 └── QSplitter (Vertical)
-    ├── QTabWidget       — pack / sourcefile / cover / metadata 四个子 Tab
+    ├── QTabWidget       — pack / name / cover / meta 四个子 Tab
     └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
 
 注意:
@@ -51,9 +51,9 @@ class MangaModule(QWidget):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(tab0, '1. pack')
-        self._tabs.addTab(tab1, '2. sourcefile')
+        self._tabs.addTab(tab1, '2. name')
         self._tabs.addTab(tab2, '3. cover')
-        self._tabs.addTab(tab3, '4. metadata')
+        self._tabs.addTab(tab3, '4. meta')
 
         self._log_stack = QStackedWidget()
         self._logs: list[LogView] = []

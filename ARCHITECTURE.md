@@ -21,12 +21,12 @@ mt/                              — 漫画工具（manga toolkit）
 ├── __main__.py                  — 适配 `python -m mt` 的转发层
 ├── cli/                         — CLI 入口 + 子命令调度（main = mt-cli）
 │   ├── __init__.py              — build_parser() / main()
-│   ├── sourcefile.py            — sourcefile 子命令
-│   ├── metadata.py              — metadata 子命令
+│   ├── name.py                  — name 子命令
+│   ├── meta.py                  — meta 子命令
 │   ├── cover.py                 — cover 子命令
 │   ├── pack.py                  — pack 子命令
 │   ├── doctor.py                — doctor 子命令（环境体检）
-│   └── examples.py              — 内置示例（sourcefile / metadata 共用）
+│   └── examples.py              — 内置示例（name / meta 共用）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
 │   ├── __init__.py              — QApplication 入口（main = mt-gui）
 │   ├── __main__.py              — `python -m mt.gui` / PyInstaller 入口
@@ -46,8 +46,8 @@ mt/                              — 漫画工具（manga toolkit）
 ├── presentation/                — 领域对象的终端渲染
 │   └── view.py                  — print_run_banner / print_*_preview / print_metadata_diff_table
 └── workflow/                    — 高层工作流
-    ├── sourcefile.py            — 源文件扫描、重命名执行
-    ├── metadata.py              — ComicInfo.xml 生成 & 写入
+    ├── sourcefile.py            — 源文件扫描、重命名执行（name 子命令工作流）
+    ├── metadata.py              — ComicInfo.xml 生成 & 写入（meta 子命令工作流）
     ├── cover.py                 — 封面查找、裁剪、WebP 编码、CBZ 追加写入
     └── pack.py                  — 图片目录序号化 + STORED zip 打包
 
