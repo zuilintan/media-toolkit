@@ -59,8 +59,12 @@ jobs:
           uv run pyinstaller --noconfirm --windowed --onefile `
             --name "media-toolkit-gui-${{ steps.tag.outputs.name }}" `
             --add-data "mt/data/examples.json;mt/data" `
+            --add-data "ft/config_template.json;ft" `
             --collect-submodules mt `
-            mt/gui/__main__.py
+            --collect-submodules ft `
+            --collect-submodules base `
+            --collect-submodules app `
+            app/__main__.py
 
       - name: Smoke test exe (启动后立即结束即视为失败)
         shell: pwsh

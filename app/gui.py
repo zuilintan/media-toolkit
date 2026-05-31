@@ -9,7 +9,7 @@ gui.py — 媒体工作台总入口（单窗口装载 mt + ft 两个业务模块
 4. 首次注册的 MangaModule.default_sink 被 set_output；运行时各 module
    自己的子 Tab 触发任务前再 set_output 到对应 sink，路由互不干扰
 
-可通过 ``uv run media-toolkit-gui`` 启动（pyproject scripts）。
+可通过 ``uv run app-gui`` 启动（pyproject scripts）。
 
 注：保留 mt-gui / ft-gui 单模块入口，便于只需用单一业务时启动。
 """
@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     check_pyside6(
         app_name='media-toolkit',
         install_cmd='uv sync --extra gui',
-        run_cmd='uv run media-toolkit-gui',
+        run_cmd='uv run app-gui',
         doctor_cmd='uv run mt-cli doctor',
     )
 
