@@ -19,7 +19,7 @@ ClassifyTab (QWidget)
 from __future__ import annotations
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QThread, Signal, Slot
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
@@ -38,6 +38,22 @@ from ft.workflow.classify.path import path_to_author_name
 def _reporter(level: str, msg: str) -> None:
     """适配 base.fs.Reporter → base.console，由 QtSink 路由到 LogView。"""
     {'info': emit, 'warn': warn, 'error': error}.get(level, emit)(msg)
+
+
+class _AliasThread(QThread):
+    """后台别名扫描线程，避免阻塞 GUI 主线程。"""
+
+    scan_done = Signal(object)   # dict[str, Path]
+
+    def __init__(self, workdirs: list[Path], sink, parent=None) -> None:
+        super().__init__(parent)
+        self._workdirs = workdirs
+        self._sink = sink
+
+    def run(self) -> None:
+        set_output(self._sink)
+        result = scan_aliases(self._workdirs, reporter=_reporter)
+        self.scan_done.emit(result)
 
 
 class ClassifyTab(QWidget):
@@ -98,7 +114,15 @@ class ClassifyTab(QWidget):
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
-        self._alias_map = scan_aliases(self._workdirs_paths, reporter=_reporter)
+        self._refresh_btn.setEnabled(False)
+        self._scan_thread = _AliasThread(list(self._workdirs_paths), self._sink, self)
+        self._scan_thread.scan_done.connect(self._on_scan_done)
+        self._scan_thread.start()
+
+    @Slot(object)
+    def _on_scan_done(self, alias_map) -> None:
+        self._alias_map = alias_map
+        self._refresh_btn.setEnabled(True)
 
     # ── 回调 ──────────────────────────────────────────────────────────
     def _on_refresh(self) -> None:
