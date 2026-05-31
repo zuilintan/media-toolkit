@@ -5,7 +5,7 @@ manga-toolkit — 漫画文件整理工具集
     core/      — 纯数据层（config / models / patterns）
     infra/     — 基础设施层（utils / console）
     naming/    — 名称解析与构建（parser / builder）
-    workflow/  — 高层工作流（scanner / session / comicinfo）
+    workflow/  — 高层工作流（scanner / comicinfo）
     cli/       — 命令行子命令（examples / rename / comicinfo）
     data/      — 随包数据（examples.json）
 

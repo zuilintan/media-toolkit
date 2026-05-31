@@ -131,10 +131,6 @@ mt-cli sourcefile --root /path/to/manga
 # 批量执行
 mt-cli sourcefile --root /path/to/manga --apply
 
-# 列出 / 回退已有的 session 记录（当前 apply 不再写新 session）
-mt-cli sourcefile --list-sessions
-mt-cli sourcefile --rollback
-
 # 内置解析示例（回归测试）
 mt-cli sourcefile --examples
 

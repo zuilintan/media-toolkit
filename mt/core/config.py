@@ -11,9 +11,6 @@ from mt import __version__  # 版本号唯一来源
 # 批量模式默认扫描根目录（留空，强制用户通过 --root 指定）
 DEFAULT_ROOT_DIR: str = ""
 
-# 操作记录文件路径（相对当前工作目录）
-SESSIONS_FILE: str = "rename_sessions.json"
-
 # 支持处理的文件后缀
 FILE_EXTS: frozenset[str] = frozenset({".zip", ".cbz"})
 

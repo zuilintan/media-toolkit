@@ -66,7 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             '示例:\n'
             '  mt-cli sourcefile --root /path/to/manga --apply\n'
-            '  mt-cli sourcefile --rollback\n'
             '  mt-cli sourcefile --examples\n'
             '  mt-cli metadata --root /path/to/cbz\n'
             '  mt-cli metadata --root /path/to/cbz --apply\n'
