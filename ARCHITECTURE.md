@@ -38,19 +38,19 @@ module/                          — 业务包命名空间
 │   │   └── workers/             — QThread 阻塞任务包装
 │   ├── core/                    — 纯数据层（无 I/O，无内部依赖）
 │   │   ├── config.py            — 全局默认配置
-│   │   ├── models.py            — Chapter / Volume / MangaInfo / *Plan 数据类
+│   │   ├── models.py            — Chapter / Volume / MangaInfo / *KitPlan 数据类
 │   │   └── patterns.py          — 正则表达式常量与规则表
-│   ├── infra/                   — 基础设施层（字符串工具、调度）
-│   │   ├── utils.py             — 纯工具函数（繁简转换、路径、重命名）
+│   ├── infra/                   — 基础设施层（plan 调度 + 进度反馈）
 │   │   └── parallel.py          — run_plans：进度行 + 可选并行
 │   ├── naming/                  — 名称解析与构建
 │   │   ├── parser.py            — parse_name(author, name) → MangaInfo
-│   │   └── builder.py           — build_new_name(info) → str
+│   │   ├── builder.py           — build_new_name(info) → str
+│   │   └── text.py              — 命名层字符串工具（繁简 / 归一化 / flag）
 │   ├── presentation/            — 领域对象的终端渲染
 │   │   └── view.py              — print_run_banner / print_*_preview / print_meta_kit_diff_table
-│   └── workflow/                — 高层工作流
-│       ├── rename_kit.py          — 源文件扫描、重命名执行（rename-kit 子命令工作流）
-│       ├── meta_kit.py          — ComicInfo.xml 生成 & 写入（meta-kit 子命令工作流）
+│   └── workflow/                — 高层工作流（每个 *-kit 一个模块）
+│       ├── rename_kit.py        — 源文件扫描、重命名执行
+│       ├── meta_kit.py          — ComicInfo.xml 生成 & 写入
 │       ├── cover_kit.py         — 封面查找、裁剪、WebP 编码、CBZ 追加写入
 │       └── pack_kit.py          — 图片目录序号化 + STORED zip 打包
 └── artifact/                    — 文件工具（artifact toolkit）
@@ -86,9 +86,9 @@ base/console · base/fs · base/drag_loop
         ↓
 module/manga/core/{config,models,patterns}
         ↓
-module/manga/infra/{utils,parallel}    ← base/console
+module/manga/infra/parallel            ← base/console
         ↓
-module/manga/naming/{parser,builder}   ← module/manga/core · module/manga/infra · base/console
+module/manga/naming/{parser,builder,text}  ← module/manga/core · base/console
         ↓
 module/manga/workflow/*                ← module/manga/core · module/manga/infra · module/manga/naming · module/manga/presentation · base/*
         ↓
