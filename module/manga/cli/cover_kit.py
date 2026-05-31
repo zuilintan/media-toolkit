@@ -1,17 +1,9 @@
-"""
-cover_kit.py — cover-kit 子命令：为 CBZ 写入 2:3 封面
+"""``cover-kit`` 子命令：为 CBZ 写入 2:3 封面。
 
-解决 grimmory 在生成封面时遇到「decompression bomb」（源图超过 2000 万
-像素）的问题。通过在 CBZ 内写入一张 2:3 / ≤ 1000×1500 的 WebP，grimmory
-即可直接用之，不再读取超大原图。
+源图（``0001.*`` 或 ``cover.*``）→ ``0000.webp``；源为 ``cover.*`` 时写入后
+同步从 ZIP 删除原 ``cover.*``。详见 :mod:`module.manga.workflow.cover_kit`。
 
-目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``；
-源为 ``cover.*`` 时写入后同步从 ZIP 删除原 cover.*。
-
-流程: scan → 全量 plan（含裁剪+编码）→ 预览 → 二次确认 → 整批写入。
-与 cli/meta_kit.py 结构对称。
-
-依赖: workflow.cover_kit / infra.console / presentation
+流程: scan → 全量 plan（含裁剪 + 编码）→ 预览 → 二次确认 → 整批写入。
 """
 
 from __future__ import annotations
@@ -25,7 +17,7 @@ from module.manga.cli import validate_root
 
 
 def cmd_cover(args: argparse.Namespace) -> int:
-    """cover-kit 子命令调度。"""
+    """``cover-kit`` 子命令调度。"""
     mode = 'smart' if args.smart else 'center'
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
@@ -84,7 +76,7 @@ def cmd_cover(args: argparse.Namespace) -> int:
 
 
 def add_cover_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 cover-kit 子命令的参数。"""
+    """挂载 ``cover-kit`` 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',

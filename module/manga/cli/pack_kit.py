@@ -1,10 +1,7 @@
-"""
-pack_kit.py — pack-kit 子命令：图片目录序号化重命名 + STORED zip 打包
+"""``pack-kit`` 子命令：图片目录序号化重命名 + STORED zip 打包。
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批执行。
-与 cli/rename_kit.py 结构对称。
-
-依赖: workflow.pack_kit / infra.console / presentation
+详见 :mod:`module.manga.workflow.pack_kit`。
 """
 
 from __future__ import annotations
@@ -18,7 +15,7 @@ from module.manga.cli import validate_root
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
-    """pack-kit 子命令调度。"""
+    """``pack-kit`` 子命令调度。"""
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
     if root is None:
@@ -74,7 +71,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
 
 
 def add_pack_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 pack-kit 子命令的参数。"""
+    """挂载 ``pack-kit`` 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='待处理根目录（递归识别图片目录单位：「仅图片」'
                         '或「仅含图片子目录」即视为一本漫画）')

@@ -1,22 +1,7 @@
-"""
-manga.cli — manga-toolkit 命令行入口与子命令实现
+"""``manga-cli`` 入口与 *-kit 子命令实现。
 
-包入口 ``main()`` 对应 pyproject scripts 的 ``manga-cli``；本包仅放业务 *-kit 子命令实现，
-由本模块的 build_parser 组装：
-
-    rename_kit.py — 源文件批量重命名（.zip / .cbz）
-    meta_kit.py   — 向 CBZ 写入 ComicInfo.xml
-    cover_kit.py  — 为 CBZ 写入 2:3 封面
-    pack_kit.py   — 图片目录序号化重命名 + STORED zip 打包
-
-旁路 / 辅助子命令位于 ``manga.extras``:
-    extras.doctor   — doctor 子命令（环境体检）
-    extras.examples — rename-kit / meta-kit 的 ``--examples`` 选项共用的演示运行器
-
-本模块同时提供包级共用工具:
-    validate_root() — --root 参数三件套校验（非空 / 存在 / 是目录）
-
-兼容性: 也可使用 ``python -m manga <subcommand> ...``。
+本包只放业务 *-kit；旁路子命令（``doctor`` / ``--examples`` 演示运行器）位于
+:mod:`module.manga.extras`，由 :func:`build_parser` 一并组装到顶层 subparsers。
 """
 
 from __future__ import annotations
@@ -33,10 +18,9 @@ from base.console import emit, setup_logging
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def validate_root(root_arg: str) -> Path | None:
-    """统一的 --root 校验。rename-kit / meta-kit 等子命令共用。
+    """``--root`` 三件套校验（非空 / 存在 / 是目录），各 *-kit 子命令共用。
 
-    Returns:
-        通过校验的绝对路径；任一校验失败时返回 None 并已 emit 错误提示。
+    :return: 通过校验的绝对路径；任一校验失败时返回 ``None`` 并已 emit 错误提示。
     """
     if not root_arg:
         emit('❌ 请指定 --root <目录>'); return None
@@ -53,7 +37,7 @@ def validate_root(root_arg: str) -> Path | None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def build_parser() -> argparse.ArgumentParser:
-    # 延迟 import 子命令避免循环（manga.cli.rename_kit 反向 import 本模块的 validate_root）
+    # 延迟 import 子命令避免循环（cli.rename_kit 等反向 import 本模块的 validate_root）
     from module.manga.cli.cover_kit import cmd_cover,  add_cover_kit_args
     from module.manga.extras.doctor import cmd_doctor, add_doctor_args
     from module.manga.cli.meta_kit import cmd_meta,   add_meta_kit_args

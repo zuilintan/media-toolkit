@@ -1,10 +1,7 @@
-"""
-meta_kit.py — meta-kit 子命令：向 CBZ 写入 ComicInfo.xml 元数据
+"""``meta-kit`` 子命令：向 CBZ 写入 ``ComicInfo.xml`` 元数据。
 
-流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
-与 cli/rename_kit.py 结构对称。
-
-依赖: workflow.meta_kit / infra.console / presentation / extras.examples
+流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。结构与
+:mod:`module.manga.cli.rename_kit` 对称。
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from module.manga.extras.examples import run_meta_kit_examples
 
 
 def cmd_meta(args: argparse.Namespace) -> int:
-    """meta-kit 子命令调度。"""
+    """``meta-kit`` 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
         return 0 if run_meta_kit_examples() == 0 else 1
@@ -80,7 +77,7 @@ def cmd_meta(args: argparse.Namespace) -> int:
 
 
 def add_meta_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 meta-kit 子命令的参数。"""
+    """挂载 ``meta-kit`` 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',

@@ -1,8 +1,4 @@
-"""
-__main__.py — 适配 `python -m manga` 调用。
-
-实际实现位于 manga.cli 包的 main()；此处仅做转发。
-"""
+"""``python -m module.manga`` 调用入口；转发到 :func:`module.manga.cli.main`。"""
 from module.manga.cli import main
 
 if __name__ == '__main__':

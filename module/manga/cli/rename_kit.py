@@ -1,10 +1,7 @@
-"""
-rename_kit.py — rename-kit 子命令：源文件（.zip / .cbz）批量重命名
+"""``rename-kit`` 子命令：源文件（``.zip`` / ``.cbz``）批量重命名。
 
-流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
-与 cli/meta_kit.py 结构对称。
-
-依赖: workflow.rename_kit / infra.console / presentation / extras.examples
+流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。结构与
+:mod:`module.manga.cli.meta_kit` 对称。
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from module.manga.extras.examples import run_rename_kit_examples
 
 
 def cmd_rename(args: argparse.Namespace) -> int:
-    """rename-kit 子命令调度。"""
+    """``rename-kit`` 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
         return 0 if run_rename_kit_examples() == 0 else 1
@@ -79,7 +76,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
 
 
 def add_rename_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 rename-kit 子命令的参数。"""
+    """挂载 ``rename-kit`` 子命令的参数。"""
     p.add_argument('--root',          default='',
                    help='漫画根目录（批量模式，目录下按作者目录组织）')
     p.add_argument('--apply',         action='store_true',
