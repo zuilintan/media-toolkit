@@ -1,12 +1,12 @@
 """
-examples.py — 内置示例数据加载与展示
+examples.py — 内置示例数据加载与演示运行器
 
 示例数据集中存放于 ``module/manga/data/examples.json``，每条为
-``{"author", "i", "e"}``（i=input, e=expected），由 rename_kit 与 meta_kit
-两个子命令共用:
+``{"author", "i", "e"}``（i=input, e=expected），由 rename-kit 与 meta-kit
+两个子命令的 ``--examples`` 选项共用:
 
-  - rename_kit 使用 (author, i, e)，验证「输入 → 规范化输出」转换；
-  - meta_kit  使用 (author, e)，将规范化文件名解析为 ComicInfo 字段并展示。
+  - rename-kit 使用 (author, i, e)，验证「输入 → 规范化输出」转换；
+  - meta-kit  使用 (author, e)，将规范化文件名解析为 ComicInfo 字段并展示。
 
 依赖: naming.parser / naming.builder / workflow.meta_kit / infra.console / presentation
 """
@@ -24,7 +24,7 @@ from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from module.manga.presentation.view import print_meta_kit_diff_table
 
 # 示例数据文件（随包分发）
-_DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
+_DATA_PATH = Path(__file__).resolve().parent / 'data' / 'examples.json'
 
 # meta_kit 示例用的模拟出版商文件名
 _EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'

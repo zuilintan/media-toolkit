@@ -8,6 +8,7 @@ manga-toolkit — 漫画文件整理工具集
     workflow/  — 高层工作流（rename_kit / meta_kit / cover_kit / pack_kit）
     cli/       — 命令行子命令（rename-kit / meta-kit / cover-kit / pack-kit / doctor）
     data/      — 随包数据（examples.json）
+    examples.py — 内置示例演示运行器（rename-kit / meta-kit 的 --examples 共用）
 
 CLI 入口:
     cli/__init__.py             — main() 与 build_parser() 主入口

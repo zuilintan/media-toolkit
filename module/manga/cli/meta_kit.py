@@ -4,7 +4,7 @@ meta_kit.py — meta-kit 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
 与 cli/rename_kit.py 结构对称。
 
-依赖: workflow.meta_kit / infra.console / presentation / cli.examples
+依赖: workflow.meta_kit / infra.console / presentation / examples
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from base.console import SEP2, emit, confirm, print_summary
 from module.manga.presentation.view import print_meta_kit_preview, print_run_banner
 from module.manga.workflow.meta_kit import preview_plans, apply_plans
 from module.manga.cli import validate_root
-from module.manga.cli.examples import run_meta_kit_examples
+from module.manga.examples import run_meta_kit_examples
 
 
 def cmd_meta(args: argparse.Namespace) -> int:

@@ -4,12 +4,13 @@ manga.cli — manga-toolkit 命令行入口与子命令实现
 包入口 ``main()`` 对应 pyproject scripts 的 ``manga-cli``；子命令拆分为独立
 模块（rename-kit/meta-kit/cover-kit/pack-kit/doctor），由本模块的 build_parser 组装：
 
-    rename_kit.py       — 源文件批量重命名（.zip / .cbz）
-    meta_kit.py       — 向 CBZ 写入 ComicInfo.xml
-    cover_kit.py      — 为 CBZ 写入 2:3 封面
-    pack_kit.py       — 图片目录序号化重命名 + STORED zip 打包
+    rename_kit.py — 源文件批量重命名（.zip / .cbz）
+    meta_kit.py   — 向 CBZ 写入 ComicInfo.xml
+    cover_kit.py  — 为 CBZ 写入 2:3 封面
+    pack_kit.py   — 图片目录序号化重命名 + STORED zip 打包
     doctor.py     — 环境体检
-    examples.py   — 内置示例数据（rename-kit / meta-kit 共用）
+
+rename-kit / meta-kit 的 ``--examples`` 选项共用 ``manga.examples`` 模块的演示运行器。
 
 本模块同时提供包级共用工具:
     validate_root() — --root 参数三件套校验（非空 / 存在 / 是目录）
