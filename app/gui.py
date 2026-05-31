@@ -1,5 +1,5 @@
 """
-gui.py — 媒体工作台总入口（单窗口装载 mt + ft 两个业务模块）
+gui.py — 媒体工作台总入口（单窗口装载 mt + artifact 两个业务模块）
 
 启动顺序
 --------
@@ -11,7 +11,7 @@ gui.py — 媒体工作台总入口（单窗口装载 mt + ft 两个业务模块
 
 可通过 ``uv run app-gui`` 启动（pyproject scripts）。
 
-注：保留 mt-gui / ft-gui 单模块入口，便于只需用单一业务时启动。
+注：保留 mt-gui / artifact-gui 单模块入口，便于只需用单一业务时启动。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     from base.console import setup_logging
     from base.gui.config import set_default_app_dir_name
     from base.gui.shell import Shell
-    from ft.gui.module import FtModule
+    from artifact.gui.module import FtModule
     from mt import __version__
     from mt.gui.module import MangaModule
 

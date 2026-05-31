@@ -1,12 +1,12 @@
-"""tests for ft.cli.classify (interactive selection + dispatcher)."""
+"""tests for artifact.cli.classify (interactive selection + dispatcher)."""
 
 from __future__ import annotations
 from pathlib import Path
 
 import pytest
 
-from ft.cli.classify import _choose_target, _prompt_index
-from ft.workflow.classify.config import WorkDir
+from artifact.cli.classify import _choose_target, _prompt_index
+from artifact.workflow.classify.config import WorkDir
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

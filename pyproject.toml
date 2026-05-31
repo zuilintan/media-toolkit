@@ -27,8 +27,8 @@ gui = [
 # CLI 命令名用连字符（CLI 惯例），模块名用下划线（PEP 8）
 mt-cli  = "mt.cli:main"
 mt-gui  = "mt.gui:main"
-ft-cli  = "ft.cli:main"
-ft-gui  = "ft.gui:main"
+artifact-cli  = "artifact.cli:main"
+artifact-gui  = "artifact.gui:main"
 app-gui = "app.gui:main"
 
 # dev 组（PEP 735）：`uv sync --group dev`；不会被发布到 wheel/PyPI extras
@@ -44,11 +44,11 @@ testpaths = ["tests"]
 cache_dir = "tests/.pytest_cache"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mt", "ft", "base", "app"]
+packages = ["mt", "artifact", "base", "app"]
 
-# 把 ft/config_template.json 一并打进 wheel（load_config 失败提示要指向它）
+# 把 artifact/config_template.json 一并打进 wheel（load_config 失败提示要指向它）
 [tool.hatch.build.targets.wheel.force-include]
-"ft/config_template.json" = "ft/config_template.json"
+"artifact/config_template.json" = "artifact/config_template.json"
 
 [build-system]
 requires = ["hatchling"]

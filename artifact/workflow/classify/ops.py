@@ -21,7 +21,7 @@ from base.fs import (
     Reporter, _default_reporter, merge_into, safe_rmtree,
 )
 
-from ft.workflow.classify.config import WorkDir
+from artifact.workflow.classify.config import WorkDir
 
 
 @dataclass(frozen=True)

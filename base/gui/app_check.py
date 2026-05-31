@@ -1,7 +1,7 @@
 """
 app_check.py — PySide6 安装/版本体检（GUI 入口共用）
 
-各业务 GUI 入口（mt.gui、ft.gui 等的 main()）应在开头调用
+各业务 GUI 入口（mt.gui、artifact.gui 等的 main()）应在开头调用
 ``check_pyside6(...)``，把硬编码的提示信息（用什么命令安装、怎么诊断）参数化
 传入，确保用户拿到的是适配自己包的可执行指引。
 """

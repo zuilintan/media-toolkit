@@ -1,4 +1,4 @@
-"""tests for ft.workflow.classify + base.fs.merge_into."""
+"""tests for artifact.workflow.classify + base.fs.merge_into."""
 
 from __future__ import annotations
 from pathlib import Path
@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 
 from base.fs import merge_into, safe_rmtree
-from ft.workflow.classify.alias import ALIAS_PREFIX, scan_aliases
-from ft.workflow.classify.config import Config, WorkDir, load_config
-from ft.workflow.classify.matcher import find_candidates
-from ft.workflow.classify.path import path_to_author_name
+from artifact.workflow.classify.alias import ALIAS_PREFIX, scan_aliases
+from artifact.workflow.classify.config import Config, WorkDir, load_config
+from artifact.workflow.classify.matcher import find_candidates
+from artifact.workflow.classify.path import path_to_author_name
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -210,7 +210,7 @@ class TestLoadConfig:
     def test_basic_load(self, tmp_path: Path) -> None:
         cfg = tmp_path / 'c.json'
         cfg.write_text(
-            '{"ft.workdirs": ['
+            '{"artifact.workdirs": ['
             '{"path": "/tmp/wd1", "search_url_template": "https://x?q={author}"},'
             '{"path": "/tmp/wd2", "search_url_template": ""}'
             ']}',

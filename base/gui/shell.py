@@ -6,7 +6,7 @@ UI 布局
 QMainWindow (Shell)
 └── QTabWidget (West, tabBarAutoHide)   ← 左侧"大模块"切换
     ├── mt module (任意 QWidget)
-    ├── ft module
+    ├── artifact module
     └── ...
 
 使用
@@ -23,7 +23,7 @@ QMainWindow (Shell)
 - 首次 register 的 module 若提供 ``default_sink`` kwarg，自动调
   ``set_output`` 让初始输出有去处；后续 module 各自管自己的 sink
 - 几何/侧栏状态用 base.gui.config 持久化，键名带 ``config_key_prefix``
-  避免 mt-only / ft-only / 双模块场景互相覆盖
+  避免 mt-only / artifact-only / 双模块场景互相覆盖
 """
 
 from __future__ import annotations

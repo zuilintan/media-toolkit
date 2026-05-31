@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from base.gui.config import get_config
 from base.gui.log_view import LogView
-from ft.gui.tabs.classify_tab import ClassifyTab
+from artifact.gui.tabs.classify_tab import ClassifyTab
 
 
 class FtModule(QWidget):
@@ -97,9 +97,9 @@ class FtModule(QWidget):
 
     # ── splitter 持久化 ──────────────────────────────────────────────
     def _restore_splitter(self) -> None:
-        sizes = get_config().get('ft.splitter')
+        sizes = get_config().get('artifact.splitter')
         if sizes:
             self._splitter.setSizes(sizes)
 
     def save_state(self) -> None:
-        get_config().set('ft.splitter', self._splitter.sizes())
+        get_config().set('artifact.splitter', self._splitter.sizes())

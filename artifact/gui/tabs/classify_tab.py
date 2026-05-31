@@ -1,5 +1,5 @@
 """
-classify_tab.py — ft 的 classify 业务子 Tab
+classify_tab.py — artifact 的 classify 业务子 Tab
 
 布局
 ----
@@ -26,13 +26,13 @@ from PySide6.QtWidgets import (
 
 from base.console import emit, error, set_output, warn
 from base.gui.qt_sink import QtSink
-from ft.gui.widgets.candidate_dialog import ask_candidate
-from ft.gui.widgets.drop_area import DropArea
-from ft.workflow.classify.alias import scan_aliases
-from ft.workflow.classify.config import Config, load_config
-from ft.workflow.classify.matcher import find_candidates
-from ft.workflow.classify.ops import classify_one
-from ft.workflow.classify.path import path_to_author_name
+from artifact.gui.widgets.candidate_dialog import ask_candidate
+from artifact.gui.widgets.drop_area import DropArea
+from artifact.workflow.classify.alias import scan_aliases
+from artifact.workflow.classify.config import Config, load_config
+from artifact.workflow.classify.matcher import find_candidates
+from artifact.workflow.classify.ops import classify_one
+from artifact.workflow.classify.path import path_to_author_name
 
 
 def _reporter(level: str, msg: str) -> None:
@@ -102,7 +102,7 @@ class ClassifyTab(QWidget):
             self._refresh_btn.setEnabled(False)
             return
         if not self._cfg.workdirs:
-            QMessageBox.critical(self, '配置无效', '配置中 ft.workdirs 为空')
+            QMessageBox.critical(self, '配置无效', '配置中 artifact.workdirs 为空')
             self._drop.setEnabled(False)
             return
         self._workdirs_paths = [wd.path for wd in self._cfg.workdirs]

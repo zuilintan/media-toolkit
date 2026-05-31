@@ -6,7 +6,7 @@ config.py — file-toolkit 配置加载
   Linux   : ~/.config/file-toolkit/config.json
   macOS   : ~/Library/Application Support/file-toolkit/config.json
 
-模板预置在 ``ft/config_template.json``（随 wheel 一起分发）。
+模板预置在 ``artifact/config_template.json``（随 wheel 一起分发）。
 
 设计：
   - 找不到 config 时抛 FileNotFoundError，消息中含期望路径与模板路径；
@@ -79,7 +79,7 @@ def load_config(path: Path | None = None) -> Config:
             f'请参考模板创建上述配置文件后重试。'
         )
     raw = json.loads(cfg_path.read_text('utf-8'))
-    workdirs_raw = raw.get('ft.workdirs', [])
+    workdirs_raw = raw.get('artifact.workdirs', [])
     workdirs = [
         WorkDir(
             path=Path(item['path']),

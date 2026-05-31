@@ -14,7 +14,7 @@ fs.py — 文件/路径安全操作原语
   - 仅依赖标准库，不引入任何业务模块
   - 调试日志走标准 logging（logger 名 ``base.fs``）
   - 面向用户的状态信息通过可选 ``reporter`` 回调输出，默认走 print；
-    宿主应用（mt/ft）可注入自身的 emit / warn / error 实现 GUI 日志路由
+    宿主应用（mt/artifact）可注入自身的 emit / warn / error 实现 GUI 日志路由
 """
 
 from __future__ import annotations

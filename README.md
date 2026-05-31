@@ -4,10 +4,10 @@
 >
 > - **mt**（漫画工具）：批量规范文件名、写 ComicInfo.xml、生成统一比例封面、序号化打包 STORED zip。  
 >   入口：CLI `mt-cli` / GUI `mt-gui`（PySide6）。
-> - **ft**（文件工具）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
->   入口：CLI `ft-cli classify` / GUI `ft-gui`；首次启动需按 `ft/config_template.json` 创建本地配置。
+> - **artifact**（文件工具）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
+>   入口：CLI `artifact-cli classify` / GUI `artifact-gui`；首次启动需按 `artifact/config_template.json` 创建本地配置。
 >
-> 双模块单窗口入口：`app-gui`（同窗口装载 mt + ft 两个 module）。
+> 双模块单窗口入口：`app-gui`（同窗口装载 mt + artifact 两个 module）。
 
 **如何快速判断 mt 是否适合你？**
 
@@ -15,7 +15,7 @@
 [`mt/data/examples.json`](mt/data/examples.json)  
 其中 `i`（input）为原始文件名，`e`（expected）为本项目处理后的预期结果。
 
-下文按 mt 子命令分节描述漫画整理；ft 业务文档见 `ft/`（待补充）。
+下文按 mt 子命令分节描述漫画整理；artifact 业务文档见 `artifact/`（待补充）。
 
 ---
 

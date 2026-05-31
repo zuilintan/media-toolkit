@@ -52,15 +52,15 @@ mt/                              — 漫画工具（manga toolkit）
     ├── cover.py                 — 封面查找、裁剪、WebP 编码、CBZ 追加写入
     └── pack.py                  — 图片目录序号化 + STORED zip 打包
 
-ft/                              — 文件工具（file toolkit）
+artifact/                        — 文件工具（artifact toolkit）
 ├── __init__.py
-├── cli/                         — CLI 入口（main = ft-cli）
+├── cli/                         — CLI 入口（main = artifact-cli）
 │   ├── __init__.py              — build_parser() / main()
 │   ├── classify.py              — classify 子命令
 │   └── doctor.py                — doctor 子命令（委托 base.doctor.run_doctor）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
-│   ├── __init__.py              — QApplication 入口（main = ft-gui）
-│   ├── module.py                — FtModule（被 Shell 装载）
+│   ├── __init__.py              — QApplication 入口（main = artifact-gui）
+│   ├── module.py                — ArtifactModule（被 Shell 装载）
 │   ├── tabs/classify_tab.py     — ClassifyTab：拖入区 + 工作目录面板
 │   └── widgets/                 — drop_area / candidate_dialog
 ├── workflow/classify/           — 归类工作流
@@ -72,11 +72,11 @@ ft/                              — 文件工具（file toolkit）
 └── config_template.json         — 配置模板（首次使用时参照创建 config.json）
 
 app/                             — 顶层双模块启动器
-└── gui.py                       — main = app-gui（同窗口装载 mt + ft）
+└── gui.py                       — main = app-gui（同窗口装载 mt + artifact）
 ```
 
 > 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
-> `pyproject.toml` 中 `mt-cli = "mt.cli:main"` 即为两者的桥接。
+> `pyproject.toml` 中 `mt-cli = "mt.cli:main"`、`artifact-cli = "artifact.cli:main"` 即为两者的桥接。
 
 ## 依赖关系（低层 → 高层）
 
@@ -93,13 +93,13 @@ mt/workflow/*                ← mt/core · mt/infra · mt/naming · mt/presenta
         ↓
 mt/cli/__init__.py  (main → mt-cli)
 
-ft/workflow/classify/*       ← base/{console,fs,drag_loop}
+artifact/workflow/classify/*  ← base/{console,fs,drag_loop}
         ↓
-ft/cli/__init__.py  (main → ft-cli)
+artifact/cli/__init__.py  (main → artifact-cli)
 
 base/gui/{shell,worker,…}   ← base/console
 mt/gui/module.py             ← mt/workflow/* · base/gui
-ft/gui/module.py             ← ft/workflow/* · base/gui
+artifact/gui/module.py       ← artifact/workflow/* · base/gui
         ↓
-app/gui.py  (main → app-gui)  ← mt/gui · ft/gui · base/gui
+app/gui.py  (main → app-gui)  ← mt/gui · artifact/gui · base/gui
 ```

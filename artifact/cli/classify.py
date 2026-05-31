@@ -1,11 +1,11 @@
 """
-classify.py — ft-cli classify 子命令
+classify.py — artifact-cli classify 子命令
 
 模式
 ----
-1. 拖入循环 (推荐): ``ft-cli classify --drag``
-2. 单次/批量:        ``ft-cli classify <path> [<path> ...]``
-3. 指定目标:         ``ft-cli classify <path> --target /M/MK/作者/AuthorA``
+1. 拖入循环 (推荐): ``artifact-cli classify --drag``
+2. 单次/批量:        ``artifact-cli classify <path> [<path> ...]``
+3. 指定目标:         ``artifact-cli classify <path> --target /M/MK/作者/AuthorA``
                      （跳过候选交互；目标必须是已存在的目录）
 
 交互
@@ -14,7 +14,7 @@ classify.py — ft-cli classify 子命令
 - 1 候选 → 自动使用
 - N 候选 → 列出候选，输入数字选择；输入 q 跳过
 
-依赖: ft.workflow.classify.* / base.drag_loop / base.console
+依赖: artifact.workflow.classify.* / base.drag_loop / base.console
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ from pathlib import Path
 from base.console import emit, error, warn
 from base.drag_loop import run_drag_loop
 from base.fs import Reporter
-from ft.workflow.classify.alias import scan_aliases
-from ft.workflow.classify.config import Config, WorkDir, load_config
-from ft.workflow.classify.matcher import find_candidates
-from ft.workflow.classify.ops import classify_one
-from ft.workflow.classify.path import path_to_author_name
+from artifact.workflow.classify.alias import scan_aliases
+from artifact.workflow.classify.config import Config, WorkDir, load_config
+from artifact.workflow.classify.matcher import find_candidates
+from artifact.workflow.classify.ops import classify_one
+from artifact.workflow.classify.path import path_to_author_name
 
 
 # 适配 base.fs.Reporter 协议 → base.console 函数（自动走 GUI sink 路由）
@@ -135,7 +135,7 @@ def cmd_classify(args: argparse.Namespace) -> int:
         return 2
 
     if not cfg.workdirs:
-        sys.stderr.write('❌ 配置中 ft.workdirs 为空\n')
+        sys.stderr.write('❌ 配置中 artifact.workdirs 为空\n')
         return 2
 
     target_override = Path(args.target).resolve() if args.target else None

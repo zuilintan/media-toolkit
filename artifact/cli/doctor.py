@@ -1,7 +1,7 @@
 """
-doctor.py — ft-cli 环境体检子命令
+doctor.py — artifact-cli 环境体检子命令
 
-声明 ft 所需的包并委托给 base.doctor.run_doctor 执行检查与渲染。
+声明 artifact 所需的包并委托给 base.doctor.run_doctor 执行检查与渲染。
 """
 
 from __future__ import annotations
