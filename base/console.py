@@ -66,7 +66,7 @@ def emit(*args: object, sep: str = ' ', end: str = '\n', flush: bool = False) ->
 
 
 # ── 内部 logger ───────────────────────────────────────────────────────────────
-_log = logging.getLogger('mt')
+_log = logging.getLogger('manga')
 
 
 def setup_logging(debug: bool = False) -> None:

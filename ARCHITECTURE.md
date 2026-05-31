@@ -17,10 +17,10 @@ base/                            — 跨业务共享基础设施
     ├── worker.py                — BaseWorker(QThread)：通用后台任务
     └── config.py                — QSettings 辅助（窗口几何持久化）
 
-mt/                              — 漫画工具（manga toolkit）
+manga/                           — 漫画工具（manga toolkit）
 ├── __init__.py                  — 版本号（__version__）
-├── __main__.py                  — 适配 `python -m mt` 的转发层
-├── cli/                         — CLI 入口 + 子命令调度（main = mt-cli）
+├── __main__.py                  — 适配 `python -m manga` 的转发层
+├── cli/                         — CLI 入口 + 子命令调度（main = manga-cli）
 │   ├── __init__.py              — build_parser() / main()
 │   ├── name.py                  — name 子命令
 │   ├── meta.py                  — meta 子命令
@@ -29,8 +29,8 @@ mt/                              — 漫画工具（manga toolkit）
 │   ├── doctor.py                — doctor 子命令（环境体检）
 │   └── examples.py              — 内置示例（name / meta 共用）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
-│   ├── __init__.py              — QApplication 入口（main = mt-gui）
-│   ├── __main__.py              — `python -m mt.gui` / PyInstaller 入口
+│   ├── __init__.py              — QApplication 入口（main = manga-gui）
+│   ├── __main__.py              — `python -m manga.gui` / PyInstaller 入口
 │   ├── module.py                — MangaModule（被 Shell 装载）
 │   ├── tabs/                    — 四个子命令各自 Tab
 │   └── workers/                 — QThread 阻塞任务包装
@@ -72,34 +72,34 @@ artifact/                        — 文件工具（artifact toolkit）
 └── config_template.json         — 配置模板（首次使用时参照创建 config.json）
 
 app/                             — 顶层双模块启动器
-└── gui.py                       — main = app-gui（同窗口装载 mt + artifact）
+└── gui.py                       — main = app-gui（同窗口装载 manga + artifact）
 ```
 
 > 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
-> `pyproject.toml` 中 `mt-cli = "mt.cli:main"`、`artifact-cli = "artifact.cli:main"` 即为两者的桥接。
+> `pyproject.toml` 中 `manga-cli = "manga.cli:main"`、`artifact-cli = "artifact.cli:main"` 即为两者的桥接。
 
 ## 依赖关系（低层 → 高层）
 
 ```
 base/console · base/fs · base/drag_loop
         ↓
-mt/core/{config,models,patterns}
+manga/core/{config,models,patterns}
         ↓
-mt/infra/{utils,parallel}    ← base/console
+manga/infra/{utils,parallel}    ← base/console
         ↓
-mt/naming/{parser,builder}   ← mt/core · mt/infra · base/console
+manga/naming/{parser,builder}   ← manga/core · manga/infra · base/console
         ↓
-mt/workflow/*                ← mt/core · mt/infra · mt/naming · mt/presentation · base/*
+manga/workflow/*                ← manga/core · manga/infra · manga/naming · manga/presentation · base/*
         ↓
-mt/cli/__init__.py  (main → mt-cli)
+manga/cli/__init__.py  (main → manga-cli)
 
 artifact/workflow/classify/*  ← base/{console,fs,drag_loop}
         ↓
 artifact/cli/__init__.py  (main → artifact-cli)
 
 base/gui/{shell,worker,…}   ← base/console
-mt/gui/module.py             ← mt/workflow/* · base/gui
+manga/gui/module.py          ← manga/workflow/* · base/gui
 artifact/gui/module.py       ← artifact/workflow/* · base/gui
         ↓
-app/gui.py  (main → app-gui)  ← mt/gui · artifact/gui · base/gui
+app/gui.py  (main → app-gui)  ← manga/gui · artifact/gui · base/gui
 ```

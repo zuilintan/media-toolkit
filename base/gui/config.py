@@ -84,7 +84,7 @@ _default_app_dir_name: str | None = None
 def set_default_app_dir_name(name: str) -> None:
     """设置 get_config() 不带参时使用的默认 app_dir_name。
 
-    各业务的 GUI 入口（mt.gui、artifact.gui 等的 main()）应在早期
+    各业务的 GUI 入口（manga.gui、artifact.gui 等的 main()）应在早期
     调用一次，避免下游每处 get_config() 都要显式传参。
     """
     global _default_app_dir_name

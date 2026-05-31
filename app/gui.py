@@ -1,5 +1,5 @@
 """
-gui.py — 媒体工作台总入口（单窗口装载 mt + artifact 两个业务模块）
+gui.py — 媒体工作台总入口（单窗口装载 manga + artifact 两个业务模块）
 
 启动顺序
 --------
@@ -11,7 +11,7 @@ gui.py — 媒体工作台总入口（单窗口装载 mt + artifact 两个业务
 
 可通过 ``uv run app-gui`` 启动（pyproject scripts）。
 
-注：保留 mt-gui / artifact-gui 单模块入口，便于只需用单一业务时启动。
+注：保留 manga-gui / artifact-gui 单模块入口，便于只需用单一业务时启动。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
         app_name='media-toolkit',
         install_cmd='uv sync --extra gui',
         run_cmd='uv run app-gui',
-        doctor_cmd='uv run mt-cli doctor',
+        doctor_cmd='uv run manga-cli doctor',
     )
 
     from PySide6.QtWidgets import QApplication
@@ -34,8 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     from base.gui.config import set_default_app_dir_name
     from base.gui.shell import Shell
     from artifact.gui.module import FtModule
-    from mt import __version__
-    from mt.gui.module import MangaModule
+    from manga import __version__
+    from manga.gui.module import MangaModule
 
     set_default_app_dir_name('media-toolkit')
 
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(debug=False)
 
     shell = Shell(
-        title=f'media-toolkit  —  mt {__version__}',
+        title=f'media-toolkit  —  manga {__version__}',
         config_key_prefix='media',
     )
     mt_mod = MangaModule()

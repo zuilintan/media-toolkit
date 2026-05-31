@@ -8,7 +8,7 @@ FtModule (QWidget)
     ├── QTabWidget       — 当前仅 classify 一个子 Tab（tabBarAutoHide）
     └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
 
-未来扩展业务（如其他 file 操作）直接 addTab 即可，与 mt 对称。
+未来扩展业务（如其他 file 操作）直接 addTab 即可，与 manga 对称。
 """
 
 from __future__ import annotations
