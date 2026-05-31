@@ -41,6 +41,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+cache_dir = "tests/.pytest_cache"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mt", "ft", "base", "app"]
