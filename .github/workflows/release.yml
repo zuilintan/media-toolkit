@@ -58,10 +58,9 @@ jobs:
         run: |
           uv run pyinstaller --noconfirm --windowed --onefile `
             --name "media-toolkit-gui-${{ steps.tag.outputs.name }}" `
-            --add-data "manga/data/examples.json;manga/data" `
-            --add-data "artifact/config_template.json;artifact" `
-            --collect-submodules manga `
-            --collect-submodules artifact `
+            --add-data "module/manga/data/examples.json;module/manga/data" `
+            --add-data "module/artifact/config_template.json;module/artifact" `
+            --collect-submodules module `
             --collect-submodules base `
             --collect-submodules app `
             app/__main__.py

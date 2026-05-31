@@ -11,8 +11,8 @@ PySide6 = pytest.importorskip('PySide6')
 from PySide6.QtCore import QUrl                          # noqa: E402
 from PySide6.QtWidgets import QApplication               # noqa: E402
 
-from artifact.gui.widgets.candidate_dialog import CandidateDialog   # noqa: E402
-from artifact.gui.widgets.drop_area import urls_to_paths            # noqa: E402
+from module.artifact.gui.widgets.candidate_dialog import CandidateDialog   # noqa: E402
+from module.artifact.gui.widgets.drop_area import urls_to_paths            # noqa: E402
 
 
 @pytest.fixture(scope='module')

@@ -33,9 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     from base.console import setup_logging
     from base.gui.config import set_default_app_dir_name
     from base.gui.shell import Shell
-    from artifact.gui.module import FtModule
-    from manga import __version__
-    from manga.gui.module import MangaModule
+    from module.artifact.gui.module import FtModule
+    from module.manga import __version__
+    from module.manga.gui.module import MangaModule
 
     set_default_app_dir_name('media-toolkit')
 
