@@ -24,6 +24,7 @@ import sys
 def build_parser() -> argparse.ArgumentParser:
     # 延迟 import 子命令模块（保持 ft.cli 包基本 import 轻量）
     from ft.cli.classify import cmd_classify, add_classify_args
+    from ft.cli.doctor   import cmd_doctor,   add_doctor_args
 
     parser = argparse.ArgumentParser(
         prog='ft-cli',
@@ -56,6 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_classify_args(p_classify)
     p_classify.set_defaults(func=cmd_classify)
+
+    p_doctor = sub.add_parser(
+        'doctor',
+        help='环境体检（Python 版本 + 各依赖安装状态）',
+        description='打印当前环境的 Python 版本与依赖安装状态，'
+                    '便于发 issue 前自查。',
+    )
+    add_doctor_args(p_doctor)
+    p_doctor.set_defaults(func=cmd_doctor)
 
     return parser
 

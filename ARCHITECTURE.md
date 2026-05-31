@@ -5,6 +5,7 @@
 ```
 base/                            — 跨业务共享基础设施
 ├── console.py                   — 终端输出 & GUI sink 路由（emit / warn / error / set_output）
+├── doctor.py                    — 通用环境体检引擎（run_doctor，各 CLI 声明自身 checks）
 ├── drag_loop.py                 — 通用拖入循环（run_drag_loop）
 ├── fs.py                        — 文件系统工具（merge_into / move_dir / safe_rmtree）
 └── gui/                         — 共享 GUI 组件（PySide6，可选）
@@ -55,7 +56,8 @@ ft/                              — 文件工具（file toolkit）
 ├── __init__.py
 ├── cli/                         — CLI 入口（main = ft-cli）
 │   ├── __init__.py              — build_parser() / main()
-│   └── classify.py              — classify 子命令
+│   ├── classify.py              — classify 子命令
+│   └── doctor.py                — doctor 子命令（委托 base.doctor.run_doctor）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
 │   ├── __init__.py              — QApplication 入口（main = ft-gui）
 │   ├── module.py                — FtModule（被 Shell 装载）
