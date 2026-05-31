@@ -5,7 +5,7 @@ gui.py — 媒体工作台总入口（单窗口装载 manga + artifact 两个业
 --------
 1. 体检 PySide6（共用 base.gui.app_check）
 2. set_default_app_dir_name('media-toolkit')   — 双模块共用一份配置目录
-3. 构造 Shell + 依次注册 MangaModule / FtModule
+3. 构造 Shell + 依次注册 MangaModule / ArtifactModule
 4. 首次注册的 MangaModule.default_sink 被 set_output；运行时各 module
    自己的子 Tab 触发任务前再 set_output 到对应 sink，路由互不干扰
 
@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     from base.console import setup_logging
     from base.gui.config import set_default_app_dir_name
     from base.gui.shell import Shell
-    from module.artifact.gui.module import FtModule
+    from module.artifact.gui.module import ArtifactModule
     from module.manga import __version__
     from module.manga.gui.module import MangaModule
 
@@ -46,9 +46,9 @@ def main(argv: list[str] | None = None) -> int:
         title=f'media-toolkit  —  manga {__version__}',
         config_key_prefix='media',
     )
-    mt_mod = MangaModule()
-    shell.register_module('manga', mt_mod, default_sink=mt_mod.default_sink())
-    shell.register_module('files', FtModule())
+    mm = MangaModule()
+    shell.register_module('manga', mm, default_sink=mm.default_sink())
+    shell.register_module('files', ArtifactModule())
     shell.show()
     return app.exec()
 

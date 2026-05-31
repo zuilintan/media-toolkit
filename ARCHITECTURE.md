@@ -60,7 +60,7 @@ module/                          — 业务包命名空间
     │   └── doctor.py            — doctor 子命令（委托 base.doctor.run_doctor）
     ├── gui/                     — 桌面 GUI（PySide6，可选依赖）
     │   ├── __init__.py          — QApplication 入口（main = artifact-gui）
-    │   ├── module.py            — FtModule（被 Shell 装载）
+    │   ├── module.py            — ArtifactModule（被 Shell 装载）
     │   ├── tabs/classify_tab.py — ClassifyTab：拖入区 + 工作目录面板
     │   └── widgets/             — drop_area / candidate_dialog
     ├── workflow/classify/       — 归类工作流

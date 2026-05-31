@@ -13,7 +13,7 @@ QMainWindow (Shell)
 ----
     shell = Shell(title='media-toolkit', config_key_prefix='shell')
     shell.register_module('manga', MangaModule())
-    shell.register_module('files', FtModule())
+    shell.register_module('files', ArtifactModule())
     shell.show()
 
 关键约定

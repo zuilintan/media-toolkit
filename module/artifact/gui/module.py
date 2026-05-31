@@ -3,7 +3,7 @@ module.py — file-toolkit GUI 模块（被 base.gui.shell 装载）
 
 布局
 ----
-FtModule (QWidget)
+ArtifactModule (QWidget)
 └── QSplitter (Vertical)
     ├── QTabWidget       — 当前仅 classify 一个子 Tab（tabBarAutoHide）
     └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
@@ -24,7 +24,7 @@ from base.gui.log_view import LogView
 from module.artifact.gui.tabs.classify_tab import ClassifyTab
 
 
-class FtModule(QWidget):
+class ArtifactModule(QWidget):
     """file-toolkit 业务模块：装载 classify 子 Tab + 独立日志栈。"""
 
     def __init__(self, parent=None) -> None:
