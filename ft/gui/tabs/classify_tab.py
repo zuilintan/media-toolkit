@@ -11,7 +11,7 @@ ClassifyTab (QWidget)
 
 业务流
 ------
-启动:  load_config → 显示 WorkDirs → scan_aliases；失败弹错并禁用拖入
+启动:  load_config → 显示 WorkDirs；失败弹错并禁用拖入
 拖入:  paths_dropped → 逐个 _process_one → 候选 0/1/N 分支 →
        ask_candidate → classify_one
 """
@@ -110,7 +110,6 @@ class ClassifyTab(QWidget):
         self._workdirs_label.setText(
             f'📁 WorkDirs ({len(self._cfg.workdirs)}):\n{lines}'
         )
-        self._do_scan_aliases()
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
