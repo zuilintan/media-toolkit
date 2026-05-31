@@ -1,15 +1,4 @@
-"""
-view.py — 领域对象的终端渲染
-
-提供:
-  - print_run_banner()          — 命令运行 banner（rename_kit / meta_kit 共用）
-  - print_rename_kit_preview()    — 源文件重命名计划预览（按作者分组的卡片表）
-  - print_meta_kit_preview()    — ComicInfo 写入计划预览（结构对齐 rename_kit）
-  - print_meta_kit_diff_table() — ComicInfo 字段「旧/新」两列 diff 表格
-                                  （meta_kit 预览 & examples 共用）
-
-依赖: core.models / core.config / infra.console / naming.parser
-"""
+"""领域对象的终端渲染（banner / 卡片预览 / diff 表格）。"""
 
 from __future__ import annotations
 import os
@@ -36,10 +25,10 @@ def _pad(s: str, w: int) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) -> None:
-    """统一的命令运行 banner：═══ + 命令标题 + 根目录 + 模式。
+    """统一的命令运行 banner：``═══`` + 命令标题 + 根目录 + 模式。
 
-    具体「找到 N 项」一行因不同子命令的扫描成本和 DEBUG 时序而异，
-    由调用方在 banner 之后自行追加。
+    具体「找到 N 项」一行因各子命令的扫描成本和 DEBUG 时序而异，由调用方在
+    banner 之后自行追加。
     """
     emit(SEP2)
     emit(f'  manga-cli  —  {cmd} ({subtitle})')
@@ -72,13 +61,14 @@ def _print_preview_footer(total: int, parts: list[tuple[str, int]]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_rename_kit_preview(plans: list[RenameKitPlan]) -> None:
-    """以可读格式打印源文件重命名计划。
+    """逐卡片打印源文件重命名计划。
 
-    卡片骨架与 run_rename_kit_examples 对齐：
-      ``   📄 [N]{note}``   (3 空格)
-      ``     DEBUG: …``     (5 空格，与 emit_parse_debug formatter 一致)
-      ``     旧: …``        (5 空格)
-      ``     新: …``        (5 空格)
+    卡片骨架与 :func:`~module.manga.extras.examples.run_rename_kit_examples` 对齐：
+
+    - ``   📄 [N]{note}``   (3 空格)
+    - ``     DEBUG: …``     (5 空格，与 :func:`~module.manga.naming.parser.emit_parse_debug` 一致)
+    - ``     旧: …``        (5 空格)
+    - ``     新: …``        (5 空格)
     """
     changed   = [p for p in plans if p.changed]
     unchanged = [p for p in plans if not p.changed]
@@ -119,16 +109,10 @@ def print_rename_kit_preview(plans: list[RenameKitPlan]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_meta_kit_preview(plans: list[MetaKitPlan]) -> None:
-    """打印 ComicInfo 写入计划，逐卡片渲染。
+    """逐卡片打印 ComicInfo 写入计划。
 
-    卡片骨架与 print_rename_kit_preview / run_*_examples 对齐：
-      ``   📄 [N] {filename}``   (3 空格)
-      ``     DEBUG: …``          (5 空格)
-      ``     {diff_table}``      (5 空格)
-      ``     Encoding: …``       (5 空格)
-
-    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 出版商冲突
-    / 有警告）仅作计数提示。
+    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 出版商冲突 / 有警告）
+    仅作计数提示。卡片骨架与 :func:`print_rename_kit_preview` 对齐。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -179,13 +163,12 @@ def print_meta_kit_diff_table(
     *,
     indent:       str = '         ',
 ) -> None:
-    """旧/新两列表格，行标题为 ComicInfo.xml 的标签。
+    """旧 / 新两列表格，行标题为 :data:`~module.manga.core.config.COMICINFO_TAGS` 中的每个 tag。
 
-    - 列标题: 旧 / 新
-    - 行标题: COMICINFO_TAGS 中的每个 tag
-    - 新列差异字符用 RED 高亮（与 rename_kit 卡片体的 highlight_diff 对齐）
-    - 行尾「*」标记本行新旧不一致（含字段从无到有 / 从有到无）
-    - Publisher 出版商冲突时在表下追加冲突文件列表
+    - 新列差异字符用 RED 高亮（与 :func:`print_rename_kit_preview` 的
+      :func:`~base.console.highlight_diff` 对齐）
+    - 行尾 ``*`` 标记本行新旧不一致（含字段从无到有 / 从有到无）
+    - ``pub_conflict`` 非空时在表下追加冲突文件列表
     """
     tag_w = max(len(t) for t in COMICINFO_TAGS)
     old_w = max(_vis_width('旧'), *(_vis_width(old_fields.get(t, '')) for t in COMICINFO_TAGS))
@@ -219,17 +202,11 @@ def print_meta_kit_diff_table(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_cover_preview(plans: list[CoverKitPlan]) -> None:
-    """打印封面写入计划，逐卡片渲染。
+    """逐卡片打印封面写入计划。
 
     目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``
-    （cover.* 写入后会从 ZIP 中删除自身）。
-
-    卡片骨架：
-      ``   📄 [N] {filename}{ 🔁 替换}``  (3 空格)
-      ``     源:   {src_name} {W}×{H}``   (5 空格)
-      ``     目标: {dst_name} {W}×{H} [mode]``
-
-    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 跳过）仅计数提示。
+    （``cover.*`` 写入后会从 ZIP 中删除自身）。只渲染 ``writable && changed``
+    的卡片；其余（已是最新 / 跳过）仅计数提示。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -270,16 +247,15 @@ def print_cover_preview(plans: list[CoverKitPlan]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_pack_preview(plans: list[PackKitPlan]) -> None:
-    """打印打包计划，逐卡片渲染。
+    """逐卡片打印打包计划。
 
-    卡片骨架：
-      ``   📄 [N] {name}  [单层|嵌套×K]{ 🔁 覆盖现有 zip}``  (3 空格)
-      ``     图片: {n_total}（改名 {n_renamed}）``           (5 空格)
-      ``     zip:  {zip_path}``
-      ``     首末: 0001.ext … 0123.ext``                    (≥ 2 张时)
-      ``     🟡 N 项非图片不进 zip，将随源目录一并删除: …``  (有 extras 时)
+    只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。卡片骨架：
 
-    只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。
+    - ``   📄 [N] {name}  [单层|嵌套×K]{ 🔁 覆盖现有 zip}``
+    - ``     图片: {n_total}（改名 {n_renamed}）``
+    - ``     zip:  {zip_path}``
+    - ``     首末: 0001.ext … 0123.ext`` （≥ 2 张时）
+    - ``     🟡 N 项非图片不进 zip，将随源目录一并删除: …`` （有 ``extras`` 时）
     """
     writable = [p for p in plans if p.writable]
     failed   = [p for p in plans if not p.writable]

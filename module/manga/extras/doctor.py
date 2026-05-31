@@ -1,8 +1,7 @@
-"""
-doctor.py — manga-cli doctor 子命令（环境体检）
+"""manga-cli ``doctor`` 子命令（环境体检）。
 
-声明 manga 所需的包并委托给 base.doctor.run_doctor 执行检查与渲染。
-由 cli.__init__.build_parser 注册到 manga-cli 顶层 subparsers。
+声明 manga 所需的包并委托 :func:`base.doctor.run_doctor` 执行检查与渲染。
+由 :func:`module.manga.cli.build_parser` 注册到 ``manga-cli`` 顶层 subparsers。
 """
 
 from __future__ import annotations

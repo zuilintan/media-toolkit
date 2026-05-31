@@ -1,7 +1,4 @@
-"""
-presentation — 表示层（领域对象 → 终端可读视图）
+"""表示层：把 :mod:`~module.manga.core.models` 中的 ``*Plan`` 渲染为终端可读视图。
 
-将 RenameKitPlan / MetaKitPlan / CoverKitPlan / PackKitPlan 渲染为面向用户的输出，
-依赖底层 infra.console（颜色、分隔线、高亮）与 core 数据模型，
-使 infra.console 本身不再耦合领域结构。
+依赖底层 :mod:`base.console`（颜色 / 分隔线 / 高亮），使后者不耦合领域结构。
 """
