@@ -1,16 +1,17 @@
 """
 manga.cli — manga-toolkit 命令行入口与子命令实现
 
-包入口 ``main()`` 对应 pyproject scripts 的 ``manga-cli``；子命令拆分为独立
-模块（rename-kit/meta-kit/cover-kit/pack-kit/doctor），由本模块的 build_parser 组装：
+包入口 ``main()`` 对应 pyproject scripts 的 ``manga-cli``；本包仅放业务 *-kit 子命令实现，
+由本模块的 build_parser 组装：
 
     rename_kit.py — 源文件批量重命名（.zip / .cbz）
     meta_kit.py   — 向 CBZ 写入 ComicInfo.xml
     cover_kit.py  — 为 CBZ 写入 2:3 封面
     pack_kit.py   — 图片目录序号化重命名 + STORED zip 打包
-    doctor.py     — 环境体检
 
-rename-kit / meta-kit 的 ``--examples`` 选项共用 ``manga.examples`` 模块的演示运行器。
+旁路 / 辅助子命令位于 ``manga.extras``:
+    extras.doctor   — doctor 子命令（环境体检）
+    extras.examples — rename-kit / meta-kit 的 ``--examples`` 选项共用的演示运行器
 
 本模块同时提供包级共用工具:
     validate_root() — --root 参数三件套校验（非空 / 存在 / 是目录）
@@ -54,7 +55,7 @@ def validate_root(root_arg: str) -> Path | None:
 def build_parser() -> argparse.ArgumentParser:
     # 延迟 import 子命令避免循环（manga.cli.rename_kit 反向 import 本模块的 validate_root）
     from module.manga.cli.cover_kit import cmd_cover,  add_cover_kit_args
-    from module.manga.cli.doctor import cmd_doctor, add_doctor_args
+    from module.manga.extras.doctor import cmd_doctor, add_doctor_args
     from module.manga.cli.meta_kit import cmd_meta,   add_meta_kit_args
     from module.manga.cli.pack_kit import cmd_pack,   add_pack_kit_args
     from module.manga.cli.rename_kit import cmd_rename,   add_rename_kit_args

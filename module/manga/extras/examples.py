@@ -24,7 +24,7 @@ from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from module.manga.presentation.view import print_meta_kit_diff_table
 
 # 示例数据文件（随包分发）
-_DATA_PATH = Path(__file__).resolve().parent / 'data' / 'examples.json'
+_DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
 
 # meta_kit 示例用的模拟出版商文件名
 _EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'

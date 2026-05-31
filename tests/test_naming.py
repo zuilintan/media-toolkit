@@ -13,7 +13,7 @@ import pytest
 
 from module.manga.naming.parser import parse_name
 from module.manga.naming.builder import build_new_name
-from module.manga.cli.examples import load_examples
+from module.manga.extras.examples import load_examples
 
 _EXAMPLES = load_examples()
 

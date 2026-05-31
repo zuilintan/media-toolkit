@@ -21,14 +21,15 @@ module/                          — 业务包命名空间
 ├── manga/                       — 漫画工具（manga toolkit）
 │   ├── __init__.py              — 版本号（__version__）
 │   ├── __main__.py              — 适配 `python -m module.manga` 的转发层
-│   ├── cli/                     — CLI 入口 + 子命令调度（main = manga-cli）
+│   ├── cli/                     — CLI 入口 + *-kit 子命令实现（main = manga-cli）
 │   │   ├── __init__.py          — build_parser() / main()
-│   │   ├── rename_kit.py          — rename-kit 子命令
+│   │   ├── rename_kit.py        — rename-kit 子命令
 │   │   ├── meta_kit.py          — meta-kit 子命令
 │   │   ├── cover_kit.py         — cover-kit 子命令
-│   │   ├── pack_kit.py          — pack-kit 子命令
+│   │   └── pack_kit.py          — pack-kit 子命令
+│   ├── extras/                  — 旁路 / 辅助模块（非 *-kit 业务）
 │   │   ├── doctor.py            — doctor 子命令（环境体检）
-│   │   └── examples.py          — 内置示例（rename-kit / meta-kit 共用）
+│   │   └── examples.py          — 内置示例演示运行器（rename-kit / meta-kit --examples 共用）
 │   ├── gui/                     — 桌面 GUI（PySide6，可选依赖）
 │   │   ├── __init__.py          — QApplication 入口（main = manga-gui）
 │   │   ├── __main__.py          — `python -m module.manga.gui` / PyInstaller 入口

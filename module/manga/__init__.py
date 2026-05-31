@@ -6,9 +6,9 @@ manga-toolkit — 漫画文件整理工具集
     infra/     — 基础设施层（utils / console）
     naming/    — 名称解析与构建（parser / builder）
     workflow/  — 高层工作流（rename_kit / meta_kit / cover_kit / pack_kit）
-    cli/       — 命令行子命令（rename-kit / meta-kit / cover-kit / pack-kit / doctor）
+    cli/       — 命令行子命令入口与 *-kit 业务实现（rename-kit / meta-kit / cover-kit / pack-kit）
+    extras/    — 旁路 / 辅助模块（doctor 子命令 + examples 演示运行器）
     data/      — 随包数据（examples.json）
-    examples.py — 内置示例演示运行器（rename-kit / meta-kit 的 --examples 共用）
 
 CLI 入口:
     cli/__init__.py             — main() 与 build_parser() 主入口
