@@ -1,14 +1,10 @@
 """
-examples.py — 内置示例数据加载与演示运行器
+内置示例（``data/examples.json``）的加载与演示运行。
 
-示例数据集中存放于 ``module/manga/data/examples.json``，每条为
-``{"author", "i", "e"}``（i=input, e=expected），由 rename-kit 与 meta-kit
-两个子命令的 ``--examples`` 选项共用:
+被 rename-kit / meta-kit 的 ``--examples`` 选项共用：
 
-  - rename-kit 使用 (author, i, e)，验证「输入 → 规范化输出」转换；
-  - meta-kit  使用 (author, e)，将规范化文件名解析为 ComicInfo 字段并展示。
-
-依赖: naming.parser / naming.builder / workflow.meta_kit / infra.console / presentation
+- :func:`run_rename_kit_examples` 验证 ``(input, expected)`` 解析往返；
+- :func:`run_meta_kit_examples` 把 ``expected`` 解析为 ComicInfo 字段并展示。
 """
 
 from __future__ import annotations
@@ -23,25 +19,24 @@ from module.manga.workflow.meta_kit import collect_fields, _extract_publisher_na
 from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from module.manga.presentation.view import print_meta_kit_diff_table
 
-# 示例数据文件（随包分发）
 _DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
 
-# meta_kit 示例用的模拟出版商文件名
+# :func:`run_meta_kit_examples` 用来模拟出版商提取的样本文件名
 _EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
 
 
 def load_examples() -> list[tuple[str, str, str]]:
-    """加载示例数据，返回 (author, input, expected) 三元组列表。"""
+    """返回 ``(author, input, expected)`` 三元组列表。"""
     raw = json.loads(_DATA_PATH.read_text(encoding='utf-8'))
     author = raw['author']
     return [(author, e['i'], e['e']) for e in raw['cases']]
 
 
 def run_rename_kit_examples() -> int:
-    """运行内建示例测试，逐条验证「输入 → 规范化输出」解析结果。
+    """逐条验证 :func:`~module.manga.naming.parser.parse_name` +
+    :func:`~module.manga.naming.builder.build_new_name` 的往返结果。
 
-    Returns:
-        失败条数（0 表示全部通过），供调用方据此设定退出码。
+    :return: 失败条数（0 表示全部通过），供调用方据此设定退出码。
     """
     emit(f'\n{SEP2}')
     emit('🧪 解析示例')
@@ -74,12 +69,11 @@ def run_rename_kit_examples() -> int:
 
 
 def run_meta_kit_examples() -> int:
-    """将规范化文件名（示例的 expected）解析为 ComicInfo 字段并展示。
+    """把规范化文件名（``expected``）解析为 ComicInfo 字段并展示。
 
-    Publisher 由常量模拟，PageCount 留空。
+    Publisher 取自 :data:`_EXAMPLES_PUBLISHER_FILE` 的模拟提取结果，PageCount 留空。
 
-    Returns:
-        失败条数（0 表示全部通过），供调用方据此设定退出码。
+    :return: 失败条数（0 表示全部通过），供调用方据此设定退出码。
     """
     examples = load_examples()
     sim_pub  = _extract_publisher_name(_EXAMPLES_PUBLISHER_FILE)
@@ -101,7 +95,7 @@ def run_meta_kit_examples() -> int:
         mi = parse_name(author, expected)
         emit_parse_debug(mi)
         fields = collect_fields(mi, sim_pub)
-        # 旧列恒空（examples 模拟"首次写入"语义），新列即 build 结果
+        # 旧列恒空：示例模拟"首次写入"语义
         print_meta_kit_diff_table(empty_old, fields, indent='     ')
         for w in mi.warnings:
             emit(f'     🟡 {w}')

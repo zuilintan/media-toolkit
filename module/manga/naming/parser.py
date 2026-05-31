@@ -1,10 +1,4 @@
-"""
-parser.py — 文件名解析
-
-核心入口: parse_name(author, name) → MangaInfo
-
-依赖: models / patterns / naming.text / console
-"""
+"""文件名解析（入口 :func:`parse_name` → :class:`~module.manga.core.models.MangaInfo`）。"""
 
 from __future__ import annotations
 import re
@@ -33,7 +27,7 @@ def _match_first(
     text: str,
     whitelist_check: bool = False,
 ) -> _T | None:
-    """遍历规则表，返回第一个匹配结果，支持白名单过滤。"""
+    """遍历规则表返回首个匹配结果，可选白名单过滤。"""
     for pat, extractor in pattern_list:
         m = pat.search(text)
         if not m:
@@ -58,7 +52,10 @@ def _is_whitelisted(text: str, m: re.Match) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _preclean(text: str) -> str:
-    """移除出版括号、方括号标签并遮盖话标题块，供检测函数使用。"""
+    """移除出版括号、方括号标签并遮盖话标题块，供检测函数使用。
+
+    :func:`detect_chapter` / :func:`detect_volume` 共用。
+    """
     text = P.PUBLICATION_PAREN_RE.sub('', text)
     text = P.BRACKET_TAG_RE.sub('', text)
     return P.SUB_PROTECT_RE.sub('', text)
@@ -77,7 +74,7 @@ def detect_volume(text: str) -> Volume | None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _protect_part_plus(text: str) -> str:
-    """将分编词汇间的 + 替换为占位符，防止被当作噪音去除。"""
+    """分编词汇间的 ``+`` 替换为占位符，防止被当作噪音去除。"""
     prev = None
     while prev != text:
         prev  = text
@@ -98,9 +95,9 @@ def _chapter_replace_cb(m: re.Match, cached: str) -> str:
 
 
 def strip_tags(text: str) -> str:
-    """去除噪音标签、卷/话数表达式及多余符号，保留干净标题。
+    """去除噪音标签、卷 / 话数表达式及多余符号，保留干净标题。
 
-    话标题 ～xxx～ 在此过程中保留，最终由 extract_subtitle() 提取。
+    话标题 ``～xxx～`` 在此过程中保留，最终由 :func:`extract_subtitle` 提取。
     """
     # 1. 去除杂志来源括号
     text = P.PUBLICATION_PAREN_RE.sub('', text)
@@ -149,16 +146,17 @@ def strip_tags(text: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def extract_subtitle(title: str) -> tuple[str, str]:
-    """从标题中分离话标题，返回 (主标题, 话标题)。
+    """从标题中分离话标题，返回 ``(主标题, 话标题)``。
 
-    话标题不含外围定界符。合集词（如总集篇）直接归入 part_tag，不视为话标题。
+    话标题不含外围定界符。合集词（如 ``总集篇``）直接归入 ``part_tag``，
+    不视为话标题。
 
     优先级:
-      1. ～xxx～ / ―xxx― / —xxx—
-      2. 「xxx」（可带后缀词）
-      3. 【前編/後編…】
+      1. ``～xxx～`` / ``―xxx―`` / ``—xxx—``
+      2. ``「xxx」``（可带后缀词）
+      3. ``【前編/後編…】``
       4. 末尾分编词汇循环剥离
-      5. 兜底：末尾含「編/篇」的词汇
+      5. 兜底：末尾含 ``編/篇`` 的词汇
     """
     # 1. 波浪线（其它定界符已由 normalize_subtitle_delimiters 预规范化）
     m = P.SUBTITLE_RE.search(title)
@@ -241,11 +239,11 @@ def _extract_series(bare: str) -> tuple[str, str]:
 
 
 def _extract_translation(bare: str) -> tuple[str, str]:
-    """提取 ¦译名¦。译名内只做多空格合并，不做其它形态规范化。
+    """提取 ``¦译名¦``，仅做多空格合并。
 
     译名常不严格遵循原名格式（可能只翻译一部分，或自带「主标题 ～话标题～」
-    结构），因此不再把空格转为 ・，也不再识别尾部分编词。
-    单侧 ¦ 形态已由 normalize_translation_delim() 在管道阶段补全。
+    结构），因此不把空格转 ``・``，也不识别尾部分编词。单侧 ``¦`` 形态已由
+    :func:`~module.manga.core.patterns.normalize_translation_delim` 在管道阶段补全。
     """
     m = P.TRANS_INLINE_RE.search(bare)
     translation = m.group(1).strip() if m else ''
@@ -257,7 +255,7 @@ def _extract_translation(bare: str) -> tuple[str, str]:
 
 
 def _normalize_chapter_title(s: str) -> str:
-    """将话标题中的 本1/本2 转为带圈数字 本①/本②；CJK 间的 ASCII 连字符规范化为 ・。"""
+    """话标题中 ``本1/本2`` → ``本①/本②``；CJK 间的 ASCII ``-`` 规范化为 ``・``。"""
     s = re.sub(r'本(\d{1,2})', lambda m: '本' + to_circle(int(m.group(1))), s)
     s = re.sub(r'(?<=[^\x00-\x7f])-(?=[^\x00-\x7f])', '・', s)
     return s
@@ -268,10 +266,10 @@ def _normalize_chapter_title(s: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _extract_special_flags(stem: str) -> tuple[str, str, str, bool, bool]:
-    """提取并剥离独立 tag，返回 (stem, language, pre_part_tag, is_colorized, is_ongoing)。
+    """提取并剥离独立 tag，返回 ``(stem, language, pre_part_tag, is_colorized, is_ongoing)``。
 
-    pre_part_tag：显式 [总集篇] tag 命中则为 '总集篇'，否则空串；
-                  作为 _resolve_part_tag 的最高优先来源（裸词位置启发式保留向后兼容）。
+    ``pre_part_tag``：显式 ``[总集篇]`` tag 命中则为 ``'总集篇'``，否则空串；
+    作为 :func:`_resolve_part_tag` 的最高优先来源。
     """
     stem, is_zxx       = extract_flag(stem, P.TEXTLESS_TAG_RE)
     language           = 'zxx' if is_zxx else ''
@@ -285,8 +283,9 @@ def _extract_special_flags(stem: str) -> tuple[str, str, str, bool, bool]:
 def _detect_language_uncensored(bare: str, language: str) -> tuple[str, bool]:
     """检测语言与无修正标志。
 
-    promote_tags 已把所有变体收敛到 [zh]/[ja]/.../[uncensored]，
-    故只需在 bare 中扫一次标准形态即可（原始 name 无需重复扫描）。
+    :func:`~module.manga.core.patterns.promote_tags` 已把所有变体收敛到
+    ``[zh]`` / ``[ja]`` / ... / ``[uncensored]``，故只需在 ``bare`` 中扫一次
+    标准形态即可。
     """
     if language != 'zxx':
         for lang, pat in P.LANG_TAGS.items():
@@ -297,9 +296,9 @@ def _detect_language_uncensored(bare: str, language: str) -> tuple[str, bool]:
 
 
 def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bool]:
-    """检测卷/话数，返回 (volume, chapter, is_bonus)。
+    """检测卷 / 话数，返回 ``(volume, chapter, is_bonus)``。
 
-    is_bonus=True 表示话数是纯番外标记（CH.00），应提升为 part_tag 字段。
+    ``is_bonus=True`` 表示话数是纯番外标记（``CH.00``），应提升为 ``part_tag``。
     """
     bare_pub  = P.PUBLICATION_PAREN_RE.sub('', bare)
     volume    = detect_volume(bare_pub)
@@ -325,9 +324,9 @@ def _detect_volume_chapter(bare: str) -> tuple[Volume | None, Chapter | None, bo
 def _resolve_part_tag(
     main_title: str, ch_title: str, is_bonus: bool, pre_part_tag: str = ''
 ) -> tuple[str, str, str]:
-    """从标题部件和番外标志推导 part_tag 字段，返回 (main_title, ch_title, part_tag)。
+    """从标题部件和番外标志推导 ``part_tag``，返回 ``(main_title, ch_title, part_tag)``。
 
-    优先级: pre_part_tag（显式 [总集篇] tag）> is_bonus > 末尾裸词启发式。
+    优先级: ``pre_part_tag``（显式 ``[总集篇]`` tag）> ``is_bonus`` > 末尾裸词启发式。
     """
     part_tag = pre_part_tag
 
@@ -383,14 +382,10 @@ _BONUS_TITLE_PAT = re.compile(
 
 
 def parse_name(author: str, name: str) -> MangaInfo:
-    """将文件夹或文件名解析为结构化的 MangaInfo。
+    """文件夹或文件名 → :class:`~module.manga.core.models.MangaInfo`。
 
-    Args:
-        author: 作者目录名（或文件名中的作者标识）。
-        name:   待解析的原始名称（不含后缀）。
-
-    Returns:
-        填充完毕的 MangaInfo。
+    :param author: 作者目录名（或文件名中的作者标识）。
+    :param name:   待解析的原始名称（不含后缀）。
     """
     # 0. 预处理管道（详见 patterns.py §5）
     stem = norm_punct(name)
@@ -460,14 +455,12 @@ def parse_name(author: str, name: str) -> MangaInfo:
 
 
 def emit_parse_debug(mi: MangaInfo) -> None:
-    """Emit ``parse_name`` 的 DEBUG 摘要行（DEBUG 级别下生效）。
+    """:func:`parse_name` 的 DEBUG 摘要行（DEBUG 级别下生效）。
 
-    parse_name 本身只做解析、不输出 DEBUG，由调用方在最合适的时机触发：
-      - print_rename_kit_preview / print_meta_kit_preview：渲染卡片时；
-      - examples：每条示例渲染时。
-
-    funcname 锁定为 ``parse_name``，与原先 parse_name 内部 debug() 的输出一致。
-    覆盖 MangaInfo 全部可观测字段，DEBUG 行即可替代旧 'Flag:' 摘要。
+    :func:`parse_name` 本身不输出 DEBUG，由调用方在最合适的时机触发
+    （:func:`~module.manga.presentation.view.print_rename_kit_preview` /
+    :func:`~module.manga.presentation.view.print_meta_kit_preview` 渲染卡片时、
+    :mod:`~module.manga.extras.examples` 渲染每条示例时）。
     """
     flags = '/'.join(
         f for f, on in [

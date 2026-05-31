@@ -1,8 +1,4 @@
-"""
-models.py — 核心数据模型
-
-依赖: 无（纯数据，不导入项目内其他模块）
-"""
+"""核心数据模型（纯数据，不导入项目内其他模块）。"""
 
 from __future__ import annotations
 import os
@@ -10,12 +6,11 @@ import re
 from dataclasses import dataclass
 
 
-# ── 内部工具 ────────────────────────────────────────────────────────────────
 _XML_ENCODING_RE = re.compile(rb'<\?xml[^?]*?encoding=[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
 
 
 def _detect_xml_encoding(xml_bytes: bytes | None) -> str:
-    """从 ``<?xml … encoding="…"?>`` 提取编码名；无声明按 XML 规范默认 'utf-8'。"""
+    """从 ``<?xml … encoding="…"?>`` 提取编码名；无声明按 XML 规范默认 ``utf-8``。"""
     if not xml_bytes:
         return ''
     m = _XML_ENCODING_RE.search(xml_bytes[:200])
@@ -27,12 +22,7 @@ def _detect_xml_encoding(xml_bytes: bytes | None) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fmt_num(v: float) -> str:
-    """将数字格式化为两位整数或含小数的字符串。
-
-    Examples:
-        1   → "01"
-        4.5 → "04.5"
-    """
+    """两位整数格式（``1 → "01"``, ``4.5 → "04.5"``）。"""
     i = int(v)
     if v == i:
         return f"{i:02d}"
@@ -45,19 +35,13 @@ def fmt_num(v: float) -> str:
 
 @dataclass
 class Chapter:
-    """表示话数：单话、连续范围，或附带额外附录词的章节组合（CH. 前缀）。
+    """话数：单话、连续范围或附带 ``bonus`` 附录词（``CH.`` 前缀）。
 
-    Attributes:
-        start: 起始话数，如 1、2.5。
-        end:   终止话数（范围模式），None 表示单话。
-        bonus: 附加在末尾的附录词，空字符串表示无附录。
-               常见值：'番外篇'、'后日谈'，以及未来可能出现的其他词汇。
+    示例: ``Chapter(4.5)`` → ``CH.04.5``、``Chapter(1, 5, bonus='番外篇')`` → ``CH.01-05+番外篇``。
 
-    格式化示例:
-        Chapter(4.5)                    → "CH.04.5"
-        Chapter(1, 5)                   → "CH.01-05"
-        Chapter(1, 5, bonus='番外篇')   → "CH.01-05+番外篇"
-        Chapter(1, 5, bonus='后日谈')   → "CH.01-05+后日谈"
+    :ivar start: 起始话数。
+    :ivar end:   终止话数（范围模式），``None`` 表示单话。
+    :ivar bonus: 附录词（``番外篇`` / ``后日谈`` 等），空串表示无附录。
     """
     start: float
     end:   float | None = None
@@ -72,12 +56,7 @@ class Chapter:
         return s
 
     def number_str(self) -> str:
-        """仅数字部分，不含 'CH.' 前缀，供 ComicInfo <Number> 使用。
-
-        Examples:
-            Chapter(1, 5)                  → "01-05"
-            Chapter(1, 5, bonus='番外篇')  → "01-05+番外篇"
-        """
+        """仅数字部分，不含 ``CH.`` 前缀，供 ComicInfo ``<Number>`` 使用。"""
         s = fmt_num(self.start)
         if self.end is not None:
             s += f"-{fmt_num(self.end)}"
@@ -92,11 +71,7 @@ class Chapter:
 
 @dataclass
 class Volume:
-    """表示卷数：仅单卷（VOL. 前缀）。
-
-    格式化示例:
-        Volume(2) → "VOL.02"
-    """
+    """卷数（``VOL.`` 前缀），如 ``Volume(2)`` → ``VOL.02``。"""
     start: float
 
     def __str__(self) -> str:
@@ -109,25 +84,14 @@ class Volume:
 
 @dataclass
 class MangaInfo:
-    """解析后的漫画元数据。
+    """解析后的漫画元数据，由 :func:`~module.manga.naming.parser.parse_name` 产出。
 
-    Attributes:
-        author:        作者名。
-        main_title:    主标题。
-        volume:        卷数对象（None 表示无卷信息）。
-        chapter:       话数对象（None 表示无话数信息）。
-        chapter_title: 话标题文本（不含 ～ 定界符）。
-        series:        系列名。
-        translation:   译名（不含 ¦ 定界符）。
-        language:      语言代码：'zh'、'ja'、'ko'、'en'、'zxx' 或 ''。
-        is_uncensored: 是否无修正。
-        is_colorized:  是否彩色化。
-        is_ongoing:    是否连载中。
-        part_tag:      分编标记（非数字章节分类词）。三类：
-                         附录类（与 CH. 同级且互斥）：番外篇 / 后日谈
-                         结构类（与 CH. 同级且互斥）：上篇 / 中篇 / 下篇
-                         合集类（作为 [总集篇] tag 输出）：总集篇
-        original:      解析前的原始输入字符串。
+    :ivar part_tag: 分编标记（非数字章节分类词），三类：
+
+        - 附录类：``番外篇`` / ``后日谈``（与 ``CH.`` 同级且互斥）
+        - 结构类：``上篇`` / ``中篇`` / ``下篇``（与 ``CH.`` 同级且互斥）
+        - 合集类：``总集篇``（作为 ``[总集篇]`` tag 输出）
+    :ivar language: 语言代码（``zh`` / ``ja`` / ``ko`` / ``en`` / ``zxx`` / ``''``）。
     """
     author:        str
     main_title:    str
@@ -145,7 +109,7 @@ class MangaInfo:
 
     @property
     def warnings(self) -> list[str]:
-        """解析后发现的非阻断性问题，用于在预览/处理流程中提示用户。"""
+        """解析后发现的非阻断性问题，用于在预览 / 处理流程中提示用户。"""
         warns: list[str] = []
         if not self.language:
             warns.append('缺少语言标签')
@@ -153,20 +117,12 @@ class MangaInfo:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RenameKitPlan（rename-kit 子命令：源文件重命名计划）
+# RenameKitPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class RenameKitPlan:
-    """单个源文件的重命名计划（rename-kit 子命令仅处理 .zip / .cbz 文件）。
-
-    Attributes:
-        author_dir: 作者目录路径（字符串，便于 JSON 序列化）。
-        author:     作者名。
-        old_name:   原始文件名（含后缀）。
-        new_name:   目标文件名（含后缀）。
-        info:       解析后的 MangaInfo（解析失败时为 None）。
-    """
+    """rename-kit 单个源文件（``.zip`` / ``.cbz``）的重命名计划。"""
     author_dir: str
     author:     str
     old_name:   str
@@ -175,7 +131,6 @@ class RenameKitPlan:
 
     @property
     def changed(self) -> bool:
-        """名称是否发生变化。"""
         return self.old_name != self.new_name
 
     @property
@@ -185,17 +140,15 @@ class RenameKitPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MetaKitPlan（meta-kit 子命令：单个 CBZ 的 ComicInfo 写入计划）
+# MetaKitPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class MetaKitPlan:
-    """单个 CBZ 的 ComicInfo.xml 写入计划（解析阶段产出，写入阶段消费）。
+    """meta-kit 单个 CBZ 的 ``ComicInfo.xml`` 写入计划。
 
-    与 RenameKitPlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
-
-    plan 阶段即构建 new_xml（确定性），写入阶段直接复用，并据 ``changed``
-    实现幂等：已有 ComicInfo.xml 完全一致则跳过。
+    plan 阶段即构建 ``new_xml``（确定性），apply 阶段直接复用并据 :attr:`changed`
+    实现幂等：已有 ``ComicInfo.xml`` 与目标完全一致则跳过。
     """
     cbz_path:        str
     mi:              MangaInfo
@@ -203,10 +156,10 @@ class MetaKitPlan:
     pub_conflict:    list[str] | None
     page_count:      int
     tags_val:        str
-    fields:          dict[str, str]  # 本次构建的字段（新值）
-    existing_fields: dict[str, str]  # 现有 ComicInfo.xml 解析出的字段（旧值）
-    existing_xml:    bytes | None    # 现有 ComicInfo.xml 原始字节（无则 None）
-    new_xml:         bytes           # 本次构建的目标字节
+    fields:          dict[str, str]  #: 本次构建的字段（新值）
+    existing_fields: dict[str, str]  #: 现有 ``ComicInfo.xml`` 解析出的字段（旧值）
+    existing_xml:    bytes | None    #: 现有 ``ComicInfo.xml`` 原始字节（无则 ``None``）
+    new_xml:         bytes           #: 本次构建的目标字节
 
     @property
     def writable(self) -> bool:
@@ -215,17 +168,17 @@ class MetaKitPlan:
 
     @property
     def changed(self) -> bool:
-        """是否需要实际写入：无现有版本，或现有版本与目标不一致。"""
+        """无现有版本或与目标不一致时为 True。"""
         return self.existing_xml is None or self.existing_xml != self.new_xml
 
     @property
     def existing_encoding(self) -> str:
-        """现有 ComicInfo.xml 的声明编码；无现有版本返回 ''。"""
+        """现有 XML 的声明编码；无现有版本返回 ``''``。"""
         return _detect_xml_encoding(self.existing_xml)
 
     @property
     def new_encoding(self) -> str:
-        """目标 ComicInfo.xml 的声明编码（恒为 'utf-8'）。"""
+        """目标 XML 的声明编码（恒为 ``utf-8``）。"""
         return _detect_xml_encoding(self.new_xml)
 
     @property
@@ -238,28 +191,20 @@ class MetaKitPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CoverKitPlan（cover-kit 子命令：CBZ 封面生成/替换计划）
+# CoverKitPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class CoverKitPlan:
-    """单个 CBZ 的封面写入计划（plan 阶段产出，apply 阶段消费）。
+    """cover-kit 单个 CBZ 的封面写入计划。
 
-    plan 阶段会真正解码源图、裁剪、转为 WebP 字节，apply 阶段只追加写入；
-    这样确保预览展示的尺寸与最终写入完全一致。``existing_bytes`` 用于
-    幂等判定：与目标完全一致则跳过写入。
+    plan 阶段就真正解码源图、裁剪、转为 WebP 字节，apply 阶段只追加写入；
+    这样确保预览展示的尺寸与最终写入完全一致。:attr:`existing_bytes` 用于
+    幂等判定：与目标完全一致则跳过。
 
-    Attributes:
-        cbz_path:       目标 CBZ 路径。
-        src_name:       源图像在 ZIP 根目录中的文件名（无可用源图时为 None）。
-        src_size:       源图像 (W, H)；无源图时 None。
-        dst_size:       输出 (W, H)；无源图或失败时 None。
-        mode:           'center' | 'smart'，本次使用的裁剪算法。
-        dst_name:       目标文件名（依源图推导：源 cover.* 或 0001.* →
-                        0000.webp）；无源图时 None。
-        webp_bytes:     待写入的 WebP 二进制；无源图或失败时 None。
-        existing_bytes: CBZ 内已有同名目标文件的原始字节；不存在时 None。
-        error:          plan 阶段发生的错误（如源图损坏 / 解码失败）；正常时 ''。
+    :ivar mode:    本次使用的裁剪算法（``'center'`` / ``'smart'``）。
+    :ivar dst_name: 目标文件名（依源图推导：源 ``cover.*`` / ``0001.*`` → ``0000.webp``）。
+    :ivar error:   plan 阶段发生的错误（如源图损坏 / 解码失败）；正常时为 ``''``。
     """
     cbz_path:       str
     src_name:       str | None
@@ -277,7 +222,7 @@ class CoverKitPlan:
 
     @property
     def writable(self) -> bool:
-        """是否可写入：有源图、有输出字节、无错误。"""
+        """有源图、有输出字节、无错误时为 True。"""
         return self.src_name is not None and self.webp_bytes is not None and not self.error
 
     @property
@@ -287,35 +232,31 @@ class CoverKitPlan:
 
     @property
     def changed(self) -> bool:
-        """是否需要实际写入：无现有版本，或现有字节与目标不一致。"""
+        """无现有版本或与目标字节不一致时为 True。"""
         return self.existing_bytes is None or self.existing_bytes != self.webp_bytes
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PackKitPlan（pack-kit 子命令：图片目录 → 序号化重命名 + STORED zip 打包）
+# PackKitPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class PackKitPlan:
-    """单个「打包单位」的序号化重命名 + 打包计划。
+    """pack-kit 单个「打包单位」的序号化重命名 + 打包计划。
 
-    打包单位由 workflow.pack._find_units 递归识别，分两种:
-      - ``'flat'``：直接含图片、无子目录（zip 内平铺）
-      - ``'nested'``：仅含子目录且每个子目录都是 flat（zip 内保留子目录路径）
+    打包单位由 :func:`~module.manga.workflow.pack_kit._find_units` 递归识别，分两种：
+
+    - ``'flat'``：直接含图片、无子目录（zip 内平铺）
+    - ``'nested'``：仅含子目录且每个子目录都是 flat（zip 内保留子目录路径）
 
     plan 阶段只扫描 / 算目标名 / 收集非图片，不动盘；apply 阶段以
-    ``zipfile.ZIP_STORED`` 写入同级 ``<dir>.zip``，写完整树 ``rmtree``。
+    ``zipfile.ZIP_STORED`` 写入同级 ``<dir>.zip``，写完后整树 ``rmtree``。
 
-    Attributes:
-        src_dir:    打包单位的根目录路径。
-        zip_path:   目标 zip 路径（``<src_dir.parent>/<src_dir.name>.zip``）。
-        renames:    ``(old_rel, new_rel)`` 列表；flat 模式只有文件名；
-                    nested 模式带子目录前缀（如 ``Ch01/0001.jpg``，用 /）。
-        extras:     非图片文件（相对 src_dir 的路径字符串，用 /）；
-                    不进 zip，但会随源目录被 rmtree 一并删除。
-        zip_exists: 目标 zip 已存在（apply 时会覆盖）。
-        kind:       ``'flat'`` / ``'nested'``；驱动预览展示与统计分组。
-        error:      plan 阶段发现的阻断性问题；非空则该计划不会被执行。
+    :ivar renames: ``(old_rel, new_rel)`` 列表；nested 模式带子目录前缀（如
+        ``Ch01/0001.jpg``，分隔符统一用 ``/``）。
+    :ivar extras:  非图片文件（相对 src_dir 的路径，用 ``/``）；不进 zip，
+        但会随源目录被 ``rmtree`` 一并删除。
+    :ivar error:   plan 阶段发现的阻断性问题；非空则该计划不会被执行。
     """
     src_dir:    str
     zip_path:   str
@@ -331,7 +272,7 @@ class PackKitPlan:
 
     @property
     def writable(self) -> bool:
-        """是否可执行：无错误且至少有一张图片。"""
+        """无错误且至少有一张图片时为 True。"""
         return not self.error and bool(self.renames)
 
     @property
@@ -343,8 +284,8 @@ class PackKitPlan:
     def n_subdirs(self) -> int:
         """nested 模式下涉及的子目录数；flat 模式恒为 0。
 
-        只统计含 ``/`` 的条目（真正的子目录条目）；nested 顶层文件
-        （cover.*/ComicInfo.xml 等）的 old 是裸文件名，不在此处计入。
+        只统计含 ``/`` 的条目；nested 顶层文件（``cover.*`` / ``ComicInfo.xml`` 等）
+        的 ``old`` 是裸文件名，不计入。
         """
         if self.kind != 'nested':
             return 0

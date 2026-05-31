@@ -1,25 +1,17 @@
-"""
-parallel.py — 通用 plan 调度：进度反馈 + 可选 ProcessPoolExecutor
+"""通用 plan 调度：进度反馈 + 可选 ``ProcessPoolExecutor``。
 
-四个子命令（rename-kit / meta-kit / cover-kit / pack-kit）的 plan 阶段都符合
-「列出 items → 对每项调用 worker → 收集结果」骨架。本模块抽公共
-执行器，让各子命令只关心 items / worker / 进度行格式。
+四个 *-kit 的 plan 阶段都符合「列出 items → 对每项 ``worker(item)`` → 收集结果」
+骨架，统一抽到 :func:`run_plans`。
 
 设计要点
 --------
-- 串行模式（``jobs=1``，默认）：保证顺序、零启动成本、debug 友好；
-- 并行模式（``jobs>1`` 或 ``jobs=0`` 自动）：使用 ``ProcessPoolExecutor``，
-  ``as_completed`` 顺序非确定，通过 **索引回填** 让最终结果按 items 原顺序，
-  避免调用方再做一次排序；
-- 启用阈值（``parallel_threshold``）：items 少于阈值时即使指定 ``jobs>1``
-  也走串行 —— Windows ``spawn`` 启动成本 ≈ 0.3s/进程，少量任务上并行反而更慢；
-- worker 必须 picklable（顶层 / 模块级函数）；worker 内部应捕获异常并以
-  「错误 plan」形式返回，避免子进程未捕获异常通过 ``fut.result()`` 透传到
-  主进程；
-- ``progress_line(idx, total, result) -> str``：每完成一个调用一次。
-  ``None`` 表示不打进度。
-
-依赖: 仅标准库 + infra.console
+- 串行（``jobs=1``，默认）保序、零启动成本、debug 友好；
+- 并行（``jobs>1`` / ``jobs=0`` 自动）用 ``ProcessPoolExecutor``，``as_completed``
+  顺序非确定，通过**索引回填**保证最终结果按 ``items`` 原序；
+- :data:`DEFAULT_PARALLEL_THRESHOLD` 阈值：少量任务下 Windows ``spawn`` 启动成本
+  （≈ 0.3s/进程）大于并行收益，强制走串行；
+- ``worker`` 必须 picklable（顶层 / 模块级函数）；内部应捕获异常以
+  「错误 plan」形式返回，避免未捕获异常透传到主进程。
 """
 
 from __future__ import annotations
@@ -35,7 +27,7 @@ T = TypeVar('T')   # 输入项
 R = TypeVar('R')   # plan 结果
 
 
-# ── 默认值（与 cover-kit 子命令初版语义对齐）─────────────────────────────────────
+# 默认值与 cover-kit 初版语义对齐
 DEFAULT_JOBS_CAP:           int = 4
 DEFAULT_PARALLEL_THRESHOLD: int = 4
 
@@ -43,8 +35,8 @@ DEFAULT_PARALLEL_THRESHOLD: int = 4
 def resolve_jobs(jobs: int, *, cap: int = DEFAULT_JOBS_CAP) -> int:
     """``jobs=0`` → 自动 ``min(cpu, cap)``；其余按用户指定，至少 1。
 
-    上限 ``cap`` 默认 4 是经验值：CPU 密集场景下 4 进程能拿到大部分加速，
-    再多增益递减；同时 IPC（大对象序列化）开始与启动成本抵消收益。
+    ``cap`` 默认 4 是经验值：CPU 密集场景下 4 进程能拿到大部分加速，再多增益递减；
+    同时 IPC 序列化开始与启动成本抵消收益。
     """
     if jobs == 0:
         return max(1, min(os.cpu_count() or 1, cap))
@@ -64,22 +56,18 @@ def run_plans(
 ) -> list[R]:
     """通用 plan 调度。
 
-    Args:
-        items:              待处理项；空列表直接返回 []。
-        worker:             ``f(item) -> result``，必须 picklable
-                            （顶层函数 / 模块级函数）。
-        jobs:               1 串行；>1 并行进程数；0 自动 ``min(cpu, cap)``。
-        parallel_threshold: items 数 ≥ 此值才启用并行；否则强制串行
-                            （避免 spawn 启动成本 > 收益）。
-        progress_line:      ``f(idx_done, total, result) -> str``；
-                            ``None`` 表示不打进度。
-        parallel_banner:    并行启动时打印的提示前缀。
-        on_progress:        每完成一项即回调 ``f(done, total)``；始终在主进程调用。
-        cancel_token:       设为已 set 时提前退出，返回当前已处理的结果。
-
-    Returns:
-        与 ``items`` 等长、顺序一致的 ``[R]``（即使并行也按原序）；
-        取消时未处理项位置上为 None。
+    :param items:              待处理项；空列表直接返回 ``[]``。
+    :param worker:             ``f(item) -> result``，必须 picklable（顶层 / 模块级函数）。
+    :param jobs:               1 串行；>1 并行进程数；0 自动 ``min(cpu, cap)``。
+    :param parallel_threshold: items 数 ≥ 此值才启用并行；否则强制串行
+        （避免 spawn 启动成本 > 收益）。
+    :param progress_line:      ``f(idx_done, total, result) -> str``；
+        ``None`` 表示不打进度。
+    :param parallel_banner:    并行启动时打印的提示前缀。
+    :param on_progress:        每完成一项即回调 ``f(done, total)``；始终在主进程调用。
+    :param cancel_token:       已 set 时提前退出，返回当前已处理的结果。
+    :return: 与 ``items`` 等长、顺序一致的 ``[R]``（即使并行也按原序）；
+        取消时未处理项位置上为 ``None``。
     """
     total = len(items)
     if total == 0:
