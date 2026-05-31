@@ -2,9 +2,9 @@
 
 > 媒体文件整理工具集，含两个业务包：
 >
-> - **mt**（漫画整理）：批量规范文件名、写 ComicInfo.xml、生成统一比例封面、序号化打包 STORED zip。  
+> - **mt**（漫画工具）：批量规范文件名、写 ComicInfo.xml、生成统一比例封面、序号化打包 STORED zip。  
 >   入口：CLI `mt-cli` / GUI `mt-gui`（PySide6）。
-> - **ft**（文件归类）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
+> - **ft**（文件工具）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
 >   入口：CLI `ft-cli classify` / GUI `ft-gui`；首次启动需按 `ft/config_template.json` 创建本地配置。
 >
 > 双模块单窗口入口：`app-gui`（同窗口装载 mt + ft 两个 module）。
@@ -247,29 +247,43 @@ GUI 完全复用 `mt.workflow.{sourcefile,metadata,cover}` 的 `plan_*` / `apply
 ## 项目结构
 
 ```
-mt/
-├── __init__.py
+base/                            — 跨业务共享基础设施
+├── console.py                   — 终端输出 & GUI sink 路由（emit / warn / error / set_output）
+├── drag_loop.py                 — 通用拖入循环（run_drag_loop）
+├── fs.py                        — 文件系统工具（merge_into / move_dir / safe_rmtree）
+└── gui/                         — 共享 GUI 组件（PySide6，可选）
+    ├── shell.py                 — Shell(QMainWindow)：左侧 Tab 宿主，register_module()
+    ├── app_check.py             — check_pyside6()：启动前依赖检查
+    ├── log_view.py              — LogView：日志滚动文本框
+    ├── qt_sink.py               — QtSink：console → LogView 桥接
+    ├── path_picker.py           — PathPicker：路径选择 + 拖入 widget
+    ├── worker.py                — BaseWorker(QThread)：通用后台任务
+    └── config.py                — QSettings 辅助（窗口几何持久化）
+
+mt/                              — 漫画工具（manga toolkit）
+├── __init__.py                  — 版本号（__version__）
 ├── __main__.py                  — 适配 `python -m mt` 的转发层
-├── cli/                         — CLI 入口 + 子命令调度层（main = mt-cli）
+├── cli/                         — CLI 入口 + 子命令调度（main = mt-cli）
+│   ├── __init__.py              — build_parser() / main()
 │   ├── sourcefile.py            — sourcefile 子命令
 │   ├── metadata.py              — metadata 子命令
 │   ├── cover.py                 — cover 子命令
+│   ├── pack.py                  — pack 子命令
+│   ├── doctor.py                — doctor 子命令（环境体检）
 │   └── examples.py              — 内置示例（sourcefile / metadata 共用）
 ├── gui/                         — 桌面 GUI（PySide6，可选依赖）
 │   ├── __init__.py              — QApplication 入口（main = mt-gui）
 │   ├── __main__.py              — `python -m mt.gui` / PyInstaller 入口
-│   ├── module.py                — MangaModule（被 shell 装载）
+│   ├── module.py                — MangaModule（被 Shell 装载）
 │   ├── tabs/                    — 四个子命令各自 Tab
 │   └── workers/                 — QThread 阻塞任务包装
 ├── core/                        — 纯数据层（无 I/O，无内部依赖）
 │   ├── config.py                — 全局默认配置
-│   ├── models.py                — Chapter / Volume / MangaInfo
-│   │                              / SourcefilePlan / MetadataPlan / CoverPlan
+│   ├── models.py                — Chapter / Volume / MangaInfo / *Plan 数据类
 │   └── patterns.py              — 正则表达式常量与规则表
-├── infra/                       — 基础设施层（终端、I/O、字符串工具、调度）
-│   ├── utils.py                 — 纯工具函数（繁简、路径、重命名）
-│   ├── console.py               — 终端输出 & 日志
-│   └── parallel.py              — 通用 plan 调度: run_plans (进度行 + 可选并行)
+├── infra/                       — 基础设施层（字符串工具、调度）
+│   ├── utils.py                 — 纯工具函数（繁简转换、路径、重命名）
+│   └── parallel.py              — run_plans：进度行 + 可选并行
 ├── naming/                      — 名称解析与构建
 │   ├── parser.py                — parse_name(author, name) → MangaInfo
 │   └── builder.py               — build_new_name(info) → str
@@ -279,8 +293,29 @@ mt/
     ├── sourcefile.py            — 源文件扫描、重命名执行
     ├── metadata.py              — ComicInfo.xml 生成 & 写入
     ├── cover.py                 — 封面查找、裁剪、WebP 编码、CBZ 追加写入
-    ├── drag.py                  — 通用拖入循环 + 目录搬移（共用）
-    └── session.py               — 操作记录 & 回退（仅 sourcefile 读取使用）
+    ├── pack.py                  — 图片目录序号化 + STORED zip 打包
+    └── session.py               — 操作记录 & 回退（仅 sourcefile 使用）
+
+ft/                              — 文件工具（file toolkit）
+├── __init__.py
+├── cli/                         — CLI 入口（main = ft-cli）
+│   ├── __init__.py              — build_parser() / main()
+│   └── classify.py              — classify 子命令
+├── gui/                         — 桌面 GUI（PySide6，可选依赖）
+│   ├── __init__.py              — QApplication 入口（main = ft-gui）
+│   ├── module.py                — FtModule（被 Shell 装载）
+│   ├── tabs/classify_tab.py     — ClassifyTab：拖入区 + 工作目录面板
+│   └── widgets/                 — drop_area / candidate_dialog
+├── workflow/classify/           — 归类工作流
+│   ├── config.py                — WorkDir / Config / load_config()
+│   ├── path.py                  — path_to_author_name()
+│   ├── alias.py                 — scan_aliases()（扫描 [别名]：XX.txt）
+│   ├── matcher.py               — find_candidates()
+│   └── ops.py                   — classify_one()
+└── config_template.json         — 配置模板（首次使用时参照创建 config.json）
+
+app/                             — 顶层双模块启动器
+└── gui.py                       — main = app-gui（同窗口装载 mt + ft）
 ```
 
 > 命名约定：Python 模块名遵循 PEP 8（小写 + 下划线），暴露的 CLI 命令名遵循 Unix 惯例（小写 + 连字符）。
@@ -289,24 +324,25 @@ mt/
 依赖关系（低层 → 高层）：
 
 ```
-core/config · core/models
+base/console · base/fs · base/drag_loop
         ↓
-core/patterns      ← core/models
+mt/core/{config,models,patterns}
         ↓
-infra/utils        ← core/patterns
-base/console      ← core/models
-infra/parallel     ← base/console
+mt/infra/{utils,parallel}    ← base/console
         ↓
-naming/parser      ← core/models · core/patterns · infra/utils · base/console
-naming/builder     ← core/models · core/patterns · infra/utils
+mt/naming/{parser,builder}   ← mt/core · mt/infra · base/console
         ↓
-workflow/drag      ← infra/utils · base/console
-workflow/session   ← core/models · core/config · infra/utils · base/console
-workflow/sourcefile← core/models · core/config · naming/* · infra/{utils,console,parallel} · presentation · workflow/drag
-workflow/metadata  ← core/models · core/config · core/patterns · infra/{console,parallel} · naming/parser · presentation · workflow/drag
-workflow/cover     ← core/models · core/config · infra/{console,parallel} · presentation · workflow/drag
-        ↓
-mt/cli/{sourcefile,metadata,cover,pack,examples}
+mt/workflow/*                ← mt/core · mt/infra · mt/naming · mt/presentation · base/*
         ↓
 mt/cli/__init__.py  (main → mt-cli)
+
+ft/workflow/classify/*       ← base/{console,fs,drag_loop}
+        ↓
+ft/cli/__init__.py  (main → ft-cli)
+
+base/gui/{shell,worker,…}   ← base/console
+mt/gui/module.py             ← mt/workflow/* · base/gui
+ft/gui/module.py             ← ft/workflow/* · base/gui
+        ↓
+app/gui.py  (main → app-gui)  ← mt/gui · ft/gui · base/gui
 ```
