@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
 
     shell = Shell(title='file-toolkit', config_key_prefix='artifact-only')
     module = ArtifactModule()
-    shell.register_module('files', module, default_sink=module.default_sink())
+    shell.register_module('artifact', module, default_sink=module.default_sink())
     shell.show()
     return app.exec()
 

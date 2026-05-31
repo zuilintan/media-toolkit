@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     mm = MangaModule()
     shell.register_module('manga', mm, default_sink=mm.default_sink())
-    shell.register_module('files', ArtifactModule())
+    shell.register_module('artifact', ArtifactModule())
     shell.show()
     return app.exec()
 
