@@ -11,34 +11,22 @@ cover.py — cover 子命令：为 CBZ 写入 2:3 封面
 流程: scan → 全量 plan（含裁剪+编码）→ 预览 → 二次确认 → 整批写入。
 与 cli/metadata.py 结构对称。
 
-依赖: workflow.cover / base.drag_loop / infra.console / presentation
+依赖: workflow.cover / infra.console / presentation
 """
 
 from __future__ import annotations
 
 import argparse
 
-from base.drag_loop import run_drag_loop
 from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_cover_preview, print_run_banner
-from mt.workflow.cover import (
-    plan_covers, apply_cover_plans, make_process_cover_dir,
-    DEFAULT_QUALITY,
-)
+from mt.workflow.cover import plan_covers, apply_cover_plans, DEFAULT_QUALITY
 from mt.cli import validate_root
 
 
 def cmd_cover(args: argparse.Namespace) -> int:
     """cover 子命令调度。"""
     mode = 'smart' if args.smart else 'center'
-
-    # ── 旁路: drag ───────────────────────────────────────────────────────────
-    if args.drag:
-        run_drag_loop(
-            process_one=make_process_cover_dir(mode, args.quality, args.jobs),
-            title='cover',
-        )
-        return 0
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
@@ -101,8 +89,6 @@ def add_cover_args(p: argparse.ArgumentParser) -> None:
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',
                    help='实际写入封面（不加此参数则仅预览）')
-    p.add_argument('--drag',    action='store_true',
-                   help='循环拖入模式')
     p.add_argument('--smart',   action='store_true',
                    help='使用 smartcrop 显著性裁剪（默认居中裁剪）')
     p.add_argument('--quality', type=int, default=DEFAULT_QUALITY,

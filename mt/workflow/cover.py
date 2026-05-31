@@ -18,7 +18,7 @@ cover.py — CBZ 封面生成（cover 子命令工作流层）
      ``cover.*`` 时额外删除所有 ``cover.*`` 条目（参考 ComicInfo.xml
      的追加替换方式，不重建整个压缩包）
 
-依赖: Pillow / smartcrop（可选） / models / config / console / drag
+依赖: Pillow / smartcrop（可选） / models / config / console
 """
 
 from __future__ import annotations
@@ -396,24 +396,3 @@ def apply_cover_plans(
     print_op_result(ok_n, fail, skip)
     return fail
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 单目录处理（drag 模式回调）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def make_process_cover_dir(mode: str, quality: int, jobs: int = 1):
-    """构造一个绑定 mode/quality/jobs 的 process_cover_dir 函数（供 drag 注入）。"""
-    from mt.presentation.view import print_cover_preview   # 延迟导入避免循环
-
-    def process_cover_dir(target_dir: Path) -> None:
-        emit(f'\n{SEP}')
-        emit(f'📂 目录: {target_dir}')
-        plans = plan_covers(str(target_dir), mode=mode, quality=quality, jobs=jobs)
-        print_cover_preview(plans)
-        if not any(p.writable and p.changed for p in plans):
-            return
-        if not confirm('\n🟡 确认写入封面？按 Enter 继续: '):
-            return
-        apply_cover_plans(plans, dry_run=False)
-
-    return process_cover_dir

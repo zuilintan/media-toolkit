@@ -10,7 +10,7 @@ Number 字段规则（与 CH. 同级且互斥）:
 
 Format 字段：part_tag 是合集类（总集篇等）时写入；否则空。
 
-依赖: models / patterns / config / parser / console / presentation / drag
+依赖: models / patterns / config / parser / console / presentation
 """
 
 from __future__ import annotations
@@ -464,24 +464,5 @@ def apply_metadata_plans(
 
     print_op_result(ok_n, fail, skip)
     return fail
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 单目录处理（drag 模式回调）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def make_process_metadata_dir(jobs: int = 1):
-    """构造一个绑定 jobs 的 process_metadata_dir 函数（供 drag 注入）。"""
-    def process_metadata_dir(target_dir: Path) -> None:
-        emit(f'\n{SEP}')
-        emit(f'📂 目录: {target_dir}')
-        plans = plan_metadatas(str(target_dir), jobs=jobs)
-        print_metadata_preview(plans)
-        if not any(p.writable and p.changed for p in plans):
-            return
-        if not confirm('\n🟡 确认执行 ComicInfo 写入？按 Enter 继续: '):
-            return
-        apply_metadata_plans(plans, dry_run=False)
-    return process_metadata_dir
 
 

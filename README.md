@@ -94,9 +94,6 @@ issue 前自查或脚本判断。
 ## sourcefile 子命令
 
 ```bash
-# 循环拖入模式（推荐日常使用）
-mt-cli sourcefile --drag
-
 # 批量预览（不修改文件）
 mt-cli sourcefile --root /path/to/manga
 
@@ -109,9 +106,6 @@ mt-cli sourcefile --rollback
 
 # 内置解析示例（回归测试）
 mt-cli sourcefile --examples
-
-# 启用调试输出（放在子命令之前）
-mt-cli --debug sourcefile --drag
 
 # 并行 plan（纯字符串处理为主，收益有限；主要用于大目录的进度反馈）
 mt-cli sourcefile --root /path/to/manga --jobs 4
@@ -129,9 +123,6 @@ mt-cli metadata --root /path/to/cbz
 
 # 实际写入
 mt-cli metadata --root /path/to/cbz --apply
-
-# 循环拖入模式
-mt-cli metadata --drag
 
 # 内置示例
 mt-cli metadata --examples
@@ -196,9 +187,6 @@ mt-cli cover --root /path/to/cbz --apply --smart
 # 并行处理（plan 阶段；4 个文件以上才会真正启用）
 mt-cli cover --root /path/to/cbz --apply --jobs 4
 mt-cli cover --root /path/to/cbz --apply --jobs 0   # 自动 min(cpu, 4)
-
-# 循环拖入
-mt-cli cover --drag
 ```
 
 每处理一个 cbz 即打印进度行 `✅ [12/345] 文件名`，便于大批量任务跟踪。

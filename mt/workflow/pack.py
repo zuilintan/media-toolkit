@@ -218,8 +218,7 @@ def _find_units(
     kind ∈ ``{'flat', 'nested'}``。跳过的目录（含混合 / 图不足 / 空 /
     超深）会经 ``info()`` 打印一条提示，便于用户排查。
 
-    drag 模式入口；batch 模式请改用 ``_find_units_in_root`` 以避免把 root
-    自身当 NESTED。
+    batch 模式请改用 ``_find_units_in_root`` 以避免把 root 自身当 NESTED。
 
     ``_in_container`` 由 CONTAINER 分支递归向下传递。在容器内部
     （如 ``漫画/卷1/话1``）若遇到 1-child wrapper（卷下只有 1 话），
@@ -569,27 +568,3 @@ def apply_pack_plans(
     return fail
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 单目录处理（drag 模式回调）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def process_pack_dir(src_dir: Path) -> None:
-    """drag 模式入口：在拖入的目录下识别单位 → preview → confirm → apply。
-
-    与批量模式共用 _find_units：拖入的目录本身可能是 FLAT/NESTED 单位
-    （单本/分话漫画），也可能是包含多本的容器，统一处理。
-    """
-    from mt.presentation.view import print_pack_preview   # 延迟导入避免循环
-    emit(f'\n{SEP}')
-    emit(f'📂 目录: {src_dir}')
-    units = _find_units(src_dir)
-    if not units:
-        emit('  未识别出任何打包单位')
-        return
-    plans = [plan_unit(str(d), k) for d, k in units]
-    print_pack_preview(plans)
-    if not any(p.writable for p in plans):
-        return
-    if not confirm('\n🟡 确认打包并删除源目录？按 Enter 继续: '):
-        return
-    apply_pack_plans(plans, dry_run=False)

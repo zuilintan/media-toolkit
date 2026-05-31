@@ -3,7 +3,7 @@ sourcefile.py — 源文件扫描与重命名（sourcefile 子命令的工作流
 
 只处理 .zip / .cbz 源文件；按作者目录组织。
 
-依赖: models / config / parser / builder / utils / console / presentation / drag
+依赖: models / config / parser / builder / utils / console / presentation
 """
 
 from __future__ import annotations
@@ -60,11 +60,6 @@ def _iter_sourcefile_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
                 items.append((author, str(f)))
     return items
 
-
-def scan_author_dir(author_dir: Path) -> list[SourcefilePlan]:
-    """扫描单个作者目录，仅处理 .zip / .cbz 文件（drag 模式入口；不打进度）。"""
-    items = _iter_sourcefile_items([author_dir])
-    return [_plan_one(it) for it in items]
 
 
 def plan_sourcefiles(
@@ -150,16 +145,3 @@ def apply_sourcefile_plans(
     return fail
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 单作者目录处理（drag 模式回调）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def process_sourcefile_dir(author_dir: Path) -> None:
-    """drag 模式下处理单个作者目录：plan → preview → confirm → apply。"""
-    emit(f'\n{SEP}')
-    emit(f'📂 作者目录: {author_dir}')
-    plans = scan_author_dir(author_dir)
-    print_sourcefile_preview(plans)
-    if not confirm('\n🟡 确认执行重命名？按 Enter 继续: '):
-        return
-    apply_sourcefile_plans(plans, dry_run=False)

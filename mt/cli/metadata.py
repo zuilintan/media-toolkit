@@ -4,20 +4,16 @@ metadata.py — metadata 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
 与 cli/sourcefile.py 结构对称。
 
-依赖: workflow.metadata / base.drag_loop / infra.console / presentation
-      / cli.examples
+依赖: workflow.metadata / infra.console / presentation / cli.examples
 """
 
 from __future__ import annotations
 
 import argparse
 
-from base.drag_loop import run_drag_loop
 from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_metadata_preview, print_run_banner
-from mt.workflow.metadata import (
-    plan_metadatas, apply_metadata_plans, make_process_metadata_dir,
-)
+from mt.workflow.metadata import plan_metadatas, apply_metadata_plans
 from mt.cli import validate_root
 from mt.cli.examples import run_metadata_examples
 
@@ -27,12 +23,6 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
         return 0 if run_metadata_examples() == 0 else 1
-    if args.drag:
-        run_drag_loop(
-            process_one=make_process_metadata_dir(args.jobs),
-            title='metadata',
-        )
-        return 0
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
@@ -95,8 +85,6 @@ def add_metadata_args(p: argparse.ArgumentParser) -> None:
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',
                    help='实际写入 ComicInfo.xml（不加此参数则仅预览）')
-    p.add_argument('--drag',    action='store_true',
-                   help='循环拖入模式')
     p.add_argument('--examples', action='store_true',
                    help='解析内置示例并展示结果，不处理任何文件')
     p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',

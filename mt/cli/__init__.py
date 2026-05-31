@@ -65,7 +65,6 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '示例:\n'
-            '  mt-cli sourcefile --drag\n'
             '  mt-cli sourcefile --root /path/to/manga --apply\n'
             '  mt-cli sourcefile --rollback\n'
             '  mt-cli sourcefile --examples\n'
@@ -91,7 +90,6 @@ def build_parser() -> argparse.ArgumentParser:
             '常用模式:\n'
             '  mt-cli sourcefile --root <dir>         # 批量预览\n'
             '  mt-cli sourcefile --root <dir> --apply # 批量执行\n'
-            '  mt-cli sourcefile --drag               # 循环拖入模式（推荐）\n'
             '  mt-cli sourcefile --examples           # 内置解析示例\n'
         ),
     )
@@ -129,7 +127,6 @@ def build_parser() -> argparse.ArgumentParser:
             '  mt-cli cover --root ./manga\n'
             '  mt-cli cover --root ./manga --apply\n'
             '  mt-cli cover --root ./manga --apply --smart\n'
-            '  mt-cli cover --drag\n'
         ),
     )
     add_cover_args(p_cover)
@@ -145,7 +142,6 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             '默认为预览模式（不修改文件），确认无误后加 --apply 实际执行。\n\n'
             '示例:\n'
-            '  mt-cli pack --drag\n'
             '  mt-cli pack --root ./albums\n'
             '  mt-cli pack --root ./albums --apply\n'
         ),

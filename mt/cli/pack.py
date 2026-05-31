@@ -4,29 +4,21 @@ pack.py — pack 子命令：图片目录序号化重命名 + STORED zip 打包
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批执行。
 与 cli/sourcefile.py 结构对称。
 
-依赖: workflow.pack / base.drag_loop / infra.console / presentation
+依赖: workflow.pack / infra.console / presentation
 """
 
 from __future__ import annotations
 
 import argparse
 
-from base.drag_loop import run_drag_loop
 from base.console import SEP2, emit, confirm, print_summary
 from mt.presentation.view import print_pack_preview, print_run_banner
-from mt.workflow.pack import (
-    plan_packs, apply_pack_plans, process_pack_dir,
-)
+from mt.workflow.pack import plan_packs, apply_pack_plans
 from mt.cli import validate_root
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
     """pack 子命令调度。"""
-    # ── 旁路: drag ───────────────────────────────────────────────────────────
-    if args.drag:
-        run_drag_loop(process_one=process_pack_dir, title='pack')
-        return 0
-
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
     if root is None:
@@ -88,8 +80,6 @@ def add_pack_args(p: argparse.ArgumentParser) -> None:
                         '或「仅含图片子目录」即视为一本漫画）')
     p.add_argument('--apply',   action='store_true',
                    help='实际执行重命名 + 打包（不加此参数则仅预览）')
-    p.add_argument('--drag',    action='store_true',
-                   help='循环拖入模式')
     p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',
                    help='plan 阶段并行进程数（1=串行，默认；'
                         '0=自动 min(cpu, 4)；≥ 4 个目录时才真正启用并行）')
