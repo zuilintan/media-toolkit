@@ -5,8 +5,8 @@ manga-toolkit — 漫画文件整理工具集
     core/      — 纯数据层（config / models / patterns）
     infra/     — 基础设施层（utils / console）
     naming/    — 名称解析与构建（parser / builder）
-    workflow/  — 高层工作流（scanner / comicinfo）
-    cli/       — 命令行子命令（examples / rename / comicinfo）
+    workflow/  — 高层工作流（rename_kit / meta_kit / cover_kit / pack_kit）
+    cli/       — 命令行子命令（rename-kit / meta-kit / cover-kit / pack-kit / doctor）
     data/      — 随包数据（examples.json）
 
 CLI 入口:
@@ -19,8 +19,10 @@ console 命令:
     manga-gui           — 由 pyproject.toml 注册，指向 manga.gui:main
 
 子命令:
-    rename     — 批量重命名漫画文件 / 目录
-    comicinfo  — 向 CBZ 写入 ComicInfo.xml
+    rename-kit   — 批量重命名漫画文件 / 目录
+    meta-kit   — 向 CBZ 写入 ComicInfo.xml
+    cover-kit  — 为 CBZ 写入 2:3 封面
+    pack-kit   — 图片目录序号化重命名 + STORED zip 打包
 """
 
 from base import __version__  # noqa: F401

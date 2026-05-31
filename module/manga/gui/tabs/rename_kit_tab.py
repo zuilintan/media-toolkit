@@ -1,7 +1,7 @@
 """
-sourcefile_tab.py — name 子命令的 GUI Tab
+rename_kit_tab.py — rename-kit 子命令的 GUI Tab
 
-复用 manga.workflow.sourcefile 的 plan / apply 函数；不调用 manga.cli.cmd_name
+复用 manga.workflow.rename_kit 的 plan / apply 函数；不调用 manga.cli.cmd_rename
 （cmd_* 内部用 input() 阻塞确认，与 GUI 互斥）。
 """
 
@@ -13,14 +13,14 @@ from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import SourcefilePlan
+from module.manga.core.models import RenameKitPlan
 from module.manga.gui.tabs.base_tab import BaseTab
-from module.manga.presentation.view import print_sourcefile_preview
-from module.manga.workflow.sourcefile import apply_sourcefile_plans, plan_sourcefiles
+from module.manga.presentation.view import print_rename_kit_preview
+from module.manga.workflow.rename_kit import apply_plans, preview_plans
 
 
-class SourcefileTab(BaseTab):
-    cmd_name         = 'name'
+class RenameKitTab(BaseTab):
+    cmd_name         = 'rename-kit'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有可执行的重命名'
@@ -45,18 +45,18 @@ class SourcefileTab(BaseTab):
         return '源文件批量重命名'
 
     def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        return plan_sourcefiles, (root,), {'jobs': self._jobs.value()}
+        return preview_plans, (root,), {'jobs': self._jobs.value()}
 
     def _apply_fn(self):
-        return apply_sourcefile_plans
+        return apply_plans
 
-    def _render_preview(self, plans: list[SourcefilePlan]) -> None:
-        print_sourcefile_preview(plans)
+    def _render_preview(self, plans: list[RenameKitPlan]) -> None:
+        print_rename_kit_preview(plans)
 
-    def _count_actionable(self, plans: list[SourcefilePlan]) -> int:
+    def _count_actionable(self, plans: list[RenameKitPlan]) -> int:
         return sum(1 for p in plans if p.changed and not p.needs_review)
 
-    def _classify_plans(self, plans: list[SourcefilePlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[RenameKitPlan]) -> dict[str, int]:
         actionable = sum(1 for p in plans if p.changed and not p.needs_review)
         review     = sum(1 for p in plans if p.needs_review)
         return {'可重命名': actionable, '需审核': review,

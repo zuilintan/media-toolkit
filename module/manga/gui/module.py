@@ -5,7 +5,7 @@ module.py — manga-toolkit GUI 模块（被 base.gui.shell 装载）
 ----
 MangaModule (QWidget)
 └── QSplitter (Vertical)
-    ├── QTabWidget       — pack / name / cover / meta 四个子 Tab
+    ├── QTabWidget       — pack-kit / rename-kit / cover-kit / meta-kit 四个子 Tab
     └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
 
 注意:
@@ -25,10 +25,10 @@ from PySide6.QtWidgets import (
 
 from base.gui.config import get_config
 from base.gui.log_view import LogView
-from module.manga.gui.tabs.cover_tab import CoverTab
-from module.manga.gui.tabs.metadata_tab import MetadataTab
-from module.manga.gui.tabs.pack_tab import PackTab
-from module.manga.gui.tabs.sourcefile_tab import SourcefileTab
+from module.manga.gui.tabs.cover_kit_tab import CoverKitTab
+from module.manga.gui.tabs.meta_kit_tab import MetaKitTab
+from module.manga.gui.tabs.pack_kit_tab import PackKitTab
+from module.manga.gui.tabs.rename_kit_tab import RenameKitTab
 
 
 class MangaModule(QWidget):
@@ -40,19 +40,19 @@ class MangaModule(QWidget):
         super().__init__(parent)
         self._busy_count = 0
 
-        tab0 = PackTab()
-        tab1 = SourcefileTab()
-        tab2 = CoverTab()
-        tab3 = MetadataTab()
+        tab0 = PackKitTab()
+        tab1 = RenameKitTab()
+        tab2 = CoverKitTab()
+        tab3 = MetaKitTab()
         self._tab_list = [tab0, tab1, tab2, tab3]
         for tab in self._tab_list:
             tab.busy_changed.connect(self._on_tab_busy)
 
         self._tabs = QTabWidget()
-        self._tabs.addTab(tab0, '1. pack')
-        self._tabs.addTab(tab1, '2. name')
-        self._tabs.addTab(tab2, '3. cover')
-        self._tabs.addTab(tab3, '4. meta')
+        self._tabs.addTab(tab0, '1. 打包')
+        self._tabs.addTab(tab1, '2. 命名')
+        self._tabs.addTab(tab2, '3. 封面')
+        self._tabs.addTab(tab3, '4. 元数据')
 
         self._log_stack = QStackedWidget()
         self._logs: list[LogView] = []

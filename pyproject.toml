@@ -9,9 +9,9 @@ requires-python = ">=3.11"
 dependencies = [
     # 繁简转换（译名繁体→简体，必选）
     "zhconv>=1.4.0",
-    # 封面图像处理（cover 子命令必选）
+    # 封面图像处理（cover-kit 子命令必选）
     "Pillow>=10.0",
-    # smartcrop 显著性裁剪（cover --smart 模式）
+    # smartcrop 显著性裁剪（cover-kit --smart 模式）
     "smartcrop>=0.3.2",
 ]
 

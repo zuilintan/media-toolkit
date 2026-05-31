@@ -1,5 +1,5 @@
 """
-sourcefile.py — 源文件扫描与重命名（sourcefile 子命令的工作流层）
+rename_kit.py — 源文件扫描与重命名（rename-kit 子命令的工作流层）
 
 只处理 .zip / .cbz 源文件；按作者目录组织。
 
@@ -9,7 +9,7 @@ sourcefile.py — 源文件扫描与重命名（sourcefile 子命令的工作流
 from __future__ import annotations
 from pathlib import Path
 
-from module.manga.core.models import SourcefilePlan
+from module.manga.core.models import RenameKitPlan
 from module.manga.core.config import FILE_EXTS
 from module.manga.naming.parser import parse_name
 from module.manga.naming.builder import build_new_name
@@ -22,10 +22,10 @@ from module.manga.infra.parallel import run_plans
 # 扫描 & 计划
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
-    """模块级 worker（picklable）：``(author, full_path_str)`` → SourcefilePlan。
+def _plan_one(item: tuple[str, str]) -> RenameKitPlan:
+    """模块级 worker（picklable）：``(author, full_path_str)`` → RenameKitPlan。
 
-    DEBUG 由 print_sourcefile_preview 在渲染卡片时统一触发，本函数无副作用，
+    DEBUG 由 print_rename_kit_preview 在渲染卡片时统一触发，本函数无副作用，
     安全用于子进程。
     """
     author, path_str = item
@@ -33,7 +33,7 @@ def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
     mi       = parse_name(author, file.stem)
     suffix   = '.cbz' if file.suffix.lower() == '.zip' else file.suffix
     new_name = build_new_name(mi) + suffix
-    return SourcefilePlan(
+    return RenameKitPlan(
         author_dir = str(file.parent),
         author     = author,
         old_name   = file.name,
@@ -42,14 +42,14 @@ def _plan_one(item: tuple[str, str]) -> SourcefilePlan:
     )
 
 
-def _progress_line(idx: int, total: int, plan: SourcefilePlan) -> str:
+def _progress_line(idx: int, total: int, plan: RenameKitPlan) -> str:
     icon = ('!' if plan.needs_review
             else '*' if plan.changed
             else '-')
     return f'   {icon} [{idx}/{total}] {plan.old_name}'
 
 
-def _iter_sourcefile_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
+def _iter_rename_kit_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
     """从作者目录列表展开为 ``(author, full_path)`` 列表（按 (作者, 文件名) 排序）。"""
     items: list[tuple[str, str]] = []
     for author_dir in author_dirs:
@@ -61,9 +61,9 @@ def _iter_sourcefile_items(author_dirs: list[Path]) -> list[tuple[str, str]]:
 
 
 
-def plan_sourcefiles(
+def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
-) -> list[SourcefilePlan]:
+) -> list[RenameKitPlan]:
     """扫描根目录下所有作者目录，汇总重命名计划。
 
     Args:
@@ -80,7 +80,7 @@ def plan_sourcefiles(
         error(f'目录不存在: {root}')
         return []
     author_dirs = [d for d in sorted(root_path.iterdir()) if d.is_dir()]
-    items       = _iter_sourcefile_items(author_dirs)
+    items       = _iter_rename_kit_items(author_dirs)
     zip_n = sum(1 for _, p in items if p.lower().endswith('.zip'))
     cbz_n = len(items) - zip_n
     emit(f'  找到文件: {zip_n} 个 .zip，{cbz_n} 个 .cbz'
@@ -95,8 +95,8 @@ def plan_sourcefiles(
 # 执行重命名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def apply_sourcefile_plans(
-    plans: list[SourcefilePlan], dry_run: bool = True, cancel_token=None,
+def apply_plans(
+    plans: list[RenameKitPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """执行重命名计划。
 

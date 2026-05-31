@@ -1,7 +1,7 @@
 """
-cover_tab.py — cover 子命令的 GUI Tab
+cover_kit_tab.py — cover-kit 子命令的 GUI Tab
 
-复用 manga.workflow.cover 的 plan_covers / apply_cover_plans。
+复用 manga.workflow.cover_kit 的 plan_covers / apply_cover_plans。
 """
 
 from __future__ import annotations
@@ -12,17 +12,17 @@ from PySide6.QtWidgets import (
     QCheckBox, QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import CoverPlan
+from module.manga.core.models import CoverKitPlan
 from base.gui.config import get_config
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.presentation.view import print_cover_preview
-from module.manga.workflow.cover import (
-    DEFAULT_QUALITY, apply_cover_plans, plan_covers,
+from module.manga.workflow.cover_kit import (
+    DEFAULT_QUALITY, apply_plans, preview_plans,
 )
 
 
-class CoverTab(BaseTab):
-    cmd_name         = 'cover'
+class CoverKitTab(BaseTab):
+    cmd_name         = 'cover-kit'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的封面'
@@ -60,15 +60,15 @@ class CoverTab(BaseTab):
     def _load_settings(self) -> None:
         super()._load_settings()
         cfg = get_config()
-        if (v := cfg.get('cover.smart')) is not None:
+        if (v := cfg.get('cover-kit.smart')) is not None:
             self._smart.setChecked(bool(v))
-        if (v := cfg.get('cover.quality')) is not None:
+        if (v := cfg.get('cover-kit.quality')) is not None:
             self._quality.setValue(int(v))
         self._smart.stateChanged.connect(
-            lambda: cfg.set('cover.smart', self._smart.isChecked())
+            lambda: cfg.set('cover-kit.smart', self._smart.isChecked())
         )
         self._quality.valueChanged.connect(
-            lambda v: cfg.set('cover.quality', v)
+            lambda v: cfg.set('cover-kit.quality', v)
         )
 
     def _mode(self) -> str:
@@ -78,22 +78,22 @@ class CoverTab(BaseTab):
         return f'CBZ 封面写入（mode={self._mode()}）'
 
     def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        return plan_covers, (root,), {
+        return preview_plans, (root,), {
             'mode':    self._mode(),
             'quality': self._quality.value(),
             'jobs':    self._jobs.value(),
         }
 
     def _apply_fn(self):
-        return apply_cover_plans
+        return apply_plans
 
-    def _render_preview(self, plans: list[CoverPlan]) -> None:
+    def _render_preview(self, plans: list[CoverKitPlan]) -> None:
         print_cover_preview(plans)
 
-    def _count_actionable(self, plans: list[CoverPlan]) -> int:
+    def _count_actionable(self, plans: list[CoverKitPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
 
-    def _classify_plans(self, plans: list[CoverPlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[CoverKitPlan]) -> dict[str, int]:
         writable = sum(1 for p in plans if p.writable and p.changed)
         unchanged = sum(1 for p in plans if p.writable and not p.changed)
         return {'可写入': writable, '无变化': unchanged,

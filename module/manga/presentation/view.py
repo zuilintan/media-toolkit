@@ -2,11 +2,11 @@
 view.py — 领域对象的终端渲染
 
 提供:
-  - print_run_banner()          — 命令运行 banner（sourcefile / metadata 共用）
-  - print_sourcefile_preview()  — 源文件重命名计划预览（按作者分组的卡片表）
-  - print_metadata_preview()    — ComicInfo 写入计划预览（结构对齐 sourcefile）
-  - print_metadata_diff_table() — ComicInfo 字段「旧/新」两列 diff 表格
-                                  （metadata 预览 & examples 共用）
+  - print_run_banner()          — 命令运行 banner（rename_kit / meta_kit 共用）
+  - print_rename_kit_preview()    — 源文件重命名计划预览（按作者分组的卡片表）
+  - print_meta_kit_preview()    — ComicInfo 写入计划预览（结构对齐 rename_kit）
+  - print_meta_kit_diff_table() — ComicInfo 字段「旧/新」两列 diff 表格
+                                  （meta_kit 预览 & examples 共用）
 
 依赖: core.models / core.config / infra.console / naming.parser
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import unicodedata
 
-from module.manga.core.models import CoverPlan, MetadataPlan, PackPlan, SourcefilePlan
+from module.manga.core.models import CoverKitPlan, MetaKitPlan, PackKitPlan, RenameKitPlan
 from module.manga.core.config import COMICINFO_TAGS
 from base.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from module.manga.naming.parser import emit_parse_debug
@@ -32,7 +32,7 @@ def _pad(s: str, w: int) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 运行 banner（sourcefile / metadata 共用）
+# 运行 banner（rename_kit / meta_kit 共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) -> None:
@@ -50,7 +50,7 @@ def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) ->
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 卡片骨架（sourcefile / metadata 共用）
+# 卡片骨架（rename_kit / meta_kit 共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _print_preview_header(title: str) -> None:
@@ -71,10 +71,10 @@ def _print_preview_footer(total: int, parts: list[tuple[str, int]]) -> None:
 # 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
+def print_rename_kit_preview(plans: list[RenameKitPlan]) -> None:
     """以可读格式打印源文件重命名计划。
 
-    卡片骨架与 run_sourcefile_examples 对齐：
+    卡片骨架与 run_rename_kit_examples 对齐：
       ``   📄 [N]{note}``   (3 空格)
       ``     DEBUG: …``     (5 空格，与 emit_parse_debug formatter 一致)
       ``     旧: …``        (5 空格)
@@ -115,13 +115,13 @@ def print_sourcefile_preview(plans: list[SourcefilePlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Metadata 预览（结构与 sourcefile 对齐）
+# meta_kit 预览（结构与 rename_kit 对齐）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_metadata_preview(plans: list[MetadataPlan]) -> None:
+def print_meta_kit_preview(plans: list[MetaKitPlan]) -> None:
     """打印 ComicInfo 写入计划，逐卡片渲染。
 
-    卡片骨架与 print_sourcefile_preview / run_*_examples 对齐：
+    卡片骨架与 print_rename_kit_preview / run_*_examples 对齐：
       ``   📄 [N] {filename}``   (3 空格)
       ``     DEBUG: …``          (5 空格)
       ``     {diff_table}``      (5 空格)
@@ -142,7 +142,7 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
         for idx, p in enumerate(changed, 1):
             emit(f'   📄 [{idx}] {p.filename}')
             emit_parse_debug(p.mi)
-            print_metadata_diff_table(
+            print_meta_kit_diff_table(
                 p.existing_fields, p.fields, p.pub_conflict,
                 indent='     ',
             )
@@ -169,10 +169,10 @@ def print_metadata_preview(plans: list[MetadataPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Metadata 字段块（ComicInfo 字段名为 spec 名，不做改动）
+# meta_kit 字段块（ComicInfo 字段名为 spec 名，不做改动）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_metadata_diff_table(
+def print_meta_kit_diff_table(
     old_fields:   dict[str, str],
     new_fields:   dict[str, str],
     pub_conflict: list[str] | None = None,
@@ -183,7 +183,7 @@ def print_metadata_diff_table(
 
     - 列标题: 旧 / 新
     - 行标题: COMICINFO_TAGS 中的每个 tag
-    - 新列差异字符用 RED 高亮（与 sourcefile 卡片体的 highlight_diff 对齐）
+    - 新列差异字符用 RED 高亮（与 rename_kit 卡片体的 highlight_diff 对齐）
     - 行尾「*」标记本行新旧不一致（含字段从无到有 / 从有到无）
     - Publisher 出版商冲突时在表下追加冲突文件列表
     """
@@ -215,10 +215,10 @@ def print_metadata_diff_table(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Cover 预览（结构对齐 sourcefile / metadata）
+# cover_kit 预览（结构对齐 rename_kit / meta_kit）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_cover_preview(plans: list[CoverPlan]) -> None:
+def print_cover_preview(plans: list[CoverKitPlan]) -> None:
     """打印封面写入计划，逐卡片渲染。
 
     目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``
@@ -266,10 +266,10 @@ def print_cover_preview(plans: list[CoverPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Pack 预览（结构对齐 sourcefile / metadata / cover）
+# Pack 预览（结构对齐 rename_kit / meta_kit / cover_kit）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_pack_preview(plans: list[PackPlan]) -> None:
+def print_pack_preview(plans: list[PackKitPlan]) -> None:
     """打印打包计划，逐卡片渲染。
 
     卡片骨架：

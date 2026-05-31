@@ -1,7 +1,7 @@
 """
 parallel.py — 通用 plan 调度：进度反馈 + 可选 ProcessPoolExecutor
 
-三个子命令（sourcefile / metadata / cover）的 plan 阶段都符合
+四个子命令（rename-kit / meta-kit / cover-kit / pack-kit）的 plan 阶段都符合
 「列出 items → 对每项调用 worker → 收集结果」骨架。本模块抽公共
 执行器，让各子命令只关心 items / worker / 进度行格式。
 
@@ -35,7 +35,7 @@ T = TypeVar('T')   # 输入项
 R = TypeVar('R')   # plan 结果
 
 
-# ── 默认值（与 cover 子命令初版语义对齐）─────────────────────────────────────
+# ── 默认值（与 cover-kit 子命令初版语义对齐）─────────────────────────────────────
 DEFAULT_JOBS_CAP:           int = 4
 DEFAULT_PARALLEL_THRESHOLD: int = 4
 

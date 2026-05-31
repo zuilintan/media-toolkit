@@ -1,5 +1,5 @@
 """
-metadata.py — ComicInfo.xml 生成、读取与写入（metadata 子命令的工作流层）
+meta_kit.py — ComicInfo.xml 生成、读取与写入（meta-kit 子命令的工作流层）
 
 将 MangaInfo 转换为 ComicInfo v2.1 XML 并写入 CBZ/ZIP 文件。
 
@@ -22,7 +22,7 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from module.manga.core.models import MangaInfo, MetadataPlan, fmt_num
+from module.manga.core.models import MangaInfo, MetaKitPlan, fmt_num
 from module.manga.core import patterns as P
 from module.manga.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
@@ -327,12 +327,12 @@ def _parse_existing_fields(xml_bytes: bytes | None) -> dict[str, str]:
     return out
 
 
-def plan_metadata(cbz_path: str) -> MetadataPlan | None:
+def preview_plan(cbz_path: str) -> MetaKitPlan | None:
     """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，不产生任何输出）。
 
     Returns:
         ``None`` — 文件名无法提取作者（跳过）；
-        否则返回 MetadataPlan；``plan.writable`` 标识能否写入、
+        否则返回 MetaKitPlan；``plan.writable`` 标识能否写入、
         ``plan.changed`` 标识是否需要实际写入。
     """
     filename = os.path.basename(cbz_path)
@@ -352,7 +352,7 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
         fields['Notes'] = existing_fields['Notes']
 
     new_xml = _serialize_xml(fields)
-    return MetadataPlan(
+    return MetaKitPlan(
         cbz_path        = cbz_path,
         mi              = mi,
         publisher       = publisher,
@@ -366,7 +366,7 @@ def plan_metadata(cbz_path: str) -> MetadataPlan | None:
     )
 
 
-def apply_metadata_plan(plan: MetadataPlan) -> str:
+def apply_plan(plan: MetaKitPlan) -> str:
     """执行单个 CBZ 的 ComicInfo.xml 写入（plan.new_xml 已在 plan 阶段构建）。
 
     Returns:
@@ -383,10 +383,10 @@ def apply_metadata_plan(plan: MetadataPlan) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 批量 plan / apply（对齐 sourcefile.plan_sourcefiles / apply_sourcefile_plans）
+# 批量 plan / apply（对齐 rename_kit.preview_plan / apply_plan）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _progress_line(idx: int, total: int, plan: MetadataPlan | None) -> str:
+def _progress_line(idx: int, total: int, plan: MetaKitPlan | None) -> str:
     if plan is None:
         return f'   ! [{idx}/{total}] (无作者，已跳过)'
     icon = ('*' if plan.writable and plan.changed
@@ -395,9 +395,9 @@ def _progress_line(idx: int, total: int, plan: MetadataPlan | None) -> str:
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
-def plan_metadatas(
+def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
-) -> list[MetadataPlan]:
+) -> list[MetaKitPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     Args:
@@ -406,7 +406,7 @@ def plan_metadatas(
         on_progress: 每完成一项即回调 ``f(done, total)``。
         cancel_token: threading.Event，已 set 时提前退出。
 
-    无作者的文件（plan_metadata 返回 None）静默丢弃；状态由调用方根据
+    无作者的文件（preview_plan 返回 None）静默丢弃；状态由调用方根据
     ``plan.writable`` 自行判定。每完成一个即打印进度行。
     """
     root_path = Path(root)
@@ -416,19 +416,19 @@ def plan_metadatas(
     files = [str(fp) for fp in sorted(root_path.rglob('*.cbz'))]
     emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
     raw = run_plans(
-        files, plan_metadata, jobs=jobs, progress_line=_progress_line,
+        files, preview_plan, jobs=jobs, progress_line=_progress_line,
         on_progress=on_progress, cancel_token=cancel_token,
     )
     return [p for p in raw if p is not None]
 
 
-def apply_metadata_plans(
-    plans: list[MetadataPlan], dry_run: bool = True, cancel_token=None,
+def apply_plans(
+    plans: list[MetaKitPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """整批写入 ComicInfo.xml。
 
     Args:
-        plans:   预览阶段产出的 MetadataPlan 列表（含 writable / 不可写两类）。
+        plans:   预览阶段产出的 MetaKitPlan 列表（含 writable / 不可写两类）。
         dry_run: True 时仅预览提示，不实际写入。
         cancel_token: threading.Event，已 set 时提前退出。
 
@@ -454,7 +454,7 @@ def apply_metadata_plans(
         if not plan.changed:
             skip += 1   # ComicInfo.xml 已存在且与目标完全一致：幂等跳过
             continue
-        result = apply_metadata_plan(plan)
+        result = apply_plan(plan)
         if result == 'ok':
             ok_n += 1
         else:

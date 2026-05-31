@@ -1,10 +1,10 @@
 """
-meta.py — meta 子命令：向 CBZ 写入 ComicInfo.xml 元数据
+meta_kit.py — meta-kit 子命令：向 CBZ 写入 ComicInfo.xml 元数据
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。
-与 cli/name.py 结构对称。
+与 cli/rename_kit.py 结构对称。
 
-依赖: workflow.metadata / infra.console / presentation / cli.examples
+依赖: workflow.meta_kit / infra.console / presentation / cli.examples
 """
 
 from __future__ import annotations
@@ -12,32 +12,32 @@ from __future__ import annotations
 import argparse
 
 from base.console import SEP2, emit, confirm, print_summary
-from module.manga.presentation.view import print_metadata_preview, print_run_banner
-from module.manga.workflow.metadata import plan_metadatas, apply_metadata_plans
+from module.manga.presentation.view import print_meta_kit_preview, print_run_banner
+from module.manga.workflow.meta_kit import preview_plans, apply_plans
 from module.manga.cli import validate_root
-from module.manga.cli.examples import run_metadata_examples
+from module.manga.cli.examples import run_meta_kit_examples
 
 
 def cmd_meta(args: argparse.Namespace) -> int:
-    """meta 子命令调度。"""
+    """meta-kit 子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
-        return 0 if run_metadata_examples() == 0 else 1
+        return 0 if run_meta_kit_examples() == 0 else 1
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
     if root is None:
         return 2
 
-    print_run_banner('meta', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
-    plans = plan_metadatas(str(root), jobs=args.jobs)
+    print_run_banner('meta-kit', 'CBZ ComicInfo.xml 批量工具', root, args.apply)
+    plans = preview_plans(str(root), jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
         emit(SEP2)
         return 0
 
-    print_metadata_preview(plans)
+    print_meta_kit_preview(plans)
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.writable and p.changed)
@@ -74,13 +74,13 @@ def cmd_meta(args: argparse.Namespace) -> int:
         emit('  操作已取消。')
         return 0
 
-    apply_metadata_plans(plans, dry_run=False)
+    apply_plans(plans, dry_run=False)
     emit(SEP2)
     return 0
 
 
-def add_meta_args(p: argparse.ArgumentParser) -> None:
-    """挂载 meta 子命令的参数。"""
+def add_meta_kit_args(p: argparse.ArgumentParser) -> None:
+    """挂载 meta-kit 子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',

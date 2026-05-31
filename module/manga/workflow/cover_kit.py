@@ -1,7 +1,7 @@
 """
-cover.py — CBZ 封面生成（cover 子命令工作流层）
+cover_kit.py — CBZ 封面生成（cover-kit 子命令工作流层）
 
-目的: grimmory 在生成 cover 时若第一张图超过 2000 万像素会触发
+目的: grimmory 在生成封面时若第一张图超过 2000 万像素会触发
 ``Rejected image: dimensions ... — possible decompression bomb`` 报错。
 本工作流在 CBZ 内写入一张 2:3 / ≤ 1000×1500 的 WebP，grimmory 即可直接采用。
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from module.manga.core.models import CoverPlan
+from module.manga.core.models import CoverKitPlan
 from module.manga.core.config import PAGE_EXTS
 from base.console import (
     emit, error, debug, info, warn, print_op_result,
@@ -41,7 +41,7 @@ from module.manga.infra.parallel import run_plans
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 TARGET_RATIO:   float          = 2 / 3            # W / H (竖图 2:3)
-MAX_SIZE:       tuple[int, int] = (1000, 1500)    # 与 grimmory cover 对齐
+MAX_SIZE:       tuple[int, int] = (1000, 1500)    # 与 grimmory 封面对齐
 DEFAULT_QUALITY: int           = 85
 SOURCE_PRIORITY: tuple[str, ...] = ('cover', '0001')
 # 源 stem → 目标文件名
@@ -150,7 +150,7 @@ def encode_webp(img: Image.Image, quality: int = DEFAULT_QUALITY) -> bytes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CBZ 追加写入（参考 workflow.metadata.write_comicinfo）
+# CBZ 追加写入（参考 workflow.meta_kit.write_comicinfo）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _cover_zinfo(filename: str, inherited_attr: int) -> zipfile.ZipInfo:
@@ -183,7 +183,7 @@ def write_cover(
     ``also_delete_stem`` 不为 None 时，同样摘除根目录下该 stem 的所有条目
     （用于 cover.* → 0000.webp 时删除原 cover.*）。
 
-    与 ``workflow.metadata.write_comicinfo`` 同构。
+    与 ``workflow.meta_kit.write_comicinfo`` 同构。
 
     Returns:
         True 表示替换了旧版（dst_name 本身已存在），False 表示首次写入。
@@ -215,11 +215,11 @@ def write_cover(
 # 单文件 plan / apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def plan_cover(
+def preview_plan(
     cbz_path: str,
     mode:     str = 'center',
     quality:  int = DEFAULT_QUALITY,
-) -> CoverPlan:
+) -> CoverKitPlan:
     """构建单个 CBZ 的封面写入计划（plan 阶段即完成裁剪 + 编码）。
 
     任何步骤异常都被吸收进 plan.error，调用方据此过滤；不会抛出。
@@ -229,7 +229,7 @@ def plan_cover(
         with zipfile.ZipFile(cbz_path, 'r') as zf:
             src_name  = find_source_image(zf)
             if src_name is None:
-                return CoverPlan(
+                return CoverKitPlan(
                     cbz_path=cbz_path, src_name=None, src_size=None,
                     dst_size=None, mode=mode, dst_name=None, webp_bytes=None,
                     existing_bytes=None, error='未找到 cover.* / 0001.* 源图',
@@ -243,7 +243,7 @@ def plan_cover(
                     break
             src_bytes = zf.read(src_name)
     except Exception as e:
-        return CoverPlan(
+        return CoverKitPlan(
             cbz_path=cbz_path, src_name=None, src_size=None, dst_size=None,
             mode=mode, dst_name=None, webp_bytes=None, existing_bytes=None,
             error=f'打开 CBZ 失败: {e}',
@@ -253,7 +253,7 @@ def plan_cover(
     # 步长取整会切几像素，center 模式也会因 WebP 重编码而字节不一致），
     # 导致每跑一次都"变小一圈"。这里直接标记为已是最新，跳过处理。
     if src_name.lower() == dst_name.lower():
-        return CoverPlan(
+        return CoverKitPlan(
             cbz_path=cbz_path, src_name=src_name, src_size=None,
             dst_size=None, mode=mode, dst_name=dst_name,
             webp_bytes=src_bytes, existing_bytes=src_bytes, error='',
@@ -276,21 +276,21 @@ def plan_cover(
         fitted  = resize_to_target(cropped, MAX_SIZE)
         webp    = encode_webp(fitted, quality=quality)
     except Exception as e:
-        return CoverPlan(
+        return CoverKitPlan(
             cbz_path=cbz_path, src_name=src_name, src_size=None, dst_size=None,
             mode=mode, dst_name=dst_name, webp_bytes=None,
             existing_bytes=existing,
             error=f'图像处理失败 ({src_name}): {e}',
         )
 
-    return CoverPlan(
+    return CoverKitPlan(
         cbz_path=cbz_path, src_name=src_name, src_size=src_size,
         dst_size=fitted.size, mode=mode, dst_name=dst_name, webp_bytes=webp,
         existing_bytes=existing, error='',
     )
 
 
-def apply_cover_plan(plan: CoverPlan) -> str:
+def apply_plan(plan: CoverKitPlan) -> str:
     """写入单个 CBZ 的目标封面（plan.dst_name）。
 
     源为 cover.* 时，写入后同步从 ZIP 删除所有 cover.* 条目（自身）。
@@ -315,21 +315,21 @@ def apply_cover_plan(plan: CoverPlan) -> str:
 # 批量 plan / apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _progress_line(idx: int, total: int, plan: CoverPlan) -> str:
+def _progress_line(idx: int, total: int, plan: CoverKitPlan) -> str:
     icon = ('*' if plan.writable and plan.changed
             else '-' if plan.writable
             else '!')
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
-def plan_covers(
+def preview_plans(
     root:    str,
     mode:    str = 'center',
     quality: int = DEFAULT_QUALITY,
     jobs:    int = 1,
     on_progress=None,
     cancel_token=None,
-) -> list[CoverPlan]:
+) -> list[CoverKitPlan]:
     """递归扫描 root 下所有 .cbz，返回 plan 列表。
 
     Args:
@@ -348,7 +348,7 @@ def plan_covers(
     emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
     return run_plans(
         files,
-        partial(plan_cover, mode=mode, quality=quality),
+        partial(preview_plan, mode=mode, quality=quality),
         jobs=jobs,
         progress_line=_progress_line,
         on_progress=on_progress,
@@ -356,13 +356,13 @@ def plan_covers(
     )
 
 
-def apply_cover_plans(
-    plans: list[CoverPlan], dry_run: bool = True, cancel_token=None,
+def apply_plans(
+    plans: list[CoverKitPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """整批写入封面。
 
     Args:
-        plans:   预览阶段产出的 CoverPlan 列表。
+        plans:   预览阶段产出的 CoverKitPlan 列表。
         dry_run: True 时仅提示。
         cancel_token: threading.Event，已 set 时提前退出。
 
@@ -388,7 +388,7 @@ def apply_cover_plans(
         if not plan.changed:
             skip += 1   # 现有封面与目标字节完全一致，幂等跳过
             continue
-        if apply_cover_plan(plan) == 'ok':
+        if apply_plan(plan) == 'ok':
             ok_n += 1
         else:
             fail += 1

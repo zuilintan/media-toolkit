@@ -1,7 +1,7 @@
 """
-metadata_tab.py — meta 子命令的 GUI Tab
+meta_kit_tab.py — meta-kit 子命令的 GUI Tab
 
-复用 manga.workflow.metadata 的 plan_metadatas / apply_metadata_plans。
+复用 manga.workflow.meta_kit 的 preview_plans / apply_plans。
 """
 
 from __future__ import annotations
@@ -12,14 +12,14 @@ from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import MetadataPlan
+from module.manga.core.models import MetaKitPlan
 from module.manga.gui.tabs.base_tab import BaseTab
-from module.manga.presentation.view import print_metadata_preview
-from module.manga.workflow.metadata import apply_metadata_plans, plan_metadatas
+from module.manga.presentation.view import print_meta_kit_preview
+from module.manga.workflow.meta_kit import apply_plans, preview_plans
 
 
-class MetadataTab(BaseTab):
-    cmd_name         = 'meta'
+class MetaKitTab(BaseTab):
+    cmd_name         = 'meta-kit'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的文件'
@@ -44,18 +44,18 @@ class MetadataTab(BaseTab):
         return 'CBZ ComicInfo.xml 批量工具'
 
     def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        return plan_metadatas, (root,), {'jobs': self._jobs.value()}
+        return preview_plans, (root,), {'jobs': self._jobs.value()}
 
     def _apply_fn(self):
-        return apply_metadata_plans
+        return apply_plans
 
-    def _render_preview(self, plans: list[MetadataPlan]) -> None:
-        print_metadata_preview(plans)
+    def _render_preview(self, plans: list[MetaKitPlan]) -> None:
+        print_meta_kit_preview(plans)
 
-    def _count_actionable(self, plans: list[MetadataPlan]) -> int:
+    def _count_actionable(self, plans: list[MetaKitPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
 
-    def _classify_plans(self, plans: list[MetadataPlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[MetaKitPlan]) -> dict[str, int]:
         writable = sum(1 for p in plans if p.writable and p.changed)
         unchanged = sum(1 for p in plans if p.writable and not p.changed)
         return {'可写入': writable, '无变化': unchanged,

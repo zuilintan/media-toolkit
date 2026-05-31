@@ -1,5 +1,5 @@
 """
-base_tab.py — 三个子命令 Tab 的通用基类
+base_tab.py — 四个子命令 Tab 的通用基类
 
 承担的共性
 ----------
@@ -43,7 +43,7 @@ class BaseTab(QWidget):
     busy_changed = Signal(bool)
 
     # ── 子类必须覆盖的类常量 ───────────────────────────────────────────
-    cmd_name:        str = ''          # 'sourcefile' / 'metadata' / 'cover'
+    cmd_name:        str = ''          # 'rename-kit' / 'meta-kit' / 'cover-kit' / 'pack-kit'
     apply_btn_text:  str = '执行'      # 写入按钮文案
     confirm_verb:    str = '写入'      # QMessageBox 中的动词
     no_change_msg:   str = '没有需要写入的项目'

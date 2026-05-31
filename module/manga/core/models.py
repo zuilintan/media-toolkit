@@ -153,12 +153,12 @@ class MangaInfo:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SourcefilePlan（sourcefile 子命令：源文件重命名计划）
+# RenameKitPlan（rename-kit 子命令：源文件重命名计划）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class SourcefilePlan:
-    """单个源文件的重命名计划（sourcefile 子命令仅处理 .zip / .cbz 文件）。
+class RenameKitPlan:
+    """单个源文件的重命名计划（rename-kit 子命令仅处理 .zip / .cbz 文件）。
 
     Attributes:
         author_dir: 作者目录路径（字符串，便于 JSON 序列化）。
@@ -185,14 +185,14 @@ class SourcefilePlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MetadataPlan（metadata 子命令：单个 CBZ 的 ComicInfo 写入计划）
+# MetaKitPlan（meta-kit 子命令：单个 CBZ 的 ComicInfo 写入计划）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class MetadataPlan:
+class MetaKitPlan:
     """单个 CBZ 的 ComicInfo.xml 写入计划（解析阶段产出，写入阶段消费）。
 
-    与 SourcefilePlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
+    与 RenameKitPlan 一样属于「批量 plan → 整批 apply」流程的中间数据。
 
     plan 阶段即构建 new_xml（确定性），写入阶段直接复用，并据 ``changed``
     实现幂等：已有 ComicInfo.xml 完全一致则跳过。
@@ -238,11 +238,11 @@ class MetadataPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CoverPlan（cover 子命令：CBZ 封面生成/替换计划）
+# CoverKitPlan（cover-kit 子命令：CBZ 封面生成/替换计划）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class CoverPlan:
+class CoverKitPlan:
     """单个 CBZ 的封面写入计划（plan 阶段产出，apply 阶段消费）。
 
     plan 阶段会真正解码源图、裁剪、转为 WebP 字节，apply 阶段只追加写入；
@@ -292,11 +292,11 @@ class CoverPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PackPlan（pack 子命令：图片目录 → 序号化重命名 + STORED zip 打包）
+# PackKitPlan（pack-kit 子命令：图片目录 → 序号化重命名 + STORED zip 打包）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class PackPlan:
+class PackKitPlan:
     """单个「打包单位」的序号化重命名 + 打包计划。
 
     打包单位由 workflow.pack._find_units 递归识别，分两种:
@@ -344,7 +344,7 @@ class PackPlan:
         """nested 模式下涉及的子目录数；flat 模式恒为 0。
 
         只统计含 ``/`` 的条目（真正的子目录条目）；nested 顶层文件
-        （cover/ComicInfo 等）的 old 是裸文件名，不在此处计入。
+        （cover.*/ComicInfo.xml 等）的 old 是裸文件名，不在此处计入。
         """
         if self.kind != 'nested':
             return 0

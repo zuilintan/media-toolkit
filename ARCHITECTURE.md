@@ -23,12 +23,12 @@ module/                          — 业务包命名空间
 │   ├── __main__.py              — 适配 `python -m module.manga` 的转发层
 │   ├── cli/                     — CLI 入口 + 子命令调度（main = manga-cli）
 │   │   ├── __init__.py          — build_parser() / main()
-│   │   ├── name.py              — name 子命令
-│   │   ├── meta.py              — meta 子命令
-│   │   ├── cover.py             — cover 子命令
-│   │   ├── pack.py              — pack 子命令
+│   │   ├── rename_kit.py          — rename-kit 子命令
+│   │   ├── meta_kit.py          — meta-kit 子命令
+│   │   ├── cover_kit.py         — cover-kit 子命令
+│   │   ├── pack_kit.py          — pack-kit 子命令
 │   │   ├── doctor.py            — doctor 子命令（环境体检）
-│   │   └── examples.py          — 内置示例（name / meta 共用）
+│   │   └── examples.py          — 内置示例（rename-kit / meta-kit 共用）
 │   ├── gui/                     — 桌面 GUI（PySide6，可选依赖）
 │   │   ├── __init__.py          — QApplication 入口（main = manga-gui）
 │   │   ├── __main__.py          — `python -m module.manga.gui` / PyInstaller 入口
@@ -46,12 +46,12 @@ module/                          — 业务包命名空间
 │   │   ├── parser.py            — parse_name(author, name) → MangaInfo
 │   │   └── builder.py           — build_new_name(info) → str
 │   ├── presentation/            — 领域对象的终端渲染
-│   │   └── view.py              — print_run_banner / print_*_preview / print_metadata_diff_table
+│   │   └── view.py              — print_run_banner / print_*_preview / print_meta_kit_diff_table
 │   └── workflow/                — 高层工作流
-│       ├── sourcefile.py        — 源文件扫描、重命名执行（name 子命令工作流）
-│       ├── metadata.py          — ComicInfo.xml 生成 & 写入（meta 子命令工作流）
-│       ├── cover.py             — 封面查找、裁剪、WebP 编码、CBZ 追加写入
-│       └── pack.py              — 图片目录序号化 + STORED zip 打包
+│       ├── rename_kit.py          — 源文件扫描、重命名执行（rename-kit 子命令工作流）
+│       ├── meta_kit.py          — ComicInfo.xml 生成 & 写入（meta-kit 子命令工作流）
+│       ├── cover_kit.py         — 封面查找、裁剪、WebP 编码、CBZ 追加写入
+│       └── pack_kit.py          — 图片目录序号化 + STORED zip 打包
 └── artifact/                    — 文件工具（artifact toolkit）
     ├── __init__.py
     ├── cli/                     — CLI 入口（main = artifact-cli）
