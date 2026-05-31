@@ -26,8 +26,7 @@ body = """
 [git]
 # 解析 conventional commit footer / breaking change
 conventional_commits = true
-# 不丢弃无 type 前缀的提交（用户有些是 "gui: ..." / "pack: ..." 无标准 type）
-filter_unconventional = false
+filter_unconventional = true
 # 不分割多 issue
 split_commits = false
 
@@ -42,8 +41,6 @@ commit_parsers = [
   { message = "^ci",        group = "⚙️ CI" },
   { message = "^build",     group = "📦 Build" },
   { message = "^chore",     group = "🔧 Chore" },
-  # 兜底：把 "gui:" / "pack:" 这类非标准 type 也展示出来
-  { message = ".*",         group = "📌 Other" },
 ]
 
 # 升序处理 commits，按时间升序在每组内呈现
