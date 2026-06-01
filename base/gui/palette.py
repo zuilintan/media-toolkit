@@ -16,32 +16,31 @@ PRIMARY_DISABLED = '#1f3d6e'
 # PRIMARY 背景之上的前景色（按钮文字 / 选区文字 —— 深浅主题都恒为白）
 ON_PRIMARY = '#ffffff'
 
-# 文本
-TEXT        = '#e6edf3'
+# 文本（整体去除纯白感，GitHub Dark 标准灰白）
+TEXT        = '#c9d1d9'
 TEXT_MUTED  = '#8b949e'         # 状态行 / 次要 label
 TEXT_DIM    = '#6e7681'         # 禁用 / 占位
-TEXT_LOG    = '#c9d1d9'         # LogView：去除纯白感，缓解长时间阅读疲劳
 
 # 边框 / 分割
-BORDER        = '#30363d'
-BORDER_STRONG = '#484f58'
-BORDER_SOFT   = '#21262d'
+BORDER        = '#363c45'
+BORDER_STRONG = '#4a5159'
+BORDER_SOFT   = '#262c34'
 
-# 背景
-BG          = '#0d1117'         # 窗口底
-BG_RAISED   = '#161b22'         # pane / button / input
-BG_SUBTLE   = '#010409'         # drop-area（凹陷感，配 dashed border）
-BG_LOG      = '#1a1f29'         # LogView：柔和深灰，配 TEXT_LOG 对比度 ~10.5:1
-BG_HOVER    = '#1c2128'
-BG_PRESSED  = '#272d36'
-BG_BUTTON_HOVER = '#1f242c'
+# 背景（整体提亮 ~5-8%，降低与文本的对比，更柔和）
+BG          = '#161a21'         # 窗口底
+BG_RAISED   = '#1d222b'         # pane / button / input
+BG_SUBTLE   = '#0b0e13'         # drop-area（配 dashed border 仍呈凹陷）
+BG_LOG      = '#1a1f29'         # LogView：略凹于 BG_RAISED，呈"代码块"感
+BG_HOVER    = '#232934'
+BG_PRESSED  = '#2d333d'
+BG_BUTTON_HOVER = '#262c36'
 
 # 滚动条
-SCROLLBAR        = '#30363d'
-SCROLLBAR_HOVER  = '#484f58'
+SCROLLBAR        = '#363c45'
+SCROLLBAR_HOVER  = '#4a5159'
 
 # Tooltip
-TOOLTIP_BG = '#1f242c'
+TOOLTIP_BG = '#232934'
 TOOLTIP_FG = TEXT
 
 
@@ -156,10 +155,9 @@ QPlainTextEdit {{
     selection-background-color: {PRIMARY};
     selection-color: {ON_PRIMARY};
 }}
-/* LogView 专用：柔和深灰背景 + 非纯白文本，对比度 ~10.5:1 */
+/* LogView 专用：略凹于 BG_RAISED 的"代码块"背景 */
 QPlainTextEdit#LogView {{
     background: {BG_LOG};
-    color: {TEXT_LOG};
 }}
 
 QGroupBox {{
