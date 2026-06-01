@@ -59,7 +59,6 @@ jobs:
           uv run pyinstaller --noconfirm --windowed --onefile `
             --name "media-toolkit-gui-${{ steps.tag.outputs.name }}" `
             --add-data "module/manga/data/examples.json;module/manga/data" `
-            --add-data "module/artifact/config_template.json;module/artifact" `
             --collect-submodules module `
             --collect-submodules base `
             --collect-submodules app `
