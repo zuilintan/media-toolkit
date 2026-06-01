@@ -9,7 +9,7 @@
     artifact-cli classify --drag                       # 循环拖入模式（推荐）
     artifact-cli classify ./AuthorA                    # 单次处理
     artifact-cli classify ./a ./b ./c                  # 多个一起
-    artifact-cli classify ./a --target M:/MK/作者/A    # 指定目标跳过候选交互
+    artifact-cli classify ./a --target M:/MMD/作者/A    # 指定目标跳过候选交互
     artifact-cli classify --drag --no-open             # 完成后不开资源管理器
 """
 
@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
             '示例:\n'
             '  artifact-cli classify --drag\n'
             '  artifact-cli classify ./AuthorA\n'
-            '  artifact-cli classify ./a --target M:/MK/作者/A\n'
+            '  artifact-cli classify ./a --target M:/MMD/作者/A\n'
         ),
     )
 
