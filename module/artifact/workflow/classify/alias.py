@@ -1,13 +1,9 @@
-"""
-alias.py — 别名扫描
+"""别名扫描（在 :class:`~module.artifact.workflow.classify.config.WorkDir` 下查
+``[别名]：XXX.txt`` 文件）。
 
-在每个 WorkDir 下的所有作者目录里查找 ``[别名]：XXX.txt`` 文件：
-  - 文件本身可空（数据载体在文件名上）
-  - 前缀 ``[别名]：`` 中的 ``：`` 为全角冒号 (U+FF1A)，与 ps1 兼容
-
-输出: alias_name → 作者目录绝对路径 的字典（大小写不敏感的 key）
-
-依赖: 仅标准库；可选并行扫描（ThreadPoolExecutor）以加速 N 个工作目录。
+文件本身可空（数据载体在文件名上）；前缀 :data:`ALIAS_PREFIX` 中的 ``：``
+为全角冒号 (U+FF1A)，与 ps1 兼容。:func:`scan_aliases` 用 ThreadPoolExecutor
+并行扫多个 WorkDir，输出大小写不敏感的 ``alias → 作者目录`` 映射。
 """
 
 from __future__ import annotations
@@ -21,9 +17,11 @@ ALIAS_SUFFIX = '.txt'
 
 
 def _scan_one_workdir(workdir: Path) -> list[tuple[str, Path]]:
-    """扫描单个 WorkDir 下所有作者目录里的别名文件，返回 [(别名, 作者目录)]。
+    """扫描单个 WorkDir 下所有作者目录里的别名文件。
 
     缺失或不可读的目录返回空 list（由调用方决定是否报告）。
+
+    :return: ``[(别名, 作者目录)]``。
     """
     out: list[tuple[str, Path]] = []
     if not workdir.is_dir():
@@ -67,13 +65,10 @@ def scan_aliases(
 ) -> dict[str, Path]:
     """并行扫描所有 WorkDir，返回大小写不敏感的 ``alias → 作者目录`` 映射。
 
-    Args:
-        workdirs:    要扫描的 WorkDir 列表。
-        reporter:    状态回调（每个目录扫描结果）。
-        max_workers: 并行线程数。
-
-    Returns:
-        ``alias_name (case-insensitive) → author_dir Path``
+    :param workdirs:    要扫描的 WorkDir 列表。
+    :param reporter:    状态回调（每个目录扫描结果）。
+    :param max_workers: 并行线程数。
+    :return: ``alias_name (大小写不敏感) → author_dir Path``。
     """
     result: dict[str, Path] = _CaseInsensitiveDict()
 

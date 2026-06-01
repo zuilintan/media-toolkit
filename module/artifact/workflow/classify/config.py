@@ -1,17 +1,10 @@
-"""
-config.py — file-toolkit 配置加载
+"""file-toolkit 配置加载（``<user_config>/file-toolkit/config.json``）。
 
-配置文件路径: ``<user_config>/file-toolkit/config.json``
-  Windows : %LOCALAPPDATA%/file-toolkit/config.json
-  Linux   : ~/.config/file-toolkit/config.json
-  macOS   : ~/Library/Application Support/file-toolkit/config.json
+跨平台路径由 :func:`~base.config_paths.user_config_dir` 解析；模板预置在
+``module/artifact/config_template.json``（随 wheel 一起分发）。
 
-模板预置在 ``module/artifact/config_template.json``（随 wheel 一起分发）。
-
-设计：
-  - 找不到 config 时抛 FileNotFoundError，消息中含期望路径与模板路径；
-    禁止静默自动落盘（避免悄悄写入默认值让用户搞不清来源）。
-  - WorkDir 是 dataclass，含 ``path`` 与 ``search_url_template`` 两字段。
+设计：找不到 config 时抛 :exc:`FileNotFoundError`，消息中含期望路径与模板路径；
+禁止静默自动落盘（避免悄悄写入默认值让用户搞不清来源）。
 """
 
 from __future__ import annotations
@@ -28,9 +21,12 @@ TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / 'config_template
 
 @dataclass(frozen=True)
 class WorkDir:
-    """工作目录（含归类作者文件夹）+ 搜索 URL 模板。"""
+    """工作目录（含归类作者文件夹）+ 搜索 URL 模板。
+
+    :ivar search_url_template: 含 ``{author}`` 占位符；空串表示不打印 URL。
+    """
     path: Path
-    search_url_template: str   # 含 {author} 占位符；空串表示不打印 URL
+    search_url_template: str
 
 
 @dataclass(frozen=True)
@@ -38,10 +34,7 @@ class Config:
     workdirs: list[WorkDir]
 
     def find_workdir(self, p: Path) -> WorkDir | None:
-        """根据一个候选目录路径反查所属 WorkDir。
-
-        匹配规则：候选目录 p 的某个祖先 == WorkDir.path。
-        """
+        """根据一个候选目录路径反查所属 :class:`WorkDir`（匹配规则：``p`` 的某个祖先 == :attr:`WorkDir.path`）。"""
         try:
             resolved = p.resolve()
         except Exception:
@@ -63,11 +56,8 @@ def config_path() -> Path:
 def load_config(path: Path | None = None) -> Config:
     """从 JSON 加载配置；找不到时给出带模板路径的指引。
 
-    Args:
-        path: 自定义配置路径；None 走默认 ``config_path()``。
-
-    Raises:
-        FileNotFoundError: 文件不存在时；消息含期望路径与模板路径。
+    :param path: 自定义配置路径；``None`` 走默认 :func:`config_path`。
+    :raises FileNotFoundError: 文件不存在时；消息含期望路径与模板路径。
     """
     cfg_path = path or config_path()
     if not cfg_path.is_file():

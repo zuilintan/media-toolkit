@@ -1,7 +1,7 @@
-"""artifact — file-toolkit 业务包
+"""file-toolkit 业务包（以"文件搬移/整理"为核心）。
 
-文件归类（classify）等以"文件搬移/整理"为核心的业务模块集合。
-对标 manga（manga-toolkit）的结构：cli / gui / workflow 三层划分。
+对标 :mod:`module.manga` 的结构：cli / gui / workflow 三层划分；
+首个业务模块为 :mod:`~module.artifact.workflow.classify`（文件归类）。
 """
 
 from base import __version__  # noqa: F401

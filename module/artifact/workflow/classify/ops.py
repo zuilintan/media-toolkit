@@ -1,11 +1,11 @@
-"""
-ops.py — 文件归类核心搬移
+"""文件归类核心搬移（只支持 move 模式，ps1 ``Invoke-ContentOperation`` 简化版）。
 
-只支持 move 模式（剪切）。来自 ps1 的 Invoke-ContentOperation 简化版：
-  - 拖入是目录 → ``merge_into(src, dst)`` 递归合并；合并后 src 为空则删除
-  - 拖入是文件 → 目标已存在则**跳过**（与 ps1 单文件分支一致），否则 move
-  - 操作完成后调 reporter 输出统计 + iwara 搜索 URL（若 WorkDir 配置了）
-  - 可选：``open_target=True`` 时尝试用系统默认动作打开目标目录
+入口 :func:`classify_one`：
+
+- 拖入目录 → :func:`~base.fs.merge_into` 递归合并；合并后 src 为空则删除
+- 拖入文件 → 目标已存在则跳过（与 ps1 单文件分支一致），否则 ``shutil.move``
+- 操作完成后调 ``reporter`` 输出统计 + iwara 搜索 URL（若 :class:`~module.artifact.workflow.classify.config.WorkDir` 配置了模板）
+- 可选：``open_target=True`` 时用系统默认动作打开目标目录
 """
 
 from __future__ import annotations
@@ -26,14 +26,18 @@ from module.artifact.workflow.classify.config import WorkDir
 
 @dataclass(frozen=True)
 class ClassifyResult:
-    """单次归类的结果摘要。"""
+    """单次归类的结果摘要。
+
+    :ivar skipped_file: 单文件且目标已存在。
+    :ivar src_removed:  源目录是否已被清理。
+    """
     src:          Path
     dst:          Path
     moved:        int = 0
     overwritten:  int = 0
     failed:       int = 0
-    skipped_file: bool = False     # 单文件且目标已存在
-    src_removed:  bool = False     # 源目录是否已被清理
+    skipped_file: bool = False
+    src_removed:  bool = False
 
     @property
     def ok(self) -> bool:
@@ -53,18 +57,16 @@ def classify_one(
     open_target: bool = True,
     reporter:    Reporter = _default_reporter,
 ) -> ClassifyResult:
-    """把 src（文件或目录）归类到 dst 目录里。
+    """把 ``src``（文件或目录）归类到 ``dst`` 目录里。
 
-    Args:
-        src:         拖入的源（文件或目录）。
-        dst:         目标作者目录（文件 / 子内容会被放入其中）。
-        workdir:     dst 所属的 WorkDir；用于打印 iwara 搜索 URL。None 跳过。
-        author_name: 用于 URL 占位符填充；None 时跳过 URL 打印。
-        open_target: 操作成功后是否打开 dst 资源管理器。
-        reporter:    日志输出回调。
-
-    Returns:
-        ClassifyResult 摘要。
+    :param src:         拖入的源（文件或目录）。
+    :param dst:         目标作者目录（文件 / 子内容会被放入其中）。
+    :param workdir:     ``dst`` 所属的 :class:`~module.artifact.workflow.classify.config.WorkDir`；
+                        用于打印 iwara 搜索 URL；``None`` 跳过。
+    :param author_name: 用于 URL 占位符填充；``None`` 时跳过 URL 打印。
+    :param open_target: 操作成功后是否打开 ``dst`` 资源管理器。
+    :param reporter:    日志输出回调。
+    :return: :class:`ClassifyResult` 摘要。
     """
     dst.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +94,7 @@ def classify_one(
 def _classify_dir(
     src: Path, dst: Path, *, reporter: Reporter,
 ) -> ClassifyResult:
-    """目录归类: merge_into 合并 → 若源空则删源。"""
+    """目录归类：:func:`~base.fs.merge_into` 合并 → 若源空则删源。"""
     reporter('info', f'\n🔄 合并目录: {src.name} → {dst}')
     stats = merge_into(src, dst, reporter=reporter)
 
@@ -123,7 +125,7 @@ def _classify_dir(
 def _classify_file(
     src: Path, dst: Path, *, reporter: Reporter,
 ) -> ClassifyResult:
-    """文件归类: 目标已存在 → 跳过；否则 shutil.move。"""
+    """文件归类：目标已存在 → 跳过；否则 ``shutil.move``。"""
     target = dst / src.name
     if target.exists():
         reporter('warn', f'⏭️ 目标文件已存在，跳过: {target}')
@@ -158,7 +160,7 @@ def _open_in_file_manager(p: Path, *, reporter: Reporter) -> None:
 def _print_search_url(
     workdir: WorkDir, author_name: str, *, reporter: Reporter,
 ) -> None:
-    """按 WorkDir 配置的模板格式化并打印搜索 URL。空模板跳过。"""
+    """按 :attr:`WorkDir.search_url_template` 格式化并打印搜索 URL（空模板跳过）。"""
     tpl = workdir.search_url_template
     if not tpl:
         return

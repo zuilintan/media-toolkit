@@ -1,13 +1,9 @@
-"""
-path.py — 拖入路径 → 作者名解析
+"""拖入路径 → 作者名解析（ps1 ``Get-AuthorNameFromPath`` 等价）。
 
-规则（来自 ps1 Get-AuthorNameFromPath）:
-  - 拖入文件夹 → 文件夹名即作者名
-  - 拖入文件   → 父目录名即作者名
+拖入文件夹 → 文件夹名即作者名；拖入文件 → 父目录名即作者名。例::
 
-例:
-  D:\\Downloads\\AuthorA               → 'AuthorA'
-  D:\\Downloads\\AuthorA\\video.mp4    → 'AuthorA'
+    D:\\Downloads\\AuthorA               → 'AuthorA'
+    D:\\Downloads\\AuthorA\\video.mp4    → 'AuthorA'
 """
 
 from __future__ import annotations
