@@ -6,10 +6,22 @@ from pathlib import Path
 import pytest
 
 from base.fs import merge_into
-from module.artifact.workflow.classify.alias import ALIAS_PREFIX, scan_aliases
+from module.artifact.workflow.classify import alias as alias_module
+from module.artifact.workflow.classify.alias import (
+    ALIAS_PREFIX, load_aliases, scan_aliases,
+)
 from module.artifact.core.runtime_config import Config, WorkDir, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.path import path_to_author_name
+
+
+@pytest.fixture(autouse=True)
+def _isolated_alias_cache(tmp_path, monkeypatch):
+    """把别名缓存路径重定向到 tmp_path，避免 scan_aliases 写盘污染真实用户缓存。"""
+    monkeypatch.setattr(
+        alias_module, 'aliases_cache_path',
+        lambda: tmp_path / 'aliases.json',
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -91,6 +103,55 @@ class TestScanAliases:
         (author / f'{ALIAS_PREFIX}   .txt').write_text('')
         m = scan_aliases([wd], reporter=lambda l, m: None)
         assert len(m) == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# alias.load_aliases (cache persistence + 启动校验)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestAliasCache:
+    def _mk_alias(self, author_dir: Path, alias: str) -> None:
+        author_dir.mkdir(parents=True, exist_ok=True)
+        (author_dir / f'{ALIAS_PREFIX}{alias}.txt').write_text('')
+
+    def test_load_empty_when_cache_missing(self) -> None:
+        # 启动初次：缓存文件尚未生成
+        valid, invalid = load_aliases(reporter=lambda *_: None)
+        assert valid == {}
+        assert invalid == []
+
+    def test_scan_writes_cache_then_load_restores(self, tmp_path: Path) -> None:
+        wd = tmp_path / 'wd'
+        self._mk_alias(wd / 'AuthorA', 'AliasA')
+        self._mk_alias(wd / 'AuthorB', 'AliasB')
+        # 扫描即落盘
+        scan_aliases([wd], reporter=lambda *_: None)
+        # 直接从缓存恢复，目录仍存在 → 全部 valid
+        valid, invalid = load_aliases(reporter=lambda *_: None)
+        assert invalid == []
+        assert set(valid.keys()) == {'aliasa', 'aliasb'}
+        assert valid['AliasA'] == wd / 'AuthorA'
+
+    def test_load_filters_invalid_entries(self, tmp_path: Path) -> None:
+        wd = tmp_path / 'wd'
+        self._mk_alias(wd / 'AuthorAlive', 'alive')
+        self._mk_alias(wd / 'AuthorDoomed', 'doomed')
+        scan_aliases([wd], reporter=lambda *_: None)
+        # 删掉一个作者目录，模拟"缓存指向已不存在的目录"
+        import shutil
+        shutil.rmtree(wd / 'AuthorDoomed')
+
+        valid, invalid = load_aliases(reporter=lambda *_: None)
+        assert 'alive' in valid
+        assert 'doomed' not in valid
+        assert invalid == ['doomed']
+
+    def test_load_corrupt_cache_treated_as_empty(self, tmp_path: Path) -> None:
+        # 直接写一个无效 JSON
+        (tmp_path / 'aliases.json').write_text('{not valid json', encoding='utf-8')
+        valid, invalid = load_aliases(reporter=lambda *_: None)
+        assert valid == {}
+        assert invalid == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

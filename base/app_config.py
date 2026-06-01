@@ -1,18 +1,25 @@
 """统一持久化目录与 JSON 配置基类（不依赖 PySide6，CLI/GUI 均可用）。
 
-约定：所有运行期可变状态都落在::
+目录约定（统一根 ``<user_config>/media-toolkit/``）::
 
-    Windows : %LOCALAPPDATA%/media-toolkit/config/<file>.json
-    macOS   : ~/Library/Application Support/media-toolkit/config/<file>.json
-    Linux   : ${XDG_CONFIG_HOME:-~/.config}/media-toolkit/config/<file>.json
+    config/   — 用户编辑的配置（GUI 提供「修改配置」按钮指向之）
+    cache/    — 程序管理的缓存数据（启动期可重建，用户不需要直接编辑）
 
-三个固定 JSON：
+具体跨平台路径::
+
+    Windows : %LOCALAPPDATA%/media-toolkit/{config,cache}/<file>.json
+    macOS   : ~/Library/Application Support/media-toolkit/{config,cache}/<file>.json
+    Linux   : ${XDG_CONFIG_HOME:-~/.config}/media-toolkit/{config,cache}/<file>.json
+
+``config/`` 下三个固定 JSON：
 
 - ``gui.json``      — GUI 用户状态（路径历史 / jobs / quality / 窗口几何 …）
 - ``artifact.json`` — artifact 业务配置（workdirs 等）
-- ``manga.json``    — manga 业务配置（占位预留）
+- ``manga.json``    — manga 业务运行期配置（占位预留）
 
 artifact / manga 文件缺失时由各自的 :class:`JsonConfig` 子类用 ``default`` 自动落盘。
+
+``cache/`` 下当前仅 ``aliases.json``（artifact 别名扫描结果缓存）。
 """
 
 from __future__ import annotations
@@ -28,6 +35,13 @@ APP_DIR_NAME = 'media-toolkit'
 def config_dir() -> Path:
     """``<user_config>/media-toolkit/config/``（自动创建）。"""
     d = user_config_dir(APP_DIR_NAME) / 'config'
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def cache_dir() -> Path:
+    """``<user_config>/media-toolkit/cache/``（自动创建）。"""
+    d = user_config_dir(APP_DIR_NAME) / 'cache'
     d.mkdir(parents=True, exist_ok=True)
     return d
 

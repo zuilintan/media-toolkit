@@ -3,12 +3,14 @@
 布局：``QVBoxLayout`` → 按钮行（修改配置 + 重载配置 + 刷新别名）+ WorkDirs
 摘要 label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
-业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config`
-→ 显示 WorkDirs（空则提示且禁用拖入）；三个按钮职责单一互不联动：
+业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config` 加载
+workdirs + :func:`~module.artifact.workflow.classify.alias.load_aliases` 从
+缓存恢复 alias_map（同时校验目录是否仍存在，失效条目剔除并在 label 提示）；
+三个按钮职责单一互不联动：
 
 - 「修改配置」用关联程序打开 artifact.json
 - 「重载配置」仅重读 workdirs 并刷新 UI（不动 alias_map）
-- 「刷新别名」仅 re-scan ``[别名]：*.txt`` 写入 alias_map（不动 workdirs）
+- 「刷新别名」re-scan ``[别名]：*.txt``、写入 alias_map 并落盘缓存
 
 拖入 → 逐个 :meth:`ClassifyTab._process_one` → 候选 0/1/N 分支 →
 :func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
@@ -28,7 +30,7 @@ from base.console import emit, error, set_output, warn
 from base.gui.qt_sink import QtSink
 from module.artifact.gui.widgets.candidate_dialog import ask_candidate
 from module.artifact.gui.widgets.drop_area import DropArea
-from module.artifact.workflow.classify.alias import scan_aliases
+from module.artifact.workflow.classify.alias import load_aliases, scan_aliases
 from module.artifact.core.runtime_config import Config, config_path, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.ops import classify_one
@@ -71,6 +73,7 @@ class ClassifyTab(QWidget):
         self._cfg: Config | None = None
         self._workdirs_paths: list[Path] = []
         self._alias_map: dict[str, Path] = {}
+        self._alias_invalid: list[str] = []   # 缓存中已失效的别名（启动校验产生）
 
         self._edit_cfg_btn = QPushButton('📝 修改配置')
         self._edit_cfg_btn.setToolTip(
@@ -111,25 +114,54 @@ class ClassifyTab(QWidget):
         lay.addWidget(self._drop, 1)
 
         self._load_workdirs()
+        self._load_alias_cache()
+        self._update_status_label()
 
     # ── 配置加载 & UI 同步 ────────────────────────────────────────────
     def _load_workdirs(self) -> None:
-        """读取 artifact.json → 更新 self._cfg / self._workdirs_paths / label / 拖入区可用性。"""
+        """读取 artifact.json → 更新 ``_cfg`` / ``_workdirs_paths`` / 拖入区可用性。
+
+        UI 文本由 :meth:`_update_status_label` 在调用方负责更新（合并别名状态）。
+        """
         self._cfg = load_config()
         if not self._cfg.workdirs:
             self._workdirs_paths = []
-            self._workdirs_label.setText(
-                '⚠️ artifact.workdirs 为空 —— 点「📝 修改配置」'
-                '编辑后再点「🔁 重载配置」。'
-            )
             self._drop.setEnabled(False)
             return
         self._workdirs_paths = [wd.path for wd in self._cfg.workdirs]
-        lines = '\n'.join(f'  • {wd.path}' for wd in self._cfg.workdirs)
-        self._workdirs_label.setText(
-            f'📁 WorkDirs ({len(self._cfg.workdirs)}):\n{lines}'
-        )
         self._drop.setEnabled(True)
+
+    def _load_alias_cache(self) -> None:
+        """从持久化缓存恢复别名映射并校验，更新 ``_alias_map`` / ``_alias_invalid``。"""
+        alias_map, invalid = load_aliases(reporter=lambda *_: None)
+        self._alias_map = alias_map
+        self._alias_invalid = invalid
+
+    def _update_status_label(self) -> None:
+        """合并 workdirs / 别名状态到顶部 label。"""
+        lines: list[str] = []
+        if not self._workdirs_paths:
+            lines.append(
+                '⚠️ artifact.workdirs 为空 —— 点「📝 修改配置」'
+                '编辑后再点「🔁 重载配置」。'
+            )
+        else:
+            lines.append(f'📁 WorkDirs ({len(self._workdirs_paths)}):')
+            lines += [f'  • {p}' for p in self._workdirs_paths]
+
+        if self._alias_invalid:
+            preview = ', '.join(self._alias_invalid[:5])
+            more = (f' 等 {len(self._alias_invalid)} 个'
+                    if len(self._alias_invalid) > 5 else '')
+            lines.append(
+                f'📇 别名缓存: {len(self._alias_map)} 可用 / '
+                f'🟡 {len(self._alias_invalid)} 个失效 — '
+                f'点「🔄 刷新别名」更新（失效示例: {preview}{more}）'
+            )
+        elif self._alias_map:
+            lines.append(f'📇 别名缓存: {len(self._alias_map)} 条已加载')
+
+        self._workdirs_label.setText('\n'.join(lines))
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
@@ -142,8 +174,10 @@ class ClassifyTab(QWidget):
     @Slot(object)
     def _on_scan_done(self, alias_map) -> None:
         self._alias_map = alias_map
+        self._alias_invalid = []   # 新扫结果一定全部有效；scan_aliases 已落盘
         self._reload_cfg_btn.setEnabled(True)
         self._refresh_alias_btn.setEnabled(True)
+        self._update_status_label()
 
     # ── 按钮回调 ──────────────────────────────────────────────────────
     def _on_edit_config(self) -> None:
@@ -161,6 +195,7 @@ class ClassifyTab(QWidget):
     def _on_reload_config(self) -> None:
         """仅重读 artifact.json → 更新 workdirs / UI；不触发别名扫描。"""
         self._load_workdirs()
+        self._update_status_label()
 
     def _on_refresh_alias(self) -> None:
         """仅重新扫描别名（workdirs 未变时使用，省略一次 IO）。"""

@@ -1,9 +1,15 @@
 """别名扫描（在 :class:`~module.artifact.core.runtime_config.WorkDir` 下查
-``[别名]：XXX.txt`` 文件）。
+``[别名]：XXX.txt`` 文件）+ 扫描结果落盘缓存。
 
 文件本身可空（数据载体在文件名上）；前缀 :data:`ALIAS_PREFIX` 中的 ``：``
 为全角冒号 (U+FF1A)，与 ps1 兼容。:func:`scan_aliases` 用 ThreadPoolExecutor
-并行扫多个 WorkDir，输出大小写不敏感的 ``alias → 作者目录`` 映射。
+并行扫多个 WorkDir，输出大小写不敏感的 ``alias → 作者目录`` 映射，并把结果
+落盘到 :func:`aliases_cache_path`（同步副作用）；下次启动可经
+:func:`load_aliases` 直接从缓存恢复，无需重复跨网络盘扫描。
+
+启动期校验：:func:`load_aliases` 对缓存中每条 ``author_dir`` 调 ``is_dir()``，
+失效条目从返回的 map 中剔除，但 JSON **不主动重写** —— 失效原因可能只是
+临时未挂载，让用户看到提示后自行点「刷新别名」决定是否重建。
 
 性能要点（针对 SMB / 网络盘的大目录树）::
 
@@ -14,14 +20,18 @@
 """
 
 from __future__ import annotations
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from base.app_config import cache_dir
 from base.fs import Reporter, _default_reporter
 
 ALIAS_PREFIX = '[别名]：'   # 全角冒号 U+FF1A
 ALIAS_SUFFIX = '.txt'
+ALIAS_CACHE_FILENAME = 'aliases.json'
+_CACHE_SCHEMA_VERSION = 1
 
 
 def _scan_one_workdir(workdir: Path) -> list[tuple[str, Path]]:
@@ -117,4 +127,73 @@ def scan_aliases(
                     result[alias] = author_dir
 
     reporter('info', f'✅ 别名加载完成: {len(result)} 条')
+    _save_aliases(result)
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 持久化缓存：scan_aliases 完成后落盘 / 启动期 load_aliases 恢复并校验
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def aliases_cache_path() -> Path:
+    """``<cache>/aliases.json`` 的绝对路径（不保证存在）。"""
+    return cache_dir() / ALIAS_CACHE_FILENAME
+
+
+def _save_aliases(alias_map: dict[str, Path]) -> None:
+    """把当前 ``alias_map`` 落盘为 :func:`aliases_cache_path` 指向的 JSON。
+
+    内部副作用，仅在 :func:`scan_aliases` 末尾调用。写盘失败不抛错（缓存损失
+    可重建，不应阻断业务），仅返回 False。
+    """
+    payload = {
+        '$schema_version': _CACHE_SCHEMA_VERSION,
+        'aliases': {alias: str(p) for alias, p in alias_map.items()},
+    }
+    try:
+        aliases_cache_path().write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), 'utf-8'
+        )
+    except OSError:
+        pass
+
+
+def load_aliases(
+    *, reporter: Reporter = _default_reporter,
+) -> tuple[dict[str, Path], list[str]]:
+    """从持久化缓存恢复别名映射，并校验每条记录指向的目录是否仍存在。
+
+    :return: ``(valid_map, invalid_aliases)``::
+
+        valid_map        — 校验通过的 ``alias → author_dir``（大小写不敏感），
+                           供 :func:`~module.artifact.workflow.classify.matcher.find_candidates` 使用
+        invalid_aliases  — 目录已失效的别名名称列表（lower-case 形式）；UI 据此
+                           提示用户考虑刷新
+
+    缓存缺失 / 解析失败 / 版本未来都按"空缓存"处理（返回 ``({}, [])``），不抛错；
+    本函数只读不写 —— 失效条目保留在 JSON，由 :func:`scan_aliases` 在用户主动
+    刷新时整体重写。
+    """
+    valid: dict[str, Path] = _CaseInsensitiveDict()
+    invalid: list[str] = []
+    path = aliases_cache_path()
+    if not path.exists():
+        return valid, invalid
+    try:
+        payload = json.loads(path.read_text('utf-8'))
+    except (OSError, ValueError) as e:
+        reporter('warn', f'别名缓存读取失败（按空缓存处理）: {e}')
+        return valid, invalid
+    raw = payload.get('aliases', {}) if isinstance(payload, dict) else {}
+
+    for alias, path_str in raw.items():
+        p = Path(path_str)
+        try:
+            ok = p.is_dir()
+        except OSError:
+            ok = False
+        if ok:
+            valid[alias] = p
+        else:
+            invalid.append(alias)
+    return valid, invalid

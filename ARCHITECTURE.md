@@ -109,21 +109,26 @@ app/gui.py  (main → app-gui)  ← module/manga/gui · module/artifact/gui · b
 
 ## 持久化目录
 
-所有运行期可变状态统一落在 `<user_config>/media-toolkit/config/` 下三个 JSON：
+所有运行期可变状态统一落在 `<user_config>/media-toolkit/`，分两类子目录：
 
 ```
-%LOCALAPPDATA%/media-toolkit/config/           (Windows)
-~/Library/Application Support/media-toolkit/config/    (macOS)
-${XDG_CONFIG_HOME:-~/.config}/media-toolkit/config/    (Linux)
-├── gui.json        — GUI 用户状态（PathPicker 历史 / 各 Tab jobs+quality+smart /
-│                     splitter sizes / Shell 窗口几何）；平铺 key，无 schema
-├── artifact.json   — artifact 业务配置（workdirs / search_url_template）；
-│                     缺失时由 base.app_config.JsonConfig 落盘 {"artifact.workdirs": []}；
-│                     GUI ClassifyTab 提供「📝 修改配置」（关联程序打开）+
-│                     「🔁 重载配置」（仅重读 workdirs）+
-│                     「🔄 刷新别名」（仅 re-scan 别名）三个按钮，职责单一
-└── manga.json      — manga 业务运行期配置；当前仅占位 {"$schema_version": 1}
+%LOCALAPPDATA%/media-toolkit/                  (Windows)
+~/Library/Application Support/media-toolkit/   (macOS)
+${XDG_CONFIG_HOME:-~/.config}/media-toolkit/   (Linux)
+├── config/         — 用户编辑的配置（GUI「📝 修改配置」按钮指向）
+│   ├── gui.json        — GUI 用户状态（PathPicker 历史 / 各 Tab jobs+quality+smart /
+│   │                     splitter sizes / Shell 窗口几何）；平铺 key，无 schema
+│   ├── artifact.json   — artifact 业务配置（workdirs / search_url_template）；
+│   │                     缺失时由 base.app_config.JsonConfig 落盘
+│   │                     {"artifact.workdirs": []}；GUI ClassifyTab 提供
+│   │                     「📝 修改配置」+「🔁 重载配置」+「🔄 刷新别名」三个按钮
+│   └── manga.json      — manga 业务运行期配置；当前仅占位 {"$schema_version": 1}
+└── cache/          — 程序管理的缓存（启动期可重建，用户不需直接编辑）
+    └── aliases.json    — artifact 别名扫描结果（[别名]：*.txt → author_dir）；
+                          scan_aliases 写盘，启动期 load_aliases 校验 +
+                          失效条目剔除并在 ClassifyTab 提示
 ```
 
 任意入口（CLI / GUI）启动期都会触发 `get_manga_config()` / `load_config()`，确保
-缺失时自动落盘。GUIConfig 同样在首次 `get_config()` 时落盘。
+config 缺失时自动落盘。cache 是「按需生成」：首次启动 aliases.json 不存在 →
+启动后空 alias_map → 用户点「🔄 刷新别名」生成；之后启动直接从缓存恢复。
