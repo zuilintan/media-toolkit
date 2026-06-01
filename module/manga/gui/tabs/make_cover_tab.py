@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from module.manga.core.models import MakeCoverPlan
 from base.gui.config import get_config
 from module.manga.gui.tabs.base_tab import BaseTab
-from module.manga.presentation.view import print_cover_preview
+from module.manga.presentation.view import print_make_cover_preview
 from module.manga.workflow.make_cover import (
     DEFAULT_QUALITY, apply_plans, preview_plans,
 )
@@ -84,7 +84,7 @@ class MakeCoverTab(BaseTab):
         return apply_plans
 
     def _render_preview(self, plans: list[MakeCoverPlan]) -> None:
-        print_cover_preview(plans)
+        print_make_cover_preview(plans)
 
     def _count_actionable(self, plans: list[MakeCoverPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)

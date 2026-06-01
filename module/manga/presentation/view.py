@@ -201,7 +201,7 @@ def print_make_meta_diff_table(
 # make_cover 预览（结构对齐 std_title / make_meta）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_cover_preview(plans: list[MakeCoverPlan]) -> None:
+def print_make_cover_preview(plans: list[MakeCoverPlan]) -> None:
     """逐卡片打印封面写入计划。
 
     目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``
@@ -246,7 +246,7 @@ def print_cover_preview(plans: list[MakeCoverPlan]) -> None:
 # Pack 预览（结构对齐 std_title / make_meta / make_cover）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_pack_preview(plans: list[PackPicPlan]) -> None:
+def print_pack_pic_preview(plans: list[PackPicPlan]) -> None:
     """逐卡片打印打包计划。
 
     只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。卡片骨架：

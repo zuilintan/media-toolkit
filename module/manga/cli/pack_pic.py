@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 
 from base.console import SEP2, emit, confirm, print_summary
-from module.manga.presentation.view import print_pack_preview, print_run_banner
+from module.manga.presentation.view import print_pack_pic_preview, print_run_banner
 from module.manga.workflow.pack_pic import preview_plans, apply_plans
 from module.manga.cli import validate_root
 
@@ -30,7 +30,7 @@ def cmd_pack_pic(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_pack_preview(plans)
+    print_pack_pic_preview(plans)
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_writable = sum(1 for p in plans if p.writable)

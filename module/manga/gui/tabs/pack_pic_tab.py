@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 
 from module.manga.core.models import PackPicPlan
 from module.manga.gui.tabs.base_tab import BaseTab
-from module.manga.presentation.view import print_pack_preview
+from module.manga.presentation.view import print_pack_pic_preview
 from module.manga.workflow.pack_pic import apply_plans, preview_plans
 
 
@@ -46,7 +46,7 @@ class PackPicTab(BaseTab):
         return apply_plans
 
     def _render_preview(self, plans: list[PackPicPlan]) -> None:
-        print_pack_preview(plans)
+        print_pack_pic_preview(plans)
 
     def _count_actionable(self, plans: list[PackPicPlan]) -> int:
         return sum(1 for p in plans if p.writable)

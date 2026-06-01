@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 
 from base.console import SEP2, emit, confirm, print_summary
-from module.manga.presentation.view import print_cover_preview, print_run_banner
+from module.manga.presentation.view import print_make_cover_preview, print_run_banner
 from module.manga.workflow.make_cover import preview_plans, apply_plans, DEFAULT_QUALITY
 from module.manga.cli import validate_root
 
@@ -33,7 +33,7 @@ def cmd_make_cover(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_cover_preview(plans)
+    print_make_cover_preview(plans)
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.writable and p.changed)
