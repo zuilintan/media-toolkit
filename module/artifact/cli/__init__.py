@@ -69,8 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from module.artifact.workflow.classify.config import load_config
+
     parser = build_parser()
     args = parser.parse_args(argv)
+    # 启动期确保 artifact.json 已落盘（缺失则用空 workdirs 默认值生成）
+    load_config()
     return args.func(args) or 0
 
 

@@ -198,14 +198,13 @@ class TestMergeInto:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestLoadConfig:
-    def test_missing_raises_with_template_hint(self, tmp_path: Path) -> None:
+    def test_explicit_missing_path_raises(self, tmp_path: Path) -> None:
+        """显式传入不存在的 path → FileNotFoundError（无参调用是另一条路径，
+        会自动落盘默认值，由 :class:`base.app_config.JsonConfig` 测试覆盖）。"""
         cfg = tmp_path / 'nope.json'
         with pytest.raises(FileNotFoundError) as exc:
             load_config(cfg)
-        msg = str(exc.value)
-        assert '期望路径' in msg
-        assert '模板示例' in msg
-        assert 'config_template.json' in msg
+        assert '期望路径' in str(exc.value)
 
     def test_basic_load(self, tmp_path: Path) -> None:
         cfg = tmp_path / 'c.json'

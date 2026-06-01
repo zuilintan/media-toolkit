@@ -122,14 +122,12 @@ def _process_one(
 
 def cmd_classify(args: argparse.Namespace) -> int:
     """``classify`` 子命令调度。"""
-    try:
-        cfg = load_config()
-    except FileNotFoundError as e:
-        sys.stderr.write(f'\n{e}\n')
-        return 2
-
+    cfg = load_config()
     if not cfg.workdirs:
-        sys.stderr.write('❌ 配置中 artifact.workdirs 为空\n')
+        sys.stderr.write(
+            '❌ 配置中 artifact.workdirs 为空\n'
+            '  编辑 GUI「打开 artifact.json」按钮指向的文件填入 workdirs 后重试。\n'
+        )
         return 2
 
     target_override = Path(args.target).resolve() if args.target else None

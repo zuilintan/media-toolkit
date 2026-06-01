@@ -8,6 +8,8 @@ base/                            — 跨业务共享基础设施
 ├── doctor.py                    — 通用环境体检引擎（run_doctor，各 CLI 声明自身 checks）
 ├── drag_loop.py                 — 通用拖入循环（run_drag_loop）
 ├── fs.py                        — 文件系统工具（merge_into / move_dir / safe_rmtree）
+├── config_paths.py              — 跨平台 user_config_dir() 定位
+├── app_config.py                — 统一持久化目录 + JsonConfig 基类（gui/artifact/manga.json 共用）
 └── gui/                         — 共享 GUI 组件（PySide6，可选）
     ├── shell.py                 — Shell(QMainWindow)：左侧 Tab 宿主，register_module()
     ├── app_check.py             — check_pyside6()：启动前依赖检查
@@ -15,7 +17,7 @@ base/                            — 跨业务共享基础设施
     ├── qt_sink.py               — QtSink：console → LogView 桥接
     ├── path_picker.py           — PathPicker：路径选择 + 拖入 widget
     ├── worker.py                — BaseWorker(QThread)：通用后台任务
-    └── config.py                — QSettings 辅助（窗口几何持久化）
+    └── config.py                — GUIConfig(JsonConfig)：gui.json 单例 + 路径历史 API
 
 module/                          — 业务包命名空间
 ├── manga/                       — 漫画工具（manga toolkit）
@@ -64,13 +66,12 @@ module/                          — 业务包命名空间
     │   ├── module.py            — ArtifactModule（被 Shell 装载）
     │   ├── tabs/classify_tab.py — ClassifyTab：拖入区 + 工作目录面板
     │   └── widgets/             — drop_area / candidate_dialog
-    ├── workflow/classify/       — 归类工作流
-    │   ├── config.py            — WorkDir / Config / load_config()
-    │   ├── path.py              — path_to_author_name()
-    │   ├── alias.py             — scan_aliases()（扫描 [别名]：XX.txt）
-    │   ├── matcher.py           — find_candidates()
-    │   └── ops.py               — classify_one()
-    └── config_template.json     — 配置模板（首次使用时参照创建 config.json）
+    └── workflow/classify/       — 归类工作流
+        ├── config.py            — WorkDir / Config / load_config()
+        ├── path.py              — path_to_author_name()
+        ├── alias.py             — scan_aliases()（扫描 [别名]：XX.txt）
+        ├── matcher.py           — find_candidates()
+        └── ops.py               — classify_one()
 
 app/                             — 顶层双模块启动器
 └── gui.py                       — main = app-gui（同窗口装载 manga + artifact）
@@ -104,3 +105,23 @@ module/artifact/gui/module.py    ← module/artifact/workflow/* · base/gui
         ↓
 app/gui.py  (main → app-gui)  ← module/manga/gui · module/artifact/gui · base/gui
 ```
+
+## 持久化目录
+
+所有运行期可变状态统一落在 `<user_config>/media-toolkit/config/` 下三个 JSON：
+
+```
+%LOCALAPPDATA%/media-toolkit/config/           (Windows)
+~/Library/Application Support/media-toolkit/config/    (macOS)
+${XDG_CONFIG_HOME:-~/.config}/media-toolkit/config/    (Linux)
+├── gui.json        — GUI 用户状态（PathPicker 历史 / 各 Tab jobs+quality+smart /
+│                     splitter sizes / Shell 窗口几何）；平铺 key，无 schema
+├── artifact.json   — artifact 业务配置（workdirs / search_url_template）；
+│                     缺失时由 base.app_config.JsonConfig 落盘 {"artifact.workdirs": []}；
+│                     GUI ClassifyTab 提供「📂 打开 artifact.json」按钮调系统关联
+│                     程序编辑，编辑后点「🔄 刷新别名」即重新读取
+└── manga.json      — manga 业务运行期配置；当前仅占位 {"$schema_version": 1}
+```
+
+任意入口（CLI / GUI）启动期都会触发 `get_manga_config()` / `load_config()`，确保
+缺失时自动落盘。GUIConfig 同样在首次 `get_config()` 时落盘。

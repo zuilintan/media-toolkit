@@ -46,10 +46,6 @@ cache_dir = "tests/.pytest_cache"
 [tool.hatch.build.targets.wheel]
 packages = ["module", "base", "app"]
 
-# 把 module/artifact/config_template.json 一并打进 wheel（load_config 失败提示要指向它）
-[tool.hatch.build.targets.wheel.force-include]
-"module/artifact/config_template.json" = "module/artifact/config_template.json"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

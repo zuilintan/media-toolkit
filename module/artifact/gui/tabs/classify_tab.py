@@ -1,18 +1,21 @@
 """``artifact`` 的 ``classify`` 业务子 Tab。
 
-布局：``QVBoxLayout`` → 按钮行（刷新别名）+ WorkDirs 摘要 label +
-:class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
+布局：``QVBoxLayout`` → 按钮行（打开 artifact.json + 刷新别名）+ WorkDirs 摘要
+label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
 业务流：启动时 :func:`~module.artifact.workflow.classify.config.load_config`
-→ 显示 WorkDirs（失败弹错并禁用拖入）；拖入 → 逐个 :meth:`ClassifyTab._process_one`
-→ 候选 0/1/N 分支 → :func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
+→ 显示 WorkDirs（空则弹错并禁用拖入）；用户可点「打开 artifact.json」用关联
+程序编辑配置，编辑保存后点「刷新别名」重新读取 workdirs + re-scan 别名；
+拖入 → 逐个 :meth:`ClassifyTab._process_one` → 候选 0/1/N 分支 →
+:func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
 → :func:`~module.artifact.workflow.classify.ops.classify_one`。
 """
 
 from __future__ import annotations
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtCore import QThread, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
@@ -22,7 +25,7 @@ from base.gui.qt_sink import QtSink
 from module.artifact.gui.widgets.candidate_dialog import ask_candidate
 from module.artifact.gui.widgets.drop_area import DropArea
 from module.artifact.workflow.classify.alias import scan_aliases
-from module.artifact.workflow.classify.config import Config, load_config
+from module.artifact.workflow.classify.config import Config, config_path, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.ops import classify_one
 from module.artifact.workflow.classify.path import path_to_author_name
@@ -65,11 +68,21 @@ class ClassifyTab(QWidget):
         self._workdirs_paths: list[Path] = []
         self._alias_map: dict[str, Path] = {}
 
+        self._open_cfg_btn = QPushButton('📂 打开 artifact.json')
+        self._open_cfg_btn.setToolTip(
+            f'用关联程序打开配置文件：\n{config_path()}\n'
+            '编辑保存后点「刷新别名」生效。'
+        )
+        self._open_cfg_btn.clicked.connect(self._on_open_config)
+
         self._refresh_btn = QPushButton('🔄 刷新别名')
-        self._refresh_btn.setToolTip('重新扫描所有 WorkDir 下的 [别名]：*.txt')
+        self._refresh_btn.setToolTip(
+            '重新读取 artifact.json + 扫描所有 WorkDir 下的 [别名]：*.txt'
+        )
         self._refresh_btn.clicked.connect(self._on_refresh)
 
         btn_lay = QHBoxLayout()
+        btn_lay.addWidget(self._open_cfg_btn)
         btn_lay.addWidget(self._refresh_btn)
         btn_lay.addStretch(1)
 
@@ -85,20 +98,18 @@ class ClassifyTab(QWidget):
         lay.addWidget(self._workdirs_label)
         lay.addWidget(self._drop, 1)
 
-        self._load_and_scan()
+        self._load_workdirs()
 
-    # ── 启动加载 ─────────────────────────────────────────────────────
-    def _load_and_scan(self) -> None:
-        try:
-            self._cfg = load_config()
-        except FileNotFoundError as e:
-            QMessageBox.critical(self, '配置缺失', str(e))
-            self._workdirs_label.setText('❌ 未加载配置；拖入将无效')
-            self._drop.setEnabled(False)
-            self._refresh_btn.setEnabled(False)
-            return
+    # ── 配置加载 & UI 同步 ────────────────────────────────────────────
+    def _load_workdirs(self) -> None:
+        """读取 artifact.json → 更新 self._cfg / self._workdirs_paths / label / 拖入区可用性。"""
+        self._cfg = load_config()
         if not self._cfg.workdirs:
-            QMessageBox.critical(self, '配置无效', '配置中 artifact.workdirs 为空')
+            self._workdirs_paths = []
+            self._workdirs_label.setText(
+                '⚠️ artifact.workdirs 为空 —— 点「📂 打开 artifact.json」'
+                '编辑后再点「🔄 刷新别名」。'
+            )
             self._drop.setEnabled(False)
             return
         self._workdirs_paths = [wd.path for wd in self._cfg.workdirs]
@@ -106,6 +117,7 @@ class ClassifyTab(QWidget):
         self._workdirs_label.setText(
             f'📁 WorkDirs ({len(self._cfg.workdirs)}):\n{lines}'
         )
+        self._drop.setEnabled(True)
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
@@ -119,12 +131,27 @@ class ClassifyTab(QWidget):
         self._alias_map = alias_map
         self._refresh_btn.setEnabled(True)
 
-    # ── 回调 ──────────────────────────────────────────────────────────
+    # ── 按钮回调 ──────────────────────────────────────────────────────
+    def _on_open_config(self) -> None:
+        """用 OS 关联程序打开 artifact.json（不存在则给提示）。"""
+        path = config_path()
+        if not path.exists():
+            # load_config() 启动时已落盘；走到这里通常是被人为删除
+            QMessageBox.warning(
+                self, '配置缺失',
+                f'未找到 {path}\n点「🔄 刷新别名」会自动重建空配置。',
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
     def _on_refresh(self) -> None:
-        if self._cfg is None:
+        """重读 artifact.json → 更新 workdirs → 重新扫描别名。"""
+        self._load_workdirs()
+        if not self._workdirs_paths:
             return
         self._do_scan_aliases()
 
+    # ── 拖入归类 ──────────────────────────────────────────────────────
     def _on_paths_dropped(self, paths: list[Path]) -> None:
         if self._cfg is None:
             return

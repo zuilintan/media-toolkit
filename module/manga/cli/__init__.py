@@ -146,9 +146,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from module.manga.core.runtime_config import get_manga_config
+
     parser = build_parser()
     args = parser.parse_args(argv)
     setup_logging(args.debug)
+    # 启动期确保 manga.json 已落盘
+    get_manga_config()
     return args.func(args) or 0
 
 

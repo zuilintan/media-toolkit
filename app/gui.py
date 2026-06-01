@@ -4,8 +4,9 @@
 便于只需用单一业务时启动。启动顺序：
 
 1. :func:`~base.gui.app_check.check_pyside6` 体检 PySide6
-2. :func:`~base.gui.config.set_default_app_dir_name` ``('media-toolkit')``
-   —— 双模块共用一份配置目录
+2. 触发 :mod:`~module.manga.core.runtime_config` /
+   :mod:`~module.artifact.workflow.classify.config` 首次加载，确保
+   ``<user_config>/media-toolkit/config/`` 三个 JSON 已落盘
 3. 构造 :class:`~base.gui.shell.Shell` + 依次注册
    :class:`~module.manga.gui.module.MangaModule` /
    :class:`~module.artifact.gui.module.ArtifactModule`
@@ -31,13 +32,16 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from base.console import setup_logging
-    from base.gui.config import set_default_app_dir_name
     from base.gui.shell import Shell
     from module.artifact.gui.module import ArtifactModule
+    from module.artifact.workflow.classify.config import load_config as _load_artifact
     from module.manga import __version__
+    from module.manga.core.runtime_config import get_manga_config
     from module.manga.gui.module import MangaModule
 
-    set_default_app_dir_name('media-toolkit')
+    # 启动期确保两份业务 JSON 已落盘（缺失则用默认值生成）
+    get_manga_config()
+    _load_artifact()
 
     app = QApplication(argv if argv is not None else sys.argv)
     setup_logging(debug=False)

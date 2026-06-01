@@ -1,10 +1,10 @@
-"""artifact-toolkit 配置加载（``<user_config>/artifact-toolkit/config.json``）。
+"""artifact 业务配置加载（统一 ``<user_config>/media-toolkit/config/artifact.json``）。
 
-跨平台路径由 :func:`~base.config_paths.user_config_dir` 解析；模板预置在
-``module/artifact/config_template.json``（随 wheel 一起分发）。
+无参 :func:`load_config` 缺失时自动创建空 workdirs；用户可在 GUI 中点
+「打开 artifact.json」用关联程序编辑，编辑保存后点「刷新别名」重新读取。
 
-设计：找不到 config 时抛 :exc:`FileNotFoundError`，消息中含期望路径与模板路径；
-禁止静默自动落盘（避免悄悄写入默认值让用户搞不清来源）。
+显式传入 ``path`` 时保持严格语义：不存在 → :exc:`FileNotFoundError`
+（用于显式自定义路径场景与测试，避免悄悄落盘到非默认位置）。
 """
 
 from __future__ import annotations
@@ -12,11 +12,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from base.config_paths import user_config_dir
+from base.app_config import JsonConfig, config_dir
 
-APP_DIR_NAME = 'artifact-toolkit'
-CONFIG_FILENAME = 'config.json'
-TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / 'config_template.json'
+
+CONFIG_FILENAME = 'artifact.json'
+_DEFAULT_DATA: dict = {'artifact.workdirs': []}
 
 
 @dataclass(frozen=True)
@@ -48,27 +48,19 @@ class Config:
         return None
 
 
+class _ArtifactJsonConfig(JsonConfig):
+    """``artifact.json`` 句柄；缺失时落盘 ``{"artifact.workdirs": []}``。"""
+
+    def __init__(self) -> None:
+        super().__init__(CONFIG_FILENAME, default=dict(_DEFAULT_DATA))
+
+
 def config_path() -> Path:
-    """配置文件的期望位置（不保证存在）。"""
-    return user_config_dir(APP_DIR_NAME) / CONFIG_FILENAME
+    """配置文件的期望位置（不保证内容已加载）。"""
+    return config_dir() / CONFIG_FILENAME
 
 
-def load_config(path: Path | None = None) -> Config:
-    """从 JSON 加载配置；找不到时给出带模板路径的指引。
-
-    :param path: 自定义配置路径；``None`` 走默认 :func:`config_path`。
-    :raises FileNotFoundError: 文件不存在时；消息含期望路径与模板路径。
-    """
-    cfg_path = path or config_path()
-    if not cfg_path.is_file():
-        raise FileNotFoundError(
-            f'未找到 artifact-toolkit 配置文件\n'
-            f'  期望路径: {cfg_path}\n'
-            f'  模板示例: {TEMPLATE_PATH}\n'
-            f'\n'
-            f'请参考模板创建上述配置文件后重试。'
-        )
-    raw = json.loads(cfg_path.read_text('utf-8'))
+def _build_config(raw: dict) -> Config:
     workdirs_raw = raw.get('artifact.workdirs', [])
     workdirs = [
         WorkDir(
@@ -78,3 +70,22 @@ def load_config(path: Path | None = None) -> Config:
         for item in workdirs_raw
     ]
     return Config(workdirs=workdirs)
+
+
+def load_config(path: Path | None = None) -> Config:
+    """加载 artifact 业务配置。
+
+    :param path: ``None`` → 使用 :func:`config_path`，缺失自动创建空 workdirs；
+        显式路径 → 不存在时抛 :exc:`FileNotFoundError`。
+    :raises FileNotFoundError: 仅在显式 ``path`` 不存在时抛出。
+    """
+    if path is not None:
+        if not path.is_file():
+            raise FileNotFoundError(
+                f'未找到 artifact 配置文件\n'
+                f'  期望路径: {path}\n'
+            )
+        raw = json.loads(path.read_text('utf-8'))
+        return _build_config(raw)
+
+    return _build_config(_ArtifactJsonConfig().data)
