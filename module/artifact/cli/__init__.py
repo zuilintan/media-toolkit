@@ -1,4 +1,4 @@
-"""file-toolkit 命令行入口与子命令实现。
+"""``artifact-cli`` 入口与子命令实现。
 
 包入口 :func:`main` 对应 pyproject scripts 的 ``artifact-cli``；子命令拆分为独立
 模块（当前仅 :mod:`~module.artifact.cli.classify` + :mod:`~module.artifact.cli.doctor`）。
@@ -26,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog='artifact-cli',
-        description='file-toolkit 统一命令行工具',
+        description='artifact-toolkit 统一命令行工具',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '示例:\n'

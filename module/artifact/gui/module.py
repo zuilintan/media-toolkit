@@ -1,4 +1,4 @@
-"""file-toolkit GUI 模块（被 :class:`~base.gui.shell.Shell` 装载）。
+"""artifact-toolkit GUI 模块（被 :class:`~base.gui.shell.Shell` 装载）。
 
 布局：``QSplitter(Vertical)`` → 上 ``QTabWidget``（当前仅 classify 一个子 Tab，
 ``tabBarAutoHide``）+ 下 ``QStackedWidget``（每子 Tab 各有一个
@@ -19,7 +19,7 @@ from module.artifact.gui.tabs.classify_tab import ClassifyTab
 
 
 class ArtifactModule(QWidget):
-    """file-toolkit 业务模块：装载 classify 子 Tab + 独立日志栈。"""
+    """artifact-toolkit 业务模块：装载 classify 子 Tab + 独立日志栈。"""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -81,7 +81,7 @@ class ArtifactModule(QWidget):
 
     def _export_current_log(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, '导出日志', 'file-toolkit.log',
+            self, '导出日志', 'artifact-toolkit.log',
             'Text files (*.txt *.log);;All files (*)',
         )
         if not path:

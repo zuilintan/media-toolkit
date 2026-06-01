@@ -1,4 +1,4 @@
-"""PySide6 桌面前端（file-toolkit 单模块视图）。
+"""PySide6 桌面前端（artifact-toolkit 单模块视图）。
 
 包入口 :func:`main` 对应 pyproject scripts 的 ``artifact-gui``，启动顺序：
 
@@ -16,7 +16,7 @@ from base.gui.app_check import check_pyside6
 
 def main(argv: list[str] | None = None) -> int:
     check_pyside6(
-        app_name='file-toolkit',
+        app_name='artifact-toolkit',
         install_cmd='uv sync --extra gui',
         run_cmd='uv run artifact-gui',
     )
@@ -28,12 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     from base.gui.shell import Shell
     from module.artifact.gui.module import ArtifactModule
 
-    set_default_app_dir_name('file-toolkit')
+    set_default_app_dir_name('artifact-toolkit')
 
     app = QApplication(argv if argv is not None else sys.argv)
     setup_logging(debug=False)
 
-    shell = Shell(title='file-toolkit', config_key_prefix='artifact-only')
+    shell = Shell(title='artifact-toolkit', config_key_prefix='artifact-only')
     module = ArtifactModule()
     shell.register_module('artifact', module, default_sink=module.default_sink())
     shell.show()

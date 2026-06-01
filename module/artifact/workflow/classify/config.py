@@ -1,4 +1,4 @@
-"""file-toolkit 配置加载（``<user_config>/file-toolkit/config.json``）。
+"""artifact-toolkit 配置加载（``<user_config>/artifact-toolkit/config.json``）。
 
 跨平台路径由 :func:`~base.config_paths.user_config_dir` 解析；模板预置在
 ``module/artifact/config_template.json``（随 wheel 一起分发）。
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from base.config_paths import user_config_dir
 
-APP_DIR_NAME = 'file-toolkit'
+APP_DIR_NAME = 'artifact-toolkit'
 CONFIG_FILENAME = 'config.json'
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / 'config_template.json'
 
@@ -62,7 +62,7 @@ def load_config(path: Path | None = None) -> Config:
     cfg_path = path or config_path()
     if not cfg_path.is_file():
         raise FileNotFoundError(
-            f'未找到 file-toolkit 配置文件\n'
+            f'未找到 artifact-toolkit 配置文件\n'
             f'  期望路径: {cfg_path}\n'
             f'  模板示例: {TEMPLATE_PATH}\n'
             f'\n'
