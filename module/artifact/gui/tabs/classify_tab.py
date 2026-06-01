@@ -4,9 +4,12 @@
 摘要 label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
 业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config`
-→ 显示 WorkDirs（空则提示且禁用拖入）；用户可点「修改配置」用关联程序编辑
-artifact.json，编辑保存后点「重载配置」重新读取 workdirs 并 re-scan 别名；
-若仅新增了 ``[别名]：*.txt`` 文件（workdirs 未变），点「刷新别名」即可。
+→ 显示 WorkDirs（空则提示且禁用拖入）；三个按钮职责单一互不联动：
+
+- 「修改配置」用关联程序打开 artifact.json
+- 「重载配置」仅重读 workdirs 并刷新 UI（不动 alias_map）
+- 「刷新别名」仅 re-scan ``[别名]：*.txt`` 写入 alias_map（不动 workdirs）
+
 拖入 → 逐个 :meth:`ClassifyTab._process_one` → 候选 0/1/N 分支 →
 :func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
 → :func:`~module.artifact.workflow.classify.ops.classify_one`。
@@ -78,7 +81,8 @@ class ClassifyTab(QWidget):
 
         self._reload_cfg_btn = QPushButton('🔁 重载配置')
         self._reload_cfg_btn.setToolTip(
-            '重新读取 artifact.json（workdirs）+ 扫描所有 WorkDir 下的 [别名]：*.txt'
+            '重新读取 artifact.json（workdirs）；'
+            '别名需要时另点「🔄 刷新别名」'
         )
         self._reload_cfg_btn.clicked.connect(self._on_reload_config)
 
@@ -155,11 +159,8 @@ class ClassifyTab(QWidget):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _on_reload_config(self) -> None:
-        """重读 artifact.json → 更新 workdirs → 重新扫描别名。"""
+        """仅重读 artifact.json → 更新 workdirs / UI；不触发别名扫描。"""
         self._load_workdirs()
-        if not self._workdirs_paths:
-            return
-        self._do_scan_aliases()
 
     def _on_refresh_alias(self) -> None:
         """仅重新扫描别名（workdirs 未变时使用，省略一次 IO）。"""

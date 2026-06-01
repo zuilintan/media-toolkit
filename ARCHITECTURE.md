@@ -120,8 +120,8 @@ ${XDG_CONFIG_HOME:-~/.config}/media-toolkit/config/    (Linux)
 ├── artifact.json   — artifact 业务配置（workdirs / search_url_template）；
 │                     缺失时由 base.app_config.JsonConfig 落盘 {"artifact.workdirs": []}；
 │                     GUI ClassifyTab 提供「📝 修改配置」（关联程序打开）+
-│                     「🔁 重载配置」（重读 workdirs + re-scan 别名）+
-│                     「🔄 刷新别名」（仅 re-scan 别名）三个按钮
+│                     「🔁 重载配置」（仅重读 workdirs）+
+│                     「🔄 刷新别名」（仅 re-scan 别名）三个按钮，职责单一
 └── manga.json      — manga 业务运行期配置；当前仅占位 {"$schema_version": 1}
 ```
 
