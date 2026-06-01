@@ -1,7 +1,7 @@
-"""``rename-kit`` 子命令：源文件（``.zip`` / ``.cbz``）批量重命名。
+"""源文件（``.zip`` / ``.cbz``）批量标题标准化子命令实现。
 
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。结构与
-:mod:`module.manga.cli.meta_kit` 对称。
+:mod:`module.manga.cli.make_meta` 对称。
 """
 
 from __future__ import annotations
@@ -9,24 +9,24 @@ from __future__ import annotations
 import argparse
 
 from base.console import SEP2, emit, confirm, print_summary
-from module.manga.presentation.view import print_rename_kit_preview, print_run_banner
-from module.manga.workflow.rename_kit import preview_plans, apply_plans
+from module.manga.presentation.view import print_std_title_preview, print_run_banner
+from module.manga.workflow.std_title import preview_plans, apply_plans
 from module.manga.cli import validate_root
-from module.manga.extras.examples import run_rename_kit_examples
+from module.manga.extras.examples import run_std_title_examples
 
 
-def cmd_rename(args: argparse.Namespace) -> int:
-    """``rename-kit`` 子命令调度。"""
+def cmd_std_title(args: argparse.Namespace) -> int:
+    """标题标准化子命令调度。"""
     # ── 旁路子命令 ────────────────────────────────────────────────────────────
     if args.examples:
-        return 0 if run_rename_kit_examples() == 0 else 1
+        return 0 if run_std_title_examples() == 0 else 1
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
     root = validate_root(args.root)
     if root is None:
         return 2
 
-    print_run_banner('rename-kit', '源文件批量重命名', root, args.apply)
+    print_run_banner(args.command, '源文件批量重命名', root, args.apply)
     plans = preview_plans(str(root), jobs=args.jobs)
 
     if not plans:
@@ -34,7 +34,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_rename_kit_preview(plans)
+    print_std_title_preview(plans)
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.changed)
@@ -75,8 +75,8 @@ def cmd_rename(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_rename_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 ``rename-kit`` 子命令的参数。"""
+def add_std_title_args(p: argparse.ArgumentParser) -> None:
+    """挂载标题标准化子命令的参数。"""
     p.add_argument('--root',          default='',
                    help='漫画根目录（批量模式，目录下按作者目录组织）')
     p.add_argument('--apply',         action='store_true',

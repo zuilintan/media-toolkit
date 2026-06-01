@@ -1,4 +1,4 @@
-"""``pack-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.pack_kit`。"""
+"""图片打包 GUI Tab；复用 :mod:`module.manga.workflow.pack_pic`。"""
 
 from __future__ import annotations
 from collections.abc import Callable
@@ -8,14 +8,14 @@ from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import PackKitPlan
+from module.manga.core.models import PackPicPlan
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.presentation.view import print_pack_preview
-from module.manga.workflow.pack_kit import apply_plans, preview_plans
+from module.manga.workflow.pack_pic import apply_plans, preview_plans
 
 
-class PackKitTab(BaseTab):
-    cmd_name         = 'pack-kit'
+class PackPicTab(BaseTab):
+    cmd_name         = 'pack_pic'
     apply_btn_text   = '打包'
     confirm_verb     = '打包并删除源目录'
     no_change_msg    = '没有可打包的目录'
@@ -45,13 +45,13 @@ class PackKitTab(BaseTab):
     def _apply_fn(self):
         return apply_plans
 
-    def _render_preview(self, plans: list[PackKitPlan]) -> None:
+    def _render_preview(self, plans: list[PackPicPlan]) -> None:
         print_pack_preview(plans)
 
-    def _count_actionable(self, plans: list[PackKitPlan]) -> int:
+    def _count_actionable(self, plans: list[PackPicPlan]) -> int:
         return sum(1 for p in plans if p.writable)
 
-    def _classify_plans(self, plans: list[PackKitPlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[PackPicPlan]) -> dict[str, int]:
         flat     = sum(1 for p in plans if p.writable and p.kind == 'flat')
         nested   = sum(1 for p in plans if p.writable and p.kind == 'nested')
         replaced = sum(1 for p in plans if p.writable and p.zip_exists)

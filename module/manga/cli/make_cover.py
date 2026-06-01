@@ -1,7 +1,7 @@
-"""``cover-kit`` 子命令：为 CBZ 写入 2:3 封面。
+"""为 CBZ 写入 2:3 封面的子命令实现。
 
 源图（``0001.*`` 或 ``cover.*``）→ ``0000.webp``；源为 ``cover.*`` 时写入后
-同步从 ZIP 删除原 ``cover.*``。详见 :mod:`module.manga.workflow.cover_kit`。
+同步从 ZIP 删除原 ``cover.*``。详见 :mod:`module.manga.workflow.make_cover`。
 
 流程: scan → 全量 plan（含裁剪 + 编码）→ 预览 → 二次确认 → 整批写入。
 """
@@ -12,12 +12,12 @@ import argparse
 
 from base.console import SEP2, emit, confirm, print_summary
 from module.manga.presentation.view import print_cover_preview, print_run_banner
-from module.manga.workflow.cover_kit import preview_plans, apply_plans, DEFAULT_QUALITY
+from module.manga.workflow.make_cover import preview_plans, apply_plans, DEFAULT_QUALITY
 from module.manga.cli import validate_root
 
 
-def cmd_cover(args: argparse.Namespace) -> int:
-    """``cover-kit`` 子命令调度。"""
+def cmd_make_cover(args: argparse.Namespace) -> int:
+    """封面写入子命令调度。"""
     mode = 'smart' if args.smart else 'center'
 
     # ── 批量模式 ──────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ def cmd_cover(args: argparse.Namespace) -> int:
     if root is None:
         return 2
 
-    print_run_banner('cover-kit', f'CBZ 封面写入（mode={mode}）', root, args.apply)
+    print_run_banner(args.command, f'CBZ 封面写入（mode={mode}）', root, args.apply)
     plans = preview_plans(str(root), mode=mode, quality=args.quality, jobs=args.jobs)
 
     if not plans:
@@ -75,8 +75,8 @@ def cmd_cover(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_cover_kit_args(p: argparse.ArgumentParser) -> None:
-    """挂载 ``cover-kit`` 子命令的参数。"""
+def add_make_cover_args(p: argparse.ArgumentParser) -> None:
+    """挂载封面写入子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
     p.add_argument('--apply',   action='store_true',

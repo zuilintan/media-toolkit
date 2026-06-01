@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import unicodedata
 
-from module.manga.core.models import CoverKitPlan, MetaKitPlan, PackKitPlan, RenameKitPlan
+from module.manga.core.models import MakeCoverPlan, MakeMetaPlan, PackPicPlan, StdTitlePlan
 from module.manga.core.config import COMICINFO_TAGS
 from base.console import SEP, SEP2, RED, YELLOW, RESET, highlight_diff, emit
 from module.manga.naming.parser import emit_parse_debug
@@ -21,7 +21,7 @@ def _pad(s: str, w: int) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 运行 banner（rename_kit / meta_kit 共用）
+# 运行 banner（所有子命令共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) -> None:
@@ -39,7 +39,7 @@ def print_run_banner(cmd: str, subtitle: str, root: object, mode_apply: bool) ->
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 卡片骨架（rename_kit / meta_kit 共用）
+# 卡片骨架（所有子命令共用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _print_preview_header(title: str) -> None:
@@ -60,10 +60,10 @@ def _print_preview_footer(total: int, parts: list[tuple[str, int]]) -> None:
 # 源文件重命名预览
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_rename_kit_preview(plans: list[RenameKitPlan]) -> None:
+def print_std_title_preview(plans: list[StdTitlePlan]) -> None:
     """逐卡片打印源文件重命名计划。
 
-    卡片骨架与 :func:`~module.manga.extras.examples.run_rename_kit_examples` 对齐：
+    卡片骨架与 :func:`~module.manga.extras.examples.run_std_title_examples` 对齐：
 
     - ``   📄 [N]{note}``   (3 空格)
     - ``     DEBUG: …``     (5 空格，与 :func:`~module.manga.naming.parser.emit_parse_debug` 一致)
@@ -105,14 +105,14 @@ def print_rename_kit_preview(plans: list[RenameKitPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# meta_kit 预览（结构与 rename_kit 对齐）
+# make_meta 预览（结构与 std_title 对齐）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_meta_kit_preview(plans: list[MetaKitPlan]) -> None:
+def print_make_meta_preview(plans: list[MakeMetaPlan]) -> None:
     """逐卡片打印 ComicInfo 写入计划。
 
     只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 出版商冲突 / 有警告）
-    仅作计数提示。卡片骨架与 :func:`print_rename_kit_preview` 对齐。
+    仅作计数提示。卡片骨架与 :func:`print_std_title_preview` 对齐。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -126,7 +126,7 @@ def print_meta_kit_preview(plans: list[MetaKitPlan]) -> None:
         for idx, p in enumerate(changed, 1):
             emit(f'   📄 [{idx}] {p.filename}')
             emit_parse_debug(p.mi)
-            print_meta_kit_diff_table(
+            print_make_meta_diff_table(
                 p.existing_fields, p.fields, p.pub_conflict,
                 indent='     ',
             )
@@ -153,10 +153,10 @@ def print_meta_kit_preview(plans: list[MetaKitPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# meta_kit 字段块（ComicInfo 字段名为 spec 名，不做改动）
+# make_meta 字段块（ComicInfo 字段名为 spec 名，不做改动）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_meta_kit_diff_table(
+def print_make_meta_diff_table(
     old_fields:   dict[str, str],
     new_fields:   dict[str, str],
     pub_conflict: list[str] | None = None,
@@ -165,7 +165,7 @@ def print_meta_kit_diff_table(
 ) -> None:
     """旧 / 新两列表格，行标题为 :data:`~module.manga.core.config.COMICINFO_TAGS` 中的每个 tag。
 
-    - 新列差异字符用 RED 高亮（与 :func:`print_rename_kit_preview` 的
+    - 新列差异字符用 RED 高亮（与 :func:`print_std_title_preview` 的
       :func:`~base.console.highlight_diff` 对齐）
     - 行尾 ``*`` 标记本行新旧不一致（含字段从无到有 / 从有到无）
     - ``pub_conflict`` 非空时在表下追加冲突文件列表
@@ -198,10 +198,10 @@ def print_meta_kit_diff_table(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# cover_kit 预览（结构对齐 rename_kit / meta_kit）
+# make_cover 预览（结构对齐 std_title / make_meta）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_cover_preview(plans: list[CoverKitPlan]) -> None:
+def print_cover_preview(plans: list[MakeCoverPlan]) -> None:
     """逐卡片打印封面写入计划。
 
     目标文件名取决于源图：源 ``0001.*`` 或 ``cover.*`` → ``0000.webp``
@@ -243,10 +243,10 @@ def print_cover_preview(plans: list[CoverKitPlan]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Pack 预览（结构对齐 rename_kit / meta_kit / cover_kit）
+# Pack 预览（结构对齐 std_title / make_meta / make_cover）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_pack_preview(plans: list[PackKitPlan]) -> None:
+def print_pack_preview(plans: list[PackPicPlan]) -> None:
     """逐卡片打印打包计划。
 
     只渲染 ``writable`` 卡片；不可写（无图 / 错误）仅作计数提示。卡片骨架：

@@ -1,4 +1,4 @@
-"""meta-kit 工作流层：:class:`~module.manga.core.models.MangaInfo`
+"""ComicInfo 元数据写入工作流层：:class:`~module.manga.core.models.MangaInfo`
 → ComicInfo v2.1 XML → 写入 CBZ。
 
 ``<Number>`` 字段规则（与 ``CH.`` 同级且互斥）:
@@ -19,7 +19,7 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring, fromstring
 from xml.dom import minidom
 
-from module.manga.core.models import MangaInfo, MetaKitPlan, fmt_num
+from module.manga.core.models import MangaInfo, MakeMetaPlan, fmt_num
 from module.manga.core import patterns as P
 from module.manga.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
@@ -325,13 +325,13 @@ def _parse_existing_fields(xml_bytes: bytes | None) -> dict[str, str]:
     return out
 
 
-def preview_plan(cbz_path: str) -> MetaKitPlan | None:
+def preview_plan(cbz_path: str) -> MakeMetaPlan | None:
     """构建单个 CBZ 的 ComicInfo 写入计划（纯函数，无输出副作用）。
 
     :return: ``None`` 表示文件名无法提取作者（跳过）；否则返回
-        :class:`~module.manga.core.models.MetaKitPlan`，由
-        :attr:`~module.manga.core.models.MetaKitPlan.writable` /
-        :attr:`~module.manga.core.models.MetaKitPlan.changed` 标识是否可写 / 需写。
+        :class:`~module.manga.core.models.MakeMetaPlan`，由
+        :attr:`~module.manga.core.models.MakeMetaPlan.writable` /
+        :attr:`~module.manga.core.models.MakeMetaPlan.changed` 标识是否可写 / 需写。
     """
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
@@ -350,7 +350,7 @@ def preview_plan(cbz_path: str) -> MetaKitPlan | None:
         fields['Notes'] = existing_fields['Notes']
 
     new_xml = _serialize_xml(fields)
-    return MetaKitPlan(
+    return MakeMetaPlan(
         cbz_path        = cbz_path,
         mi              = mi,
         publisher       = publisher,
@@ -364,8 +364,8 @@ def preview_plan(cbz_path: str) -> MetaKitPlan | None:
     )
 
 
-def apply_plan(plan: MetaKitPlan) -> str:
-    """执行单个 CBZ 的写入（:attr:`~module.manga.core.models.MetaKitPlan.new_xml` 已在 plan 阶段构建）。
+def apply_plan(plan: MakeMetaPlan) -> str:
+    """执行单个 CBZ 的写入（:attr:`~module.manga.core.models.MakeMetaPlan.new_xml` 已在 plan 阶段构建）。
 
     :return: ``'ok'`` / ``'error'``。不可写 / 无变化由调用方过滤，此处不再判定。
     """
@@ -380,10 +380,10 @@ def apply_plan(plan: MetaKitPlan) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 批量 plan / apply（对齐 rename_kit.preview_plan / apply_plan）
+# 批量 plan / apply（对齐 std_title.preview_plan / apply_plan）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _progress_line(idx: int, total: int, plan: MetaKitPlan | None) -> str:
+def _progress_line(idx: int, total: int, plan: MakeMetaPlan | None) -> str:
     if plan is None:
         return f'   ! [{idx}/{total}] (无作者，已跳过)'
     icon = ('*' if plan.writable and plan.changed
@@ -394,7 +394,7 @@ def _progress_line(idx: int, total: int, plan: MetaKitPlan | None) -> str:
 
 def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
-) -> list[MetaKitPlan]:
+) -> list[MakeMetaPlan]:
     """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
 
     无作者的文件（:func:`preview_plan` 返回 ``None``）静默丢弃。
@@ -417,7 +417,7 @@ def preview_plans(
 
 
 def apply_plans(
-    plans: list[MetaKitPlan], dry_run: bool = True, cancel_token=None,
+    plans: list[MakeMetaPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """整批写入 ``ComicInfo.xml``。
 

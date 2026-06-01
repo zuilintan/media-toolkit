@@ -458,8 +458,8 @@ def emit_parse_debug(mi: MangaInfo) -> None:
     """:func:`parse_name` 的 DEBUG 摘要行（DEBUG 级别下生效）。
 
     :func:`parse_name` 本身不输出 DEBUG，由调用方在最合适的时机触发
-    （:func:`~module.manga.presentation.view.print_rename_kit_preview` /
-    :func:`~module.manga.presentation.view.print_meta_kit_preview` 渲染卡片时、
+    （:func:`~module.manga.presentation.view.print_std_title_preview` /
+    :func:`~module.manga.presentation.view.print_make_meta_preview` 渲染卡片时、
     :mod:`~module.manga.extras.examples` 渲染每条示例时）。
     """
     flags = '/'.join(

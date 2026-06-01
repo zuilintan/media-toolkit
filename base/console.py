@@ -5,7 +5,7 @@
 GUI 可用 :func:`set_output` 接管。唯独 :func:`debug` 经 :mod:`logging` 写入 stderr，
 其捕获由 logging handler 负责，与用户输出通道解耦。
 
-领域对象的渲染（RenameKitPlan / MetaKitPlan 等）位于 presentation 层。
+领域对象的渲染（StdTitlePlan / MakeMetaPlan 等）位于 presentation 层。
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def debug(msg: str, funcname: str | None = None) -> None:
     :param msg:      日志正文。
     :param funcname: 显示的函数名标签；``None`` 时自动取调用栈的当前函数名。
                      调用方可显式覆盖以保持原始语义函数名（例如
-                     :func:`~module.manga.presentation.view.print_rename_kit_preview`
+                     :func:`~module.manga.presentation.view.print_std_title_preview`
                      想 emit ``[parse_name]`` 的 DEBUG）。
     """
     if funcname is None:
@@ -121,7 +121,7 @@ def highlight_diff(original: str, new: str, color: str = RED) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def print_op_result(ok_n: int, fail: int, skip: int = 0, label: str = '完成') -> None:
-    """统一格式输出操作统计行（rename apply / session rollback 风格）。"""
+    """统一格式输出操作统计行。"""
     parts = [f'成功 {ok_n}', f'失败 {fail}']
     if skip:
         parts.append(f'跳过 {skip}')

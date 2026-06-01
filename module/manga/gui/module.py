@@ -4,7 +4,7 @@
 
     MangaModule (QWidget)
     └── QSplitter (Vertical)
-        ├── QTabWidget       — pack-kit / rename-kit / cover-kit / meta-kit 四个子 Tab
+        ├── QTabWidget       — 打包 / 命名 / 封面 / 元数据 四个子 Tab
         └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
 
 注意:
@@ -25,10 +25,10 @@ from PySide6.QtWidgets import (
 
 from base.gui.config import get_config
 from base.gui.log_view import LogView
-from module.manga.gui.tabs.cover_kit_tab import CoverKitTab
-from module.manga.gui.tabs.meta_kit_tab import MetaKitTab
-from module.manga.gui.tabs.pack_kit_tab import PackKitTab
-from module.manga.gui.tabs.rename_kit_tab import RenameKitTab
+from module.manga.gui.tabs.make_cover_tab import MakeCoverTab
+from module.manga.gui.tabs.make_meta_tab import MakeMetaTab
+from module.manga.gui.tabs.pack_pic_tab import PackPicTab
+from module.manga.gui.tabs.std_title_tab import StdTitleTab
 
 
 class MangaModule(QWidget):
@@ -40,10 +40,10 @@ class MangaModule(QWidget):
         super().__init__(parent)
         self._busy_count = 0
 
-        tab0 = PackKitTab()
-        tab1 = RenameKitTab()
-        tab2 = CoverKitTab()
-        tab3 = MetaKitTab()
+        tab0 = PackPicTab()
+        tab1 = StdTitleTab()
+        tab2 = MakeCoverTab()
+        tab3 = MakeMetaTab()
         self._tab_list = [tab0, tab1, tab2, tab3]
         for tab in self._tab_list:
             tab.busy_changed.connect(self._on_tab_busy)

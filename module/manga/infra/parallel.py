@@ -27,7 +27,7 @@ T = TypeVar('T')   # 输入项
 R = TypeVar('R')   # plan 结果
 
 
-# 默认值与 cover-kit 初版语义对齐
+# 默认值与封面写入工作流初版语义对齐
 DEFAULT_JOBS_CAP:           int = 4
 DEFAULT_PARALLEL_THRESHOLD: int = 4
 

@@ -1,4 +1,4 @@
-"""pack-kit 工作流层：图片目录序号化重命名 + STORED zip 打包。
+"""图片打包工作流层：图片目录序号化重命名 + STORED zip 打包。
 
 按 ``<Inc NrDir:0001>`` 规则改名为 ``0001.<ext>``、``0002.<ext>`` …，再以
 ``zipfile.ZIP_STORED`` 打包到同级 ``<dir>.zip``；打包成功后整树 ``shutil.rmtree``。
@@ -21,7 +21,7 @@
 
 特例:
 
-- 仅子目录且 child 数 = 1（无 meta-kit 标记）→ 视为「包装层」直接下钻
+- 仅子目录且 child 数 = 1（无元数据标记）→ 视为「包装层」直接下钻
   （如「作者/漫画」中的作者目录），避免把 ``LSP.zip`` 当作漫画。
 - ≥ 2 个 image leaf child → 通过目录名辨识用途：
 
@@ -47,7 +47,7 @@ import time
 import zipfile
 from pathlib import Path
 
-from module.manga.core.models import PackKitPlan
+from module.manga.core.models import PackPicPlan
 from module.manga.core.config import PAGE_EXTS
 from base.console import (
     emit, error, info, warn, print_op_result,
@@ -61,7 +61,7 @@ MIN_IMAGES: int = 3   # FLAT 单位的最少图片数；不足视为噪声跳过
 MAX_DEPTH:  int = 8   # 递归扫描的最大层级（防符号链接 / 异常目录）
 
 # NESTED 单位顶层允许保留的元数据图片 stem（小写）。
-# 对齐 cover_kit.py 的产物（cover.webp / 0000.webp）和常见命名约定；
+# 对齐 make_cover.py 的产物（cover.webp / 0000.webp）和常见命名约定；
 # 这两个文件 + 任意非图片文件可与子目录共存，会原样写入 zip 顶层。
 _NESTED_TOP_IMAGE_STEMS: frozenset[str] = frozenset({'cover', '0000'})
 
@@ -244,7 +244,7 @@ def _find_units(
 
     # 图 + 目录同层：默认 MIXED 跳过；但若顶层图都是元数据图（cover/0000）
     # 且所有子目录都是 FLAT，则视为 NESTED —— 处理「漫画/cover.webp +
-    # ComicInfo.xml + 第N话/imgs」这种 meta-kit 子命令产物 + 分话的常见结构。
+    # ComicInfo.xml + 第N话/imgs」这种元数据产物 + 分话的常见结构。
     if images and subdirs:
         if (all(_is_nested_top_image(img) for img in images)
                 and all(_is_image_leaf(d) for d in subdirs)):
@@ -252,7 +252,7 @@ def _find_units(
         info(f'  ⏭️  跳过（图片与子目录混合）: {dir_path}')
         return []
 
-    # 仅子目录（无图、无 meta_kit 标记）
+    # 仅子目录（无图、无元数据标记）
     if subdirs:
         # 单 child wrapper：入口处（非容器内部）把 LSP/天龙 这类作者目录
         # 当包装层下钻，避免被识别为 LSP.zip。
@@ -303,7 +303,7 @@ def _plan_nested(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
 
     - 顶层文件（``cover.*`` / ``0000.*`` / ``ComicInfo.xml`` 等）**原名原样**写入 zip，
       作为 identity 改名（``(name, name)``）；不计入
-      :attr:`~module.manga.core.models.PackKitPlan.n_renamed`。
+      :attr:`~module.manga.core.models.PackPicPlan.n_renamed`。
     - 每个直接子目录独立编号，``arcname`` 加子目录名前缀。
     - 子目录内的非图片文件归入 ``extras``（不进 zip，随 ``rmtree`` 删除）。
     """
@@ -335,13 +335,13 @@ def _plan_nested(unit_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
     return renames, extras
 
 
-def preview_plan_unit(unit_dir_str: str, kind: str) -> PackKitPlan:
-    """构建单个打包单位的 :class:`~module.manga.core.models.PackKitPlan`（picklable worker）。"""
+def preview_plan_unit(unit_dir_str: str, kind: str) -> PackPicPlan:
+    """构建单个打包单位的 :class:`~module.manga.core.models.PackPicPlan`（picklable worker）。"""
     unit_dir = Path(unit_dir_str)
     zip_path = str(unit_dir.parent / f'{unit_dir.name}.zip')
 
     if not unit_dir.is_dir():
-        return PackKitPlan(
+        return PackPicPlan(
             src_dir=unit_dir_str, zip_path=zip_path,
             renames=[], extras=[], zip_exists=False, kind=kind,
             error='目录不存在',
@@ -353,20 +353,20 @@ def preview_plan_unit(unit_dir_str: str, kind: str) -> PackKitPlan:
         renames, extras = _plan_nested(unit_dir)
 
     if not renames:
-        return PackKitPlan(
+        return PackPicPlan(
             src_dir=unit_dir_str, zip_path=zip_path,
             renames=[], extras=extras, zip_exists=Path(zip_path).exists(),
             kind=kind, error='未找到图片文件',
         )
 
-    return PackKitPlan(
+    return PackPicPlan(
         src_dir=unit_dir_str, zip_path=zip_path,
         renames=renames, extras=extras,
         zip_exists=Path(zip_path).exists(), kind=kind,
     )
 
 
-def preview_plan_unit_item(item: tuple[str, str]) -> PackKitPlan:
+def preview_plan_unit_item(item: tuple[str, str]) -> PackPicPlan:
     """:func:`~module.manga.infra.parallel.run_plans` worker：解包 ``(unit_dir_str, kind)``。"""
     return preview_plan_unit(item[0], item[1])
 
@@ -376,7 +376,7 @@ def preview_plan_unit_item(item: tuple[str, str]) -> PackKitPlan:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _stored_zinfo(arcname: str, src_path: Path) -> zipfile.ZipInfo:
-    """构造「DOS 属性」风格的 ``ZipInfo``（与 :mod:`~module.manga.workflow.cover_kit` / Bandizip 输出对齐）。
+    """构造「DOS 属性」风格的 ``ZipInfo``（与 :mod:`~module.manga.workflow.make_cover` / Bandizip 输出对齐）。
 
     用源文件 mtime 作为条目时间；``external_attr`` 仅置 Archive bit (``0x20``)，
     高 16 位的 Unix mode 留空，避免查看器显示 ``-rw-rw-rw-``。
@@ -451,7 +451,7 @@ def _write_stored_zip(
             zi.flag_bits |= 0x800
 
 
-def apply_plan(plan: PackKitPlan) -> str:
+def apply_plan(plan: PackPicPlan) -> str:
     """执行单个 plan：写 STORED zip → 删除整个 unit 目录树。
 
     源目录删除失败不视为整体失败：zip 已落盘，仅警告并 ``'ok'`` 返回，用户可
@@ -482,17 +482,17 @@ def apply_plan(plan: PackKitPlan) -> str:
 # 批量 plan / apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _progress_line(idx: int, total: int, plan: PackKitPlan) -> str:
+def _progress_line(idx: int, total: int, plan: PackPicPlan) -> str:
     icon = ('*' if plan.writable else '!')
     return f'   {icon} [{idx}/{total}] {plan.name}'
 
 
 def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
-) -> list[PackKitPlan]:
-    """从 ``root`` 递归识别打包单位，每单位产出一个 :class:`~module.manga.core.models.PackKitPlan`。
+) -> list[PackPicPlan]:
+    """从 ``root`` 递归识别打包单位，每单位产出一个 :class:`~module.manga.core.models.PackPicPlan`。
 
-    与 :mod:`~module.manga.workflow.rename_kit` 的「root 是高层容器」语义对齐，
+    与 :mod:`~module.manga.workflow.std_title` 的「root 是高层容器」语义对齐，
     但走结构化递归：遇到 FLAT / NESTED 立即视作单位（不再下钻），其它情况继续递归。
 
     :param jobs: 1=串行；>1=并行 plan；0=自动 ``min(cpu, 4)``。识别本身
@@ -522,7 +522,7 @@ def preview_plans(
 
 
 def apply_plans(
-    plans: list[PackKitPlan], dry_run: bool = True, cancel_token=None,
+    plans: list[PackPicPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """整批执行打包计划。
 

@@ -1,4 +1,4 @@
-"""cover-kit 工作流层：在 CBZ 内写入 2:3 / ≤ 1000×1500 WebP 封面。
+"""封面写入工作流层：在 CBZ 内写入 2:3 / ≤ 1000×1500 WebP 封面。
 
 目的: grimmory 生成封面时若第一张图超过 2000 万像素会触发
 ``Rejected image: dimensions ... — possible decompression bomb`` 报错。
@@ -29,7 +29,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from module.manga.core.models import CoverKitPlan
+from module.manga.core.models import MakeCoverPlan
 from module.manga.core.config import PAGE_EXTS
 from base.console import (
     emit, error, debug, info, warn, print_op_result,
@@ -148,7 +148,7 @@ def encode_webp(img: Image.Image, quality: int = DEFAULT_QUALITY) -> bytes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CBZ 追加写入（与 :func:`~module.manga.workflow.meta_kit.write_comicinfo` 同构）
+# CBZ 追加写入（与 :func:`~module.manga.workflow.make_meta.write_comicinfo` 同构）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _cover_zinfo(filename: str, inherited_attr: int) -> zipfile.ZipInfo:
@@ -180,7 +180,7 @@ def write_cover(
     ``also_delete_stem`` 不为 ``None`` 时，同样摘除根目录下该 stem 的所有条目
     （用于 ``cover.*`` → ``0000.webp`` 时删除原 ``cover.*``）。
 
-    与 :func:`~module.manga.workflow.meta_kit.write_comicinfo` 同构。
+    与 :func:`~module.manga.workflow.make_meta.write_comicinfo` 同构。
 
     :return: ``True`` 表示替换了旧版（``dst_name`` 本身已存在），``False`` 表示首次写入。
     """
@@ -215,10 +215,10 @@ def preview_plan(
     cbz_path: str,
     mode:     str = 'center',
     quality:  int = DEFAULT_QUALITY,
-) -> CoverKitPlan:
+) -> MakeCoverPlan:
     """构建单个 CBZ 的封面写入计划（plan 阶段即完成裁剪 + 编码）。
 
-    任何步骤异常都被吸收进 :attr:`~module.manga.core.models.CoverKitPlan.error`，
+    任何步骤异常都被吸收进 :attr:`~module.manga.core.models.MakeCoverPlan.error`，
     调用方据此过滤；本函数不抛出。
     """
     existing: bytes | None = None
@@ -226,7 +226,7 @@ def preview_plan(
         with zipfile.ZipFile(cbz_path, 'r') as zf:
             src_name  = find_source_image(zf)
             if src_name is None:
-                return CoverKitPlan(
+                return MakeCoverPlan(
                     cbz_path=cbz_path, src_name=None, src_size=None,
                     dst_size=None, mode=mode, dst_name=None, webp_bytes=None,
                     existing_bytes=None, error='未找到 cover.* / 0001.* 源图',
@@ -240,7 +240,7 @@ def preview_plan(
                     break
             src_bytes = zf.read(src_name)
     except Exception as e:
-        return CoverKitPlan(
+        return MakeCoverPlan(
             cbz_path=cbz_path, src_name=None, src_size=None, dst_size=None,
             mode=mode, dst_name=None, webp_bytes=None, existing_bytes=None,
             error=f'打开 CBZ 失败: {e}',
@@ -250,7 +250,7 @@ def preview_plan(
     # 步长取整会切几像素，center 模式也会因 WebP 重编码而字节不一致），
     # 导致每跑一次都"变小一圈"。这里直接标记为已是最新，跳过处理。
     if src_name.lower() == dst_name.lower():
-        return CoverKitPlan(
+        return MakeCoverPlan(
             cbz_path=cbz_path, src_name=src_name, src_size=None,
             dst_size=None, mode=mode, dst_name=dst_name,
             webp_bytes=src_bytes, existing_bytes=src_bytes, error='',
@@ -273,22 +273,22 @@ def preview_plan(
         fitted  = resize_to_target(cropped, MAX_SIZE)
         webp    = encode_webp(fitted, quality=quality)
     except Exception as e:
-        return CoverKitPlan(
+        return MakeCoverPlan(
             cbz_path=cbz_path, src_name=src_name, src_size=None, dst_size=None,
             mode=mode, dst_name=dst_name, webp_bytes=None,
             existing_bytes=existing,
             error=f'图像处理失败 ({src_name}): {e}',
         )
 
-    return CoverKitPlan(
+    return MakeCoverPlan(
         cbz_path=cbz_path, src_name=src_name, src_size=src_size,
         dst_size=fitted.size, mode=mode, dst_name=dst_name, webp_bytes=webp,
         existing_bytes=existing, error='',
     )
 
 
-def apply_plan(plan: CoverKitPlan) -> str:
-    """写入单个 CBZ 的目标封面（:attr:`~module.manga.core.models.CoverKitPlan.dst_name`）。
+def apply_plan(plan: MakeCoverPlan) -> str:
+    """写入单个 CBZ 的目标封面（:attr:`~module.manga.core.models.MakeCoverPlan.dst_name`）。
 
     源为 ``cover.*`` 时，写入后同步从 ZIP 删除所有 ``cover.*`` 条目（自身）。
 
@@ -311,7 +311,7 @@ def apply_plan(plan: CoverKitPlan) -> str:
 # 批量 plan / apply
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _progress_line(idx: int, total: int, plan: CoverKitPlan) -> str:
+def _progress_line(idx: int, total: int, plan: MakeCoverPlan) -> str:
     icon = ('*' if plan.writable and plan.changed
             else '-' if plan.writable
             else '!')
@@ -325,7 +325,7 @@ def preview_plans(
     jobs:    int = 1,
     on_progress=None,
     cancel_token=None,
-) -> list[CoverKitPlan]:
+) -> list[MakeCoverPlan]:
     """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
 
     :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。≥ 4 个文件才启用并行。
@@ -349,7 +349,7 @@ def preview_plans(
 
 
 def apply_plans(
-    plans: list[CoverKitPlan], dry_run: bool = True, cancel_token=None,
+    plans: list[MakeCoverPlan], dry_run: bool = True, cancel_token=None,
 ) -> int:
     """整批写入封面。
 

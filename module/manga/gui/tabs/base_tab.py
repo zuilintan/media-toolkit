@@ -1,4 +1,4 @@
-"""四个 *-kit Tab 的通用基类 :class:`BaseTab`。
+"""四个子命令 Tab 的通用基类 :class:`BaseTab`。
 
 承担共性:
 
@@ -38,12 +38,12 @@ def _run_apply(apply_fn: Callable[..., int], plans: list, **kwargs) -> int:
 
 
 class BaseTab(QWidget):
-    """*-kit Tab 通用基类（UI 骨架 + 任务调度 + 状态机）。"""
+    """子命令 Tab 通用基类（UI 骨架 + 任务调度 + 状态机）。"""
 
     busy_changed = Signal(bool)
 
     # ── 子类必须覆盖的类常量 ───────────────────────────────────────────
-    cmd_name:        str = ''          # 'rename-kit' / 'meta-kit' / 'cover-kit' / 'pack-kit'
+    cmd_name:        str = ''          # QSettings key 前缀（snake_case 标识符）
     apply_btn_text:  str = '执行'      # 写入按钮文案
     confirm_verb:    str = '写入'      # QMessageBox 中的动词
     no_change_msg:   str = '没有需要写入的项目'

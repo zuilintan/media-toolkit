@@ -2,14 +2,14 @@
 
 from module.manga import __version__
 
-# ── rename-kit ────────────────────────────────────────────────────────────────
+# ── std_title ─────────────────────────────────────────────────────────────────
 
 # 留空：强制用户通过 ``--root`` 指定
 DEFAULT_ROOT_DIR: str = ""
 
 FILE_EXTS: frozenset[str] = frozenset({".zip", ".cbz"})
 
-# ── meta-kit ──────────────────────────────────────────────────────────────────
+# ── make_meta ─────────────────────────────────────────────────────────────────
 
 SCRIPT_NAME: str    = "manga-cli"
 SCRIPT_VERSION: str = __version__

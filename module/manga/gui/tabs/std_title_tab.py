@@ -1,4 +1,4 @@
-"""``rename-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.rename_kit`。"""
+"""标题标准化 GUI Tab；复用 :mod:`module.manga.workflow.std_title`。"""
 
 from __future__ import annotations
 from collections.abc import Callable
@@ -8,14 +8,14 @@ from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import RenameKitPlan
+from module.manga.core.models import StdTitlePlan
 from module.manga.gui.tabs.base_tab import BaseTab
-from module.manga.presentation.view import print_rename_kit_preview
-from module.manga.workflow.rename_kit import apply_plans, preview_plans
+from module.manga.presentation.view import print_std_title_preview
+from module.manga.workflow.std_title import apply_plans, preview_plans
 
 
-class RenameKitTab(BaseTab):
-    cmd_name         = 'rename-kit'
+class StdTitleTab(BaseTab):
+    cmd_name         = 'std_title'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有可执行的重命名'
@@ -45,13 +45,13 @@ class RenameKitTab(BaseTab):
     def _apply_fn(self):
         return apply_plans
 
-    def _render_preview(self, plans: list[RenameKitPlan]) -> None:
-        print_rename_kit_preview(plans)
+    def _render_preview(self, plans: list[StdTitlePlan]) -> None:
+        print_std_title_preview(plans)
 
-    def _count_actionable(self, plans: list[RenameKitPlan]) -> int:
+    def _count_actionable(self, plans: list[StdTitlePlan]) -> int:
         return sum(1 for p in plans if p.changed and not p.needs_review)
 
-    def _classify_plans(self, plans: list[RenameKitPlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[StdTitlePlan]) -> dict[str, int]:
         actionable = sum(1 for p in plans if p.changed and not p.needs_review)
         review     = sum(1 for p in plans if p.needs_review)
         return {'可重命名': actionable, '需审核': review,

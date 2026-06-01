@@ -1,10 +1,10 @@
 """
 内置示例（``data/examples.json``）的加载与演示运行。
 
-被 rename-kit / meta-kit 的 ``--examples`` 选项共用：
+被标题标准化 / 元数据写入子命令的 ``--examples`` 选项共用：
 
-- :func:`run_rename_kit_examples` 验证 ``(input, expected)`` 解析往返；
-- :func:`run_meta_kit_examples` 把 ``expected`` 解析为 ComicInfo 字段并展示。
+- :func:`run_std_title_examples` 验证 ``(input, expected)`` 解析往返；
+- :func:`run_make_meta_examples` 把 ``expected`` 解析为 ComicInfo 字段并展示。
 """
 
 from __future__ import annotations
@@ -15,13 +15,13 @@ from pathlib import Path
 from module.manga.core.config import COMICINFO_TAGS
 from module.manga.naming.parser import parse_name, emit_parse_debug
 from module.manga.naming.builder import build_new_name
-from module.manga.workflow.meta_kit import collect_fields, _extract_publisher_name
+from module.manga.workflow.make_meta import collect_fields, _extract_publisher_name
 from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
-from module.manga.presentation.view import print_meta_kit_diff_table
+from module.manga.presentation.view import print_make_meta_diff_table
 
 _DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
 
-# :func:`run_meta_kit_examples` 用来模拟出版商提取的样本文件名
+# :func:`run_make_meta_examples` 用来模拟出版商提取的样本文件名
 _EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
 
 
@@ -32,7 +32,7 @@ def load_examples() -> list[tuple[str, str, str]]:
     return [(author, e['i'], e['e']) for e in raw['cases']]
 
 
-def run_rename_kit_examples() -> int:
+def run_std_title_examples() -> int:
     """逐条验证 :func:`~module.manga.naming.parser.parse_name` +
     :func:`~module.manga.naming.builder.build_new_name` 的往返结果。
 
@@ -68,7 +68,7 @@ def run_rename_kit_examples() -> int:
     return fail
 
 
-def run_meta_kit_examples() -> int:
+def run_make_meta_examples() -> int:
     """把规范化文件名（``expected``）解析为 ComicInfo 字段并展示。
 
     Publisher 取自 :data:`_EXAMPLES_PUBLISHER_FILE` 的模拟提取结果，PageCount 留空。
@@ -79,7 +79,7 @@ def run_meta_kit_examples() -> int:
     sim_pub  = _extract_publisher_name(_EXAMPLES_PUBLISHER_FILE)
 
     emit(SEP2)
-    emit(f'  meta_kit  —  内置示例解析（共 {len(examples)} 条）')
+    emit(f'  make_meta  —  内置示例解析（共 {len(examples)} 条）')
     emit(f'  模拟出版商文件: {_EXAMPLES_PUBLISHER_FILE}  →  Publisher: {sim_pub}')
     emit(SEP2)
 
@@ -96,7 +96,7 @@ def run_meta_kit_examples() -> int:
         emit_parse_debug(mi)
         fields = collect_fields(mi, sim_pub)
         # 旧列恒空：示例模拟"首次写入"语义
-        print_meta_kit_diff_table(empty_old, fields, indent='     ')
+        print_make_meta_diff_table(empty_old, fields, indent='     ')
         for w in mi.warnings:
             emit(f'     🟡 {w}')
         emit()

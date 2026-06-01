@@ -1,4 +1,4 @@
-"""``cover-kit`` 子命令的 GUI Tab；复用 :mod:`module.manga.workflow.cover_kit`。"""
+"""封面写入 GUI Tab；复用 :mod:`module.manga.workflow.make_cover`。"""
 
 from __future__ import annotations
 from collections.abc import Callable
@@ -8,17 +8,17 @@ from PySide6.QtWidgets import (
     QCheckBox, QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import CoverKitPlan
+from module.manga.core.models import MakeCoverPlan
 from base.gui.config import get_config
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.presentation.view import print_cover_preview
-from module.manga.workflow.cover_kit import (
+from module.manga.workflow.make_cover import (
     DEFAULT_QUALITY, apply_plans, preview_plans,
 )
 
 
-class CoverKitTab(BaseTab):
-    cmd_name         = 'cover-kit'
+class MakeCoverTab(BaseTab):
+    cmd_name         = 'make_cover'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
     no_change_msg    = '没有需要写入的封面'
@@ -56,15 +56,15 @@ class CoverKitTab(BaseTab):
     def _load_settings(self) -> None:
         super()._load_settings()
         cfg = get_config()
-        if (v := cfg.get('cover-kit.smart')) is not None:
+        if (v := cfg.get(f'{self.cmd_name}.smart')) is not None:
             self._smart.setChecked(bool(v))
-        if (v := cfg.get('cover-kit.quality')) is not None:
+        if (v := cfg.get(f'{self.cmd_name}.quality')) is not None:
             self._quality.setValue(int(v))
         self._smart.stateChanged.connect(
-            lambda: cfg.set('cover-kit.smart', self._smart.isChecked())
+            lambda: cfg.set(f'{self.cmd_name}.smart', self._smart.isChecked())
         )
         self._quality.valueChanged.connect(
-            lambda v: cfg.set('cover-kit.quality', v)
+            lambda v: cfg.set(f'{self.cmd_name}.quality', v)
         )
 
     def _mode(self) -> str:
@@ -83,13 +83,13 @@ class CoverKitTab(BaseTab):
     def _apply_fn(self):
         return apply_plans
 
-    def _render_preview(self, plans: list[CoverKitPlan]) -> None:
+    def _render_preview(self, plans: list[MakeCoverPlan]) -> None:
         print_cover_preview(plans)
 
-    def _count_actionable(self, plans: list[CoverKitPlan]) -> int:
+    def _count_actionable(self, plans: list[MakeCoverPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
 
-    def _classify_plans(self, plans: list[CoverKitPlan]) -> dict[str, int]:
+    def _classify_plans(self, plans: list[MakeCoverPlan]) -> dict[str, int]:
         writable = sum(1 for p in plans if p.writable and p.changed)
         unchanged = sum(1 for p in plans if p.writable and not p.changed)
         return {'可写入': writable, '无变化': unchanged,

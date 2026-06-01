@@ -117,12 +117,12 @@ class MangaInfo:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RenameKitPlan
+# StdTitlePlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class RenameKitPlan:
-    """rename-kit 单个源文件（``.zip`` / ``.cbz``）的重命名计划。"""
+class StdTitlePlan:
+    """单个源文件（``.zip`` / ``.cbz``）的标题标准化重命名计划。"""
     author_dir: str
     author:     str
     old_name:   str
@@ -140,12 +140,12 @@ class RenameKitPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MetaKitPlan
+# MakeMetaPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class MetaKitPlan:
-    """meta-kit 单个 CBZ 的 ``ComicInfo.xml`` 写入计划。
+class MakeMetaPlan:
+    """单个 CBZ 的 ``ComicInfo.xml`` 元数据写入计划。
 
     plan 阶段即构建 ``new_xml``（确定性），apply 阶段直接复用并据 :attr:`changed`
     实现幂等：已有 ``ComicInfo.xml`` 与目标完全一致则跳过。
@@ -191,12 +191,12 @@ class MetaKitPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CoverKitPlan
+# MakeCoverPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class CoverKitPlan:
-    """cover-kit 单个 CBZ 的封面写入计划。
+class MakeCoverPlan:
+    """单个 CBZ 的封面写入计划。
 
     plan 阶段就真正解码源图、裁剪、转为 WebP 字节，apply 阶段只追加写入；
     这样确保预览展示的尺寸与最终写入完全一致。:attr:`existing_bytes` 用于
@@ -237,14 +237,14 @@ class CoverKitPlan:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PackKitPlan
+# PackPicPlan
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class PackKitPlan:
-    """pack-kit 单个「打包单位」的序号化重命名 + 打包计划。
+class PackPicPlan:
+    """单个「打包单位」的图片序号化重命名 + 打包计划。
 
-    打包单位由 :func:`~module.manga.workflow.pack_kit._find_units` 递归识别，分两种：
+    打包单位由 :func:`~module.manga.workflow.pack_pic._find_units` 递归识别，分两种：
 
     - ``'flat'``：直接含图片、无子目录（zip 内平铺）
     - ``'nested'``：仅含子目录且每个子目录都是 flat（zip 内保留子目录路径）
