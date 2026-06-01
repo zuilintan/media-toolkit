@@ -1,7 +1,6 @@
-"""
-__main__.py — 适配 `python -m artifact.gui` 调用 / PyInstaller 入口。
+"""适配 ``python -m module.artifact.gui`` 调用 / PyInstaller 入口。
 
-实际实现位于 artifact.gui 包的 main()；此处仅做转发。
+实际实现位于 :func:`module.artifact.gui.main`；此处仅做转发。
 """
 import sys
 

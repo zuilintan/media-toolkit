@@ -1,12 +1,8 @@
-"""
-candidate_dialog.py — 候选目录单选对话框
+"""候选目录单选对话框。
 
-两种场景:
-  - 0 候选 → 列 WorkDirs 让用户选"创建位置"
-  - N 候选 → 列已有候选作者目录让用户选
-
-业务 caller 在外层把 0/N 分支转换成统一的"路径列表 + 提示语"传入；
-对话框自身不感知业务语义。
+两种场景：0 候选 → 列 :class:`~module.artifact.workflow.classify.config.WorkDir`
+让用户选"创建位置"；N 候选 → 列已有候选作者目录让用户选。业务 caller 在外层
+把 0/N 分支转换成统一的"路径列表 + 提示语"传入；对话框自身不感知业务语义。
 """
 
 from __future__ import annotations
@@ -20,7 +16,7 @@ from PySide6.QtWidgets import (
 
 
 class CandidateDialog(QDialog):
-    """从 N 个 Path 中单选；返回 selected_index() 或 None。"""
+    """从 N 个 ``Path`` 中单选；通过 :meth:`selected_index` 取下标。"""
 
     def __init__(
         self,
@@ -63,7 +59,7 @@ def ask_candidate(
     candidates: list[Path],
     parent: QWidget | None = None,
 ) -> Path | None:
-    """便捷封装：弹出对话框 → 用户选确认 → 返回选定 Path；取消返回 None。"""
+    """便捷封装：弹出对话框 → 用户选确认 → 返回选定 ``Path``；取消返回 ``None``。"""
     dlg = CandidateDialog(title, prompt, candidates, parent)
     if dlg.exec() != QDialog.Accepted:
         return None

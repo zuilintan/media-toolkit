@@ -1,19 +1,12 @@
-"""
-classify_tab.py — artifact 的 classify 业务子 Tab
+"""``artifact`` 的 ``classify`` 业务子 Tab。
 
-布局
-----
-ClassifyTab (QWidget)
-└── QVBoxLayout
-    ├── 按钮行: [刷新别名]
-    ├── WorkDirs 摘要 label
-    └── DropArea (大块)
+布局：``QVBoxLayout`` → 按钮行（刷新别名）+ WorkDirs 摘要 label +
+:class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
-业务流
-------
-启动:  load_config → 显示 WorkDirs；失败弹错并禁用拖入
-拖入:  paths_dropped → 逐个 _process_one → 候选 0/1/N 分支 →
-       ask_candidate → classify_one
+业务流：启动时 :func:`~module.artifact.workflow.classify.config.load_config`
+→ 显示 WorkDirs（失败弹错并禁用拖入）；拖入 → 逐个 :meth:`ClassifyTab._process_one`
+→ 候选 0/1/N 分支 → :func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
+→ :func:`~module.artifact.workflow.classify.ops.classify_one`。
 """
 
 from __future__ import annotations
@@ -36,7 +29,7 @@ from module.artifact.workflow.classify.path import path_to_author_name
 
 
 def _reporter(level: str, msg: str) -> None:
-    """适配 base.fs.Reporter → base.console，由 QtSink 路由到 LogView。"""
+    """适配 :data:`~base.fs.Reporter` → :mod:`base.console`，由 :class:`~base.gui.qt_sink.QtSink` 路由到 :class:`~base.gui.log_view.LogView`。"""
     {'info': emit, 'warn': warn, 'error': error}.get(level, emit)(msg)
 
 
@@ -57,9 +50,12 @@ class _AliasThread(QThread):
 
 
 class ClassifyTab(QWidget):
-    """classify 业务 Tab：拖入归类。"""
+    """``classify`` 业务 Tab：拖入归类。
 
-    busy_changed = Signal(bool)   # 预留：当前无长任务，恒为 False
+    :ivar busy_changed: 预留信号；当前无长任务，恒为 ``False``。
+    """
+
+    busy_changed = Signal(bool)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

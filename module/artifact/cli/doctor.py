@@ -1,7 +1,6 @@
-"""
-doctor.py — artifact-cli 环境体检子命令
+"""``artifact-cli doctor`` 子命令（环境体检）。
 
-声明 artifact 所需的包并委托给 base.doctor.run_doctor 执行检查与渲染。
+声明 artifact 所需的包并委托 :func:`base.doctor.run_doctor` 执行检查与渲染。
 """
 
 from __future__ import annotations

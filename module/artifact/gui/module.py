@@ -1,14 +1,8 @@
-"""
-module.py — file-toolkit GUI 模块（被 base.gui.shell 装载）
+"""file-toolkit GUI 模块（被 :class:`~base.gui.shell.Shell` 装载）。
 
-布局
-----
-ArtifactModule (QWidget)
-└── QSplitter (Vertical)
-    ├── QTabWidget       — 当前仅 classify 一个子 Tab（tabBarAutoHide）
-    └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
-
-未来扩展业务（如其他 file 操作）直接 addTab 即可，与 manga 对称。
+布局：``QSplitter(Vertical)`` → 上 ``QTabWidget``（当前仅 classify 一个子 Tab，
+``tabBarAutoHide``）+ 下 ``QStackedWidget``（每子 Tab 各有一个
+:class:`~base.gui.log_view.LogView`）。未来扩展业务直接 ``addTab`` 即可，与 manga 对称。
 """
 
 from __future__ import annotations

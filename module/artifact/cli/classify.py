@@ -1,20 +1,14 @@
-"""
-classify.py — artifact-cli classify 子命令
+"""``artifact-cli classify`` 子命令（按作者名归类文件/目录）。
 
-模式
-----
-1. 拖入循环 (推荐): ``artifact-cli classify --drag``
-2. 单次/批量:        ``artifact-cli classify <path> [<path> ...]``
-3. 指定目标:         ``artifact-cli classify <path> --target /M/MK/作者/AuthorA``
-                     （跳过候选交互；目标必须是已存在的目录）
+模式：拖入循环（``--drag``，推荐） / 单次或批量（``<path>...``） /
+指定目标（``--target``，跳过候选交互，目标必须是已存在的目录）。
 
-交互
-----
-- 0 候选 → 列出所有 WorkDir，输入数字选择创建新作者目录；输入 q 跳过
+候选交互（:func:`_choose_target`）：
+
+- 0 候选 → 列出所有 :class:`~module.artifact.workflow.classify.config.WorkDir`，
+  输入数字选择创建新作者目录；输入 ``q`` 跳过
 - 1 候选 → 自动使用
-- N 候选 → 列出候选，输入数字选择；输入 q 跳过
-
-依赖: artifact.workflow.classify.* / base.drag_loop / base.console
+- N 候选 → 列出候选，输入数字选择；输入 ``q`` 跳过
 """
 
 from __future__ import annotations
@@ -33,7 +27,7 @@ from module.artifact.workflow.classify.ops import classify_one
 from module.artifact.workflow.classify.path import path_to_author_name
 
 
-# 适配 base.fs.Reporter 协议 → base.console 函数（自动走 GUI sink 路由）
+# 适配 :data:`base.fs.Reporter` 协议 → :mod:`base.console` 函数（自动走 GUI sink 路由）
 def _reporter(level: str, msg: str) -> None:
     {'info': emit, 'warn': warn, 'error': error}.get(level, emit)(msg)
 
@@ -62,7 +56,7 @@ def _choose_target(
     candidates: list[Path],
     workdirs: list[WorkDir],
 ) -> Path | None:
-    """根据候选数走 0/1/N 分支；返回选定目标作者目录或 None（跳过）。"""
+    """根据候选数走 0/1/N 分支；返回选定目标作者目录或 ``None``（跳过）。"""
     if not candidates:
         print(f'\n📭 未找到 "{author_name}" 的已有作者目录，请选择创建位置：')
         for i, wd in enumerate(workdirs, 1):
@@ -127,7 +121,7 @@ def _process_one(
 
 
 def cmd_classify(args: argparse.Namespace) -> int:
-    """classify 子命令调度。"""
+    """``classify`` 子命令调度。"""
     try:
         cfg = load_config()
     except FileNotFoundError as e:

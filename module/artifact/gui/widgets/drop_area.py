@@ -1,13 +1,11 @@
-"""
-drop_area.py — 大块文件/目录拖入区
+"""大块文件/目录拖入区（``QFrame`` 形态）。
 
-QFrame 形态，接受 file/dir 拖入；解析 MimeData URLs → 本地 Path 列表，
-emit ``paths_dropped(list)`` 信号交给上层业务处理。
+解析 ``QMimeData.urls()`` → 本地 ``Path`` 列表，emit
+:attr:`DropArea.paths_dropped` 信号交给上层业务处理。
 
-设计:
-  - 接受文件 ∧ 接受目录（ps1 的 classify 拖入两者都允许）
-  - 拖入悬停时高亮边框（与 base.gui.path_picker 风格一致）
-  - 解析逻辑独立为模块函数 ``urls_to_paths`` 便于单测
+设计：接受文件 ∧ 接受目录（ps1 的 classify 拖入两者都允许）；拖入悬停时高亮边框
+（与 :class:`~base.gui.path_picker.PathPicker` 风格一致）；解析逻辑独立为
+:func:`urls_to_paths` 便于单测。
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ _NORMAL_QSS = 'QFrame { border: 2px dashed #555; background: #25292c; }'
 
 
 def urls_to_paths(urls) -> list[Path]:
-    """从 QMimeData.urls() 提取本地 Path 列表（过滤非本地 / 不存在的）。"""
+    """从 ``QMimeData.urls()`` 提取本地 ``Path`` 列表（过滤非本地 / 不存在的）。"""
     out: list[Path] = []
     for url in urls:
         if not url.isLocalFile():
@@ -35,7 +33,10 @@ def urls_to_paths(urls) -> list[Path]:
 
 
 class DropArea(QFrame):
-    """大块文件/目录拖入区域；拖入后 emit paths_dropped(list[Path])。"""
+    """大块文件/目录拖入区域。
+
+    :ivar paths_dropped: 信号 ``(list[Path])``；拖入后 emit。
+    """
 
     paths_dropped = Signal(list)
 

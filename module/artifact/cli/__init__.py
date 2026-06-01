@@ -1,18 +1,16 @@
-"""
-artifact.cli — file-toolkit 命令行入口与子命令实现
+"""file-toolkit 命令行入口与子命令实现。
 
-包入口 ``main()`` 对应 pyproject scripts 的 ``artifact-cli``；子命令拆分为独立
-模块（当前仅 classify，未来按需扩展）。
+包入口 :func:`main` 对应 pyproject scripts 的 ``artifact-cli``；子命令拆分为独立
+模块（当前仅 :mod:`~module.artifact.cli.classify` + :mod:`~module.artifact.cli.doctor`）。
+模块名遵循 PEP 8（下划线），对外暴露的 console 命令使用连字符（CLI 惯例）。
 
-模块名遵循 PEP 8（下划线），对外暴露的 console 命令则使用连字符
-``artifact-cli``（CLI 惯例），两者解耦互不影响。
+用法示例::
 
-用法示例:
-  artifact-cli classify --drag                       # 循环拖入模式（推荐）
-  artifact-cli classify ./AuthorA                    # 单次处理
-  artifact-cli classify ./a ./b ./c                  # 多个一起
-  artifact-cli classify ./a --target M:/MK/作者/A    # 指定目标跳过候选交互
-  artifact-cli classify --drag --no-open             # 完成后不开资源管理器
+    artifact-cli classify --drag                       # 循环拖入模式（推荐）
+    artifact-cli classify ./AuthorA                    # 单次处理
+    artifact-cli classify ./a ./b ./c                  # 多个一起
+    artifact-cli classify ./a --target M:/MK/作者/A    # 指定目标跳过候选交互
+    artifact-cli classify --drag --no-open             # 完成后不开资源管理器
 """
 
 from __future__ import annotations

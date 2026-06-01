@@ -1,16 +1,11 @@
-"""
-artifact.gui — PySide6 桌面前端（file-toolkit 单模块视图）
+"""PySide6 桌面前端（file-toolkit 单模块视图）。
 
-包入口 ``main()`` 对应 pyproject scripts 的 ``artifact-gui``，启动顺序：
-  1. 体检 PySide6（共用 base.gui.app_check）
-  2. set_default_app_dir_name + setup_logging
-  3. 构造 Shell + 注册 ArtifactModule
-  4. 启动事件循环
+包入口 :func:`main` 对应 pyproject scripts 的 ``artifact-gui``，启动顺序：
 
-模块布局:
-    module.py        — ArtifactModule（QSplitter + 顶部 QTabWidget + 独立日志栈）
-    tabs/            — 业务子 Tab（当前仅 classify_tab）
-    widgets/         — 业务专属部件（drop_area / candidate_dialog）
+1. :func:`~base.gui.app_check.check_pyside6` 体检 PySide6
+2. :func:`~base.gui.config.set_default_app_dir_name` + :func:`~base.console.setup_logging`
+3. 构造 :class:`~base.gui.shell.Shell` + 注册 :class:`~module.artifact.gui.module.ArtifactModule`
+4. 启动事件循环
 """
 
 from __future__ import annotations
