@@ -102,13 +102,15 @@ class ClassifyTab(QWidget):
         btn_lay.addStretch(1)
 
         self._workdirs_label = QLabel('（配置加载中...）')
-        self._workdirs_label.setStyleSheet('color: #8a9097;')
+        self._workdirs_label.setProperty('muted', True)
         self._workdirs_label.setWordWrap(True)
 
         self._drop = DropArea()
         self._drop.paths_dropped.connect(self._on_paths_dropped)
 
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
         lay.addLayout(btn_lay)
         lay.addWidget(self._workdirs_label)
         lay.addWidget(self._drop, 1)

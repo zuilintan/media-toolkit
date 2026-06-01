@@ -71,6 +71,7 @@ class BaseTab(QWidget):
         self._apply_btn = QPushButton(self.apply_btn_text)
         self._apply_btn.setToolTip(f'{self.apply_btn_text} [Ctrl+Enter]')
         self._apply_btn.setEnabled(False)
+        self._apply_btn.setProperty('primary', True)
         self._scan_btn.clicked.connect(self._on_scan)
         self._apply_btn.clicked.connect(self._on_apply)
 
@@ -85,8 +86,11 @@ class BaseTab(QWidget):
         btn_lay.addStretch(1)
 
         self._status = QLabel('待扫描')
+        self._status.setProperty('muted', True)
 
         root_lay = QVBoxLayout(self)
+        root_lay.setContentsMargins(10, 10, 10, 10)
+        root_lay.setSpacing(8)
         root_lay.addWidget(dir_box)
         # 子类的选项组（jobs / smart / quality 等）
         opt_box = self._build_options_box()

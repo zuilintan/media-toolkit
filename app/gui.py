@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from base.console import setup_logging
+    from base.gui.palette import stylesheet
     from base.gui.shell import Shell
     from module.artifact.gui.module import ArtifactModule
     from module.artifact.core.runtime_config import load_config as _load_artifact
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     _load_artifact()
 
     app = QApplication(argv if argv is not None else sys.argv)
+    app.setStyleSheet(stylesheet())
     setup_logging(debug=False)
 
     shell = Shell(

@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from base.console import setup_logging
+    from base.gui.palette import stylesheet
     from base.gui.shell import Shell
     from module.manga import __version__
     from module.manga.core.runtime_config import get_manga_config
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     get_manga_config()
 
     app = QApplication(argv if argv is not None else sys.argv)
+    app.setStyleSheet(stylesheet())
     setup_logging(debug=False)
 
     shell = Shell(

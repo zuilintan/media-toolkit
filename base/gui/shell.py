@@ -18,16 +18,56 @@
   :func:`~base.console.set_output` 让初始输出有去处；后续 module 各自管自己的 sink。
 - 几何/侧栏状态用 :mod:`base.gui.config` 持久化，键名带 ``config_key_prefix``，
   避免 manga-only / artifact-only / 双模块场景互相覆盖。
+- 左侧 Tab 使用 :class:`_HorizontalTabBar`，让 West 方向的标签文字保持水平阅读，
+  替代 Qt 默认侧着旋转 90° 的样式。
+- 全局 QSS 由 :func:`~base.gui.palette.stylesheet` 提供，建议在
+  :class:`~PySide6.QtWidgets.QApplication` 构造后一次性 ``setStyleSheet``，本类
+  本身不再注入，避免每个 ``Shell`` 实例重新解析。
 """
 
 from __future__ import annotations
 from typing import Any
 
-from PySide6.QtCore import QByteArray, Qt
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget
+from PySide6.QtCore import QByteArray, QSize, Qt
+from PySide6.QtWidgets import (
+    QMainWindow, QStyle, QStyleOptionTab, QStylePainter,
+    QTabBar, QTabWidget, QWidget,
+)
 
 from base.console import set_output
 from base.gui.config import get_config
+
+
+class _HorizontalTabBar(QTabBar):
+    """West/East 方向也水平绘制文字的 ``QTabBar``。
+
+    Qt 默认实现把 East/West tab 的文字旋转 90°（侧着读），用户体验差。
+    本类重写 :meth:`tabSizeHint` 转置尺寸 + :meth:`paintEvent` 自绘
+    形状后再以水平方向绘制 text/icon。
+    """
+
+    def tabSizeHint(self, index: int) -> QSize:  # noqa: N802
+        # 所有 tab 取统一最大宽高：避免 QSS 让 selected tab 字体加粗后
+        # super() 返回不同宽度，进而引起 tab bar 总宽变化、central widget 平移
+        max_w = 0
+        max_h = 0
+        for i in range(self.count()):
+            s = super().tabSizeHint(i)
+            s.transpose()
+            max_w = max(max_w, s.width())
+            max_h = max(max_h, s.height())
+        return QSize(max_w, max_h)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QStylePainter(self)
+        opt = QStyleOptionTab()
+        for i in range(self.count()):
+            self.initStyleOption(opt, i)
+            painter.drawControl(QStyle.ControlElement.CE_TabBarTabShape, opt)
+            painter.drawItemText(
+                opt.rect, Qt.AlignmentFlag.AlignCenter,
+                self.palette(), self.isTabEnabled(i), opt.text,
+            )
 
 
 class Shell(QMainWindow):
@@ -47,8 +87,10 @@ class Shell(QMainWindow):
         self.resize(1100, 800)
 
         self._tabs = QTabWidget()
+        self._tabs.setTabBar(_HorizontalTabBar(self._tabs))
         self._tabs.setTabPosition(QTabWidget.TabPosition.West)
         self._tabs.setTabBarAutoHide(True)
+        self._tabs.setDocumentMode(True)
         self.setCentralWidget(self._tabs)
 
         self._sink_set = False

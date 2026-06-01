@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from base.gui.config import get_config
+from base.gui.palette import PRIMARY
 
 
 class PathPicker(QWidget):
@@ -73,7 +74,7 @@ class PathPicker(QWidget):
             for url in e.mimeData().urls():
                 if url.isLocalFile() and Path(url.toLocalFile()).is_dir():
                     self._combo.setStyleSheet(
-                        'QComboBox { border: 2px solid #56b6c2; }'
+                        f'QComboBox {{ border: 2px solid {PRIMARY}; }}'
                     )
                     e.acceptProposedAction()
                     return

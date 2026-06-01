@@ -15,9 +15,19 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
+from base.gui.palette import (
+    BG_SUBTLE, BORDER_STRONG, PRIMARY, PRIMARY_SOFT, TEXT_MUTED,
+)
 
-_HILITE_QSS = 'QFrame { border: 2px solid #56b6c2; background: #2c3033; }'
-_NORMAL_QSS = 'QFrame { border: 2px dashed #555; background: #25292c; }'
+
+_HILITE_QSS = (
+    f'QFrame {{ border: 2px solid {PRIMARY}; border-radius: 8px; '
+    f'background: {PRIMARY_SOFT}; }}'
+)
+_NORMAL_QSS = (
+    f'QFrame {{ border: 2px dashed {BORDER_STRONG}; border-radius: 8px; '
+    f'background: {BG_SUBTLE}; }}'
+)
 
 
 def urls_to_paths(urls) -> list[Path]:
@@ -48,7 +58,10 @@ class DropArea(QFrame):
 
         self._label = QLabel(hint)
         self._label.setAlignment(Qt.AlignCenter)
-        self._label.setStyleSheet('border: none; color: #a8b1b8; font-size: 14px;')
+        self._label.setStyleSheet(
+            'border: none; background: transparent; '
+            f'color: {TEXT_MUTED}; font-size: 14px;'
+        )
 
         lay = QVBoxLayout(self)
         lay.addWidget(self._label)
