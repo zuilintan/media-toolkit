@@ -140,30 +140,37 @@ class ClassifyTab(QWidget):
         self._alias_invalid = invalid
 
     def _update_status_label(self) -> None:
-        """合并 workdirs / 别名状态到顶部 label。"""
-        lines: list[str] = []
+        """合并 workdirs / 别名状态到顶部 label。
+
+        紧凑显示：workdirs 仅一行摘要（名字 join），完整路径放 tooltip；
+        别名失效信息保留显式提示，避免静默。
+        """
         if not self._workdirs_paths:
-            lines.append(
+            self._workdirs_label.setText(
                 '⚠️ artifact.workdirs 为空 —— 点「📝 修改配置」'
                 '编辑后再点「🔁 重载配置」。'
             )
+            self._workdirs_label.setToolTip('')
         else:
-            lines.append(f'📁 WorkDirs ({len(self._workdirs_paths)}):')
-            lines += [f'  • {p}' for p in self._workdirs_paths]
+            names = ', '.join(p.name or str(p) for p in self._workdirs_paths)
+            parts = [f'📁 WorkDirs ({len(self._workdirs_paths)}): {names}']
 
-        if self._alias_invalid:
-            preview = ', '.join(self._alias_invalid[:5])
-            more = (f' 等 {len(self._alias_invalid)} 个'
-                    if len(self._alias_invalid) > 5 else '')
-            lines.append(
-                f'📇 别名缓存: {len(self._alias_map)} 可用 / '
-                f'🟡 {len(self._alias_invalid)} 个失效 — '
-                f'点「🔄 刷新别名」更新（失效示例: {preview}{more}）'
+            if self._alias_invalid:
+                preview = ', '.join(self._alias_invalid[:5])
+                more = (f' 等 {len(self._alias_invalid)} 个'
+                        if len(self._alias_invalid) > 5 else '')
+                parts.append(
+                    f'📇 别名: {len(self._alias_map)} 可用 / '
+                    f'🟡 {len(self._alias_invalid)} 失效 — '
+                    f'点「🔄 刷新别名」更新（示例: {preview}{more}）'
+                )
+            elif self._alias_map:
+                parts.append(f'📇 别名: {len(self._alias_map)} 条已加载')
+
+            self._workdirs_label.setText(' · '.join(parts))
+            self._workdirs_label.setToolTip(
+                'WorkDirs:\n' + '\n'.join(f'• {p}' for p in self._workdirs_paths)
             )
-        elif self._alias_map:
-            lines.append(f'📇 别名缓存: {len(self._alias_map)} 条已加载')
-
-        self._workdirs_label.setText('\n'.join(lines))
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
