@@ -7,7 +7,7 @@ base/                            — 跨业务共享基础设施
 ├── console.py                   — 终端输出 & GUI sink 路由（emit / warn / error / set_output）
 ├── doctor.py                    — 通用环境体检引擎（run_doctor，各 CLI 声明自身 checks）
 ├── drag_loop.py                 — 通用拖入循环（run_drag_loop）
-├── fs.py                        — 文件系统工具（merge_into / move_dir / safe_rmtree）
+├── fs.py                        — 文件系统工具（merge_into / safe_rmtree / guard_path）
 ├── config_paths.py              — 跨平台 user_config_dir() 定位
 ├── app_config.py                — 统一持久化目录 + JsonConfig 基类（gui/artifact/manga.json 共用）
 └── gui/                         — 共享 GUI 组件（PySide6，可选）

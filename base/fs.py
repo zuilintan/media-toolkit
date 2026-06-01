@@ -121,55 +121,6 @@ def _default_reporter(level: str, msg: str) -> None:
     (sys.stdout if level == 'info' else sys.stderr).write(msg + '\n')
 
 
-def move_dir(
-    src: Path,
-    target: str,
-    *,
-    reporter: Reporter = _default_reporter,
-) -> bool:
-    """将目录 src 移动到 target，已存在同名目录则逐项合并并覆盖。
-
-    :param src:      源目录。
-    :param target:   目标父目录路径；不存在会自动创建。
-    :param reporter: 进度/警告输出回调。默认走 stdout/stderr；GUI 场景
-                     可注入 ``lambda lvl, msg: emit(msg)`` 类闭包路由到日志框。
-    :return: 无失败时为 ``True``。
-    """
-    target_path = Path(target)
-    target_path.mkdir(parents=True, exist_ok=True)
-    dest = target_path / src.name
-
-    if not dest.exists():
-        shutil.move(str(src), str(dest))
-        reporter('info', f'📦 已移动: {src.name}\n   → {dest}')
-        return True
-
-    reporter('warn', f'目标目录已存在，逐项移动并覆盖同名文件: {dest}')
-    ok_n = fail = 0
-    for item in sorted(src.iterdir()):
-        item_dest = dest / item.name
-        try:
-            if item_dest.exists():
-                safe_unlink(item_dest)
-                reporter('info', f'  🗑 删除已存在文件: {item_dest.name}')
-            shutil.move(str(item), str(item_dest))
-            ok_n += 1
-            reporter('info', f'  ✅ 移动: {item.name}')
-        except Exception as e:
-            reporter('error', f'{item.name} — {e}')
-            fail += 1
-
-    remaining = list(src.iterdir())
-    if not remaining:
-        safe_rmdir(src)
-        reporter('info', f'  🗑 源目录已清空并删除: {src}')
-    else:
-        reporter('warn',
-                 f'{len(remaining)} 个文件未能移动，源目录保留: {src}')
-    reporter('info', f'  合并完成: 成功 {ok_n} | 失败 {fail}')
-    return fail == 0
-
-
 def merge_into(
     src: Path,
     dst: Path,
@@ -177,9 +128,6 @@ def merge_into(
     reporter: Reporter = _default_reporter,
 ) -> dict:
     """把 src 内的所有内容递归 move 到 dst 内（不嵌套 ``src.name``）。
-
-    与 :func:`move_dir` 的区别：前者把 src 作为子放入 target（``target/src.name``），
-    后者把 src 的内容直接合并到 dst 中（src 本身不出现在 dst 内）。
 
     冲突策略：文件冲突 → :func:`safe_unlink` + ``shutil.move``；子目录冲突 → 递归合并。
 
