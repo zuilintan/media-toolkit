@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from module.artifact.cli.classify import _choose_target, _prompt_index
-from module.artifact.workflow.classify.config import WorkDir
+from module.artifact.core.runtime_config import WorkDir
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

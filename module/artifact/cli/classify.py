@@ -5,7 +5,7 @@
 
 候选交互（:func:`_choose_target`）：
 
-- 0 候选 → 列出所有 :class:`~module.artifact.workflow.classify.config.WorkDir`，
+- 0 候选 → 列出所有 :class:`~module.artifact.core.runtime_config.WorkDir`，
   输入数字选择创建新作者目录；输入 ``q`` 跳过
 - 1 候选 → 自动使用
 - N 候选 → 列出候选，输入数字选择；输入 ``q`` 跳过
@@ -21,7 +21,7 @@ from base.console import emit, error, warn
 from base.drag_loop import run_drag_loop
 from base.fs import Reporter
 from module.artifact.workflow.classify.alias import scan_aliases
-from module.artifact.workflow.classify.config import Config, WorkDir, load_config
+from module.artifact.core.runtime_config import Config, WorkDir, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.ops import classify_one
 from module.artifact.workflow.classify.path import path_to_author_name

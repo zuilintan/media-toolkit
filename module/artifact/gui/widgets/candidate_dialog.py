@@ -1,6 +1,6 @@
 """候选目录单选对话框。
 
-两种场景：0 候选 → 列 :class:`~module.artifact.workflow.classify.config.WorkDir`
+两种场景：0 候选 → 列 :class:`~module.artifact.core.runtime_config.WorkDir`
 让用户选"创建位置"；N 候选 → 列已有候选作者目录让用户选。业务 caller 在外层
 把 0/N 分支转换成统一的"路径列表 + 提示语"传入；对话框自身不感知业务语义。
 """

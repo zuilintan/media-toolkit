@@ -3,7 +3,7 @@
 布局：``QVBoxLayout`` → 按钮行（打开 artifact.json + 刷新别名）+ WorkDirs 摘要
 label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
-业务流：启动时 :func:`~module.artifact.workflow.classify.config.load_config`
+业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config`
 → 显示 WorkDirs（空则弹错并禁用拖入）；用户可点「打开 artifact.json」用关联
 程序编辑配置，编辑保存后点「刷新别名」重新读取 workdirs + re-scan 别名；
 拖入 → 逐个 :meth:`ClassifyTab._process_one` → 候选 0/1/N 分支 →
@@ -25,7 +25,7 @@ from base.gui.qt_sink import QtSink
 from module.artifact.gui.widgets.candidate_dialog import ask_candidate
 from module.artifact.gui.widgets.drop_area import DropArea
 from module.artifact.workflow.classify.alias import scan_aliases
-from module.artifact.workflow.classify.config import Config, config_path, load_config
+from module.artifact.core.runtime_config import Config, config_path, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.ops import classify_one
 from module.artifact.workflow.classify.path import path_to_author_name

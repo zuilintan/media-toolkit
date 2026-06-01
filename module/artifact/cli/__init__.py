@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from module.artifact.workflow.classify.config import load_config
+    from module.artifact.core.runtime_config import load_config
 
     parser = build_parser()
     args = parser.parse_args(argv)

@@ -7,7 +7,7 @@ import pytest
 
 from base.fs import merge_into
 from module.artifact.workflow.classify.alias import ALIAS_PREFIX, scan_aliases
-from module.artifact.workflow.classify.config import Config, WorkDir, load_config
+from module.artifact.core.runtime_config import Config, WorkDir, load_config
 from module.artifact.workflow.classify.matcher import find_candidates
 from module.artifact.workflow.classify.path import path_to_author_name
 

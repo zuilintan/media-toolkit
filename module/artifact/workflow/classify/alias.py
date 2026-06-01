@@ -1,4 +1,4 @@
-"""别名扫描（在 :class:`~module.artifact.workflow.classify.config.WorkDir` 下查
+"""别名扫描（在 :class:`~module.artifact.core.runtime_config.WorkDir` 下查
 ``[别名]：XXX.txt`` 文件）。
 
 文件本身可空（数据载体在文件名上）；前缀 :data:`ALIAS_PREFIX` 中的 ``：``

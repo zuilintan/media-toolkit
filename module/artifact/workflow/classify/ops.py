@@ -4,7 +4,7 @@
 
 - 拖入目录 → :func:`~base.fs.merge_into` 递归合并；合并后 src 为空则删除
 - 拖入文件 → 目标已存在则跳过（与 ps1 单文件分支一致），否则 ``shutil.move``
-- 操作完成后调 ``reporter`` 输出统计 + iwara 搜索 URL（若 :class:`~module.artifact.workflow.classify.config.WorkDir` 配置了模板）
+- 操作完成后调 ``reporter`` 输出统计 + iwara 搜索 URL（若 :class:`~module.artifact.core.runtime_config.WorkDir` 配置了模板）
 - 可选：``open_target=True`` 时用系统默认动作打开目标目录
 """
 
@@ -21,7 +21,7 @@ from base.fs import (
     Reporter, _default_reporter, merge_into, safe_rmtree,
 )
 
-from module.artifact.workflow.classify.config import WorkDir
+from module.artifact.core.runtime_config import WorkDir
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ def classify_one(
 
     :param src:         拖入的源（文件或目录）。
     :param dst:         目标作者目录（文件 / 子内容会被放入其中）。
-    :param workdir:     ``dst`` 所属的 :class:`~module.artifact.workflow.classify.config.WorkDir`；
+    :param workdir:     ``dst`` 所属的 :class:`~module.artifact.core.runtime_config.WorkDir`；
                         用于打印 iwara 搜索 URL；``None`` 跳过。
     :param author_name: 用于 URL 占位符填充；``None`` 时跳过 URL 打印。
     :param open_target: 操作成功后是否打开 ``dst`` 资源管理器。

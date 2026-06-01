@@ -61,13 +61,14 @@ module/                          — 业务包命名空间
     │   ├── __init__.py          — build_parser() / main()
     │   ├── classify.py          — classify 子命令
     │   └── doctor.py            — doctor 子命令（委托 base.doctor.run_doctor）
+    ├── core/                    — 纯数据层（运行期配置 / 领域模型）
+    │   └── runtime_config.py    — WorkDir / Config / load_config()（artifact.json）
     ├── gui/                     — 桌面 GUI（PySide6，可选依赖）
     │   ├── __init__.py          — QApplication 入口（main = artifact-gui）
     │   ├── module.py            — ArtifactModule（被 Shell 装载）
     │   ├── tabs/classify_tab.py — ClassifyTab：拖入区 + 工作目录面板
     │   └── widgets/             — drop_area / candidate_dialog
     └── workflow/classify/       — 归类工作流
-        ├── config.py            — WorkDir / Config / load_config()
         ├── path.py              — path_to_author_name()
         ├── alias.py             — scan_aliases()（扫描 [别名]：XX.txt）
         ├── matcher.py           — find_candidates()
