@@ -1,10 +1,10 @@
-"""
-test_naming.py — 文件名解析与构建的回归测试网
+"""文件名解析与构建的回归测试网（改动
+:mod:`~module.manga.naming.parser` / :mod:`~module.manga.core.patterns` /
+:mod:`~module.manga.naming.builder` 前的安全网）。
 
-将 module/manga/data/examples.json 的每条用例参数化，验证完整往返:
+将 ``module/manga/data/examples.json`` 的每条用例参数化，验证完整往返::
+
     build_new_name(parse_name(author, input)) == expected
-
-这是改动 parser.py / patterns.py / builder.py 前的安全网。
 """
 
 from __future__ import annotations

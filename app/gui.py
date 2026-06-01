@@ -1,17 +1,17 @@
-"""
-gui.py — 媒体工作台总入口（单窗口装载 manga + artifact 两个业务模块）
+"""媒体工作台总入口（单窗口装载 manga + artifact 两个业务模块）。
 
-启动顺序
---------
-1. 体检 PySide6（共用 base.gui.app_check）
-2. set_default_app_dir_name('media-toolkit')   — 双模块共用一份配置目录
-3. 构造 Shell + 依次注册 MangaModule / ArtifactModule
-4. 首次注册的 MangaModule.default_sink 被 set_output；运行时各 module
-   自己的子 Tab 触发任务前再 set_output 到对应 sink，路由互不干扰
+可通过 ``uv run app-gui`` 启动；保留 ``manga-gui`` / ``artifact-gui`` 单模块入口，
+便于只需用单一业务时启动。启动顺序：
 
-可通过 ``uv run app-gui`` 启动（pyproject scripts）。
-
-注：保留 manga-gui / artifact-gui 单模块入口，便于只需用单一业务时启动。
+1. :func:`~base.gui.app_check.check_pyside6` 体检 PySide6
+2. :func:`~base.gui.config.set_default_app_dir_name` ``('media-toolkit')``
+   —— 双模块共用一份配置目录
+3. 构造 :class:`~base.gui.shell.Shell` + 依次注册
+   :class:`~module.manga.gui.module.MangaModule` /
+   :class:`~module.artifact.gui.module.ArtifactModule`
+4. 首次注册的 :meth:`MangaModule.default_sink` 被
+   :func:`~base.console.set_output`；运行时各 module 自己的子 Tab 触发任务前
+   再 ``set_output`` 到对应 sink，路由互不干扰
 """
 
 from __future__ import annotations
