@@ -104,7 +104,7 @@ def _classify_dir(
             if not any(src.iterdir()):
                 safe_rmtree(src)
                 src_removed = True
-                reporter('info', f'🗑  源目录已清空并删除: {src}')
+                reporter('info', f'🗑 源目录已清空并删除: {src}')
         except OSError as e:
             reporter('warn', f'清理源目录失败（保留）: {src} — {e}')
 

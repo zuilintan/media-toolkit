@@ -34,14 +34,23 @@ class Config:
     workdirs: list[WorkDir]
 
     def find_workdir(self, p: Path) -> WorkDir | None:
-        """根据一个候选目录路径反查所属 :class:`WorkDir`（匹配规则：``p`` 的某个祖先 == :attr:`WorkDir.path`）。"""
+        """根据一个候选目录路径反查所属 :class:`WorkDir`（匹配规则：``p`` 的某个祖先 == :attr:`WorkDir.path`）。
+
+        对 ``p`` 和 ``WorkDir.path`` 都调用 :meth:`~pathlib.Path.resolve`，
+        确保映射网络驱动器（如 ``M:`` → ``\\\\server\\share``）能正确匹配
+        UNC 路径。
+        """
         try:
             resolved = p.resolve()
         except Exception:
             resolved = p
         for wd in self.workdirs:
             try:
-                resolved.relative_to(wd.path)
+                wd_resolved = wd.path.resolve()
+            except Exception:
+                wd_resolved = wd.path
+            try:
+                resolved.relative_to(wd_resolved)
                 return wd
             except ValueError:
                 continue

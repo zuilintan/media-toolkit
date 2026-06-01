@@ -151,7 +151,7 @@ def move_dir(
         try:
             if item_dest.exists():
                 safe_unlink(item_dest)
-                reporter('info', f'  🗑  删除已存在文件: {item_dest.name}')
+                reporter('info', f'  🗑 删除已存在文件: {item_dest.name}')
             shutil.move(str(item), str(item_dest))
             ok_n += 1
             reporter('info', f'  ✅ 移动: {item.name}')
@@ -162,7 +162,7 @@ def move_dir(
     remaining = list(src.iterdir())
     if not remaining:
         safe_rmdir(src)
-        reporter('info', f'  🗑  源目录已清空并删除: {src}')
+        reporter('info', f'  🗑 源目录已清空并删除: {src}')
     else:
         reporter('warn',
                  f'{len(remaining)} 个文件未能移动，源目录保留: {src}')
