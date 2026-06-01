@@ -71,6 +71,7 @@ class LogView(QPlainTextEdit):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName('LogView')   # 匹配 palette.py 的 QPlainTextEdit#LogView 选择器
         self.setReadOnly(True)
         self.setMaximumBlockCount(10000)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)

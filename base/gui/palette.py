@@ -20,6 +20,7 @@ ON_PRIMARY = '#ffffff'
 TEXT        = '#e6edf3'
 TEXT_MUTED  = '#8b949e'         # 状态行 / 次要 label
 TEXT_DIM    = '#6e7681'         # 禁用 / 占位
+TEXT_LOG    = '#c9d1d9'         # LogView：去除纯白感，缓解长时间阅读疲劳
 
 # 边框 / 分割
 BORDER        = '#30363d'
@@ -29,7 +30,8 @@ BORDER_SOFT   = '#21262d'
 # 背景
 BG          = '#0d1117'         # 窗口底
 BG_RAISED   = '#161b22'         # pane / button / input
-BG_SUBTLE   = '#010409'         # log / drop-area
+BG_SUBTLE   = '#010409'         # drop-area（凹陷感，配 dashed border）
+BG_LOG      = '#1a1f29'         # LogView：柔和深灰，配 TEXT_LOG 对比度 ~10.5:1
 BG_HOVER    = '#1c2128'
 BG_PRESSED  = '#272d36'
 BG_BUTTON_HOVER = '#1f242c'
@@ -153,6 +155,11 @@ QPlainTextEdit {{
     padding: 4px 6px;
     selection-background-color: {PRIMARY};
     selection-color: {ON_PRIMARY};
+}}
+/* LogView 专用：柔和深灰背景 + 非纯白文本，对比度 ~10.5:1 */
+QPlainTextEdit#LogView {{
+    background: {BG_LOG};
+    color: {TEXT_LOG};
 }}
 
 QGroupBox {{
