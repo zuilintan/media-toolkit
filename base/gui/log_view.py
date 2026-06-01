@@ -1,12 +1,7 @@
-"""
-log_view.py — 接收 QtSink 文本流的只读日志框
+"""接收 :class:`~base.gui.qt_sink.QtSink` 文本流的只读日志框。
 
-职责
-----
-- 接收 QtSink.text_written 信号，**解析** ANSI SGR 颜色转义，按色片段渲染
-- 上限块数防止超长任务把内存吃光（QPlainTextEdit.maximumBlockCount）
-
-依赖: 仅 PySide6
+接收 ``text_written`` 信号，解析 ANSI SGR 颜色转义并按色片段渲染；
+``QPlainTextEdit.maximumBlockCount`` 上限块数防止超长任务吃光内存。
 """
 
 from __future__ import annotations

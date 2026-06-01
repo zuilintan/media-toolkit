@@ -1,9 +1,8 @@
-"""
-app_check.py — PySide6 安装/版本体检（GUI 入口共用）
+"""PySide6 安装/版本体检（GUI 入口共用）。
 
-各业务 GUI 入口（manga.gui、artifact.gui 等的 main()）应在开头调用
-``check_pyside6(...)``，把硬编码的提示信息（用什么命令安装、怎么诊断）参数化
-传入，确保用户拿到的是适配自己包的可执行指引。
+各业务 GUI 入口（manga.gui、artifact.gui 等的 ``main()``）应在开头调用
+:func:`check_pyside6`，把硬编码的提示信息（安装命令、诊断命令）参数化传入，
+确保用户拿到的是适配自己包的可执行指引。
 """
 
 from __future__ import annotations
@@ -29,15 +28,13 @@ def check_pyside6(
 ) -> None:
     """检测 PySide6 是否可用；不可用时给出可执行的解决步骤后 ``sys.exit(2)``。
 
-    Args:
-        app_name:    应用显示名（出现在 emoji 行后），用于错误提示开头。
-        install_cmd: 推荐的安装命令（如 ``uv sync --extra gui``）。
-        run_cmd:     成功安装后的启动命令（如 ``uv run manga-gui``）。
-        doctor_cmd:  可选诊断命令（如 ``uv run manga-cli doctor``）。
+    分两种失败场景给出不同指引：当前 Python 不在 PySide6 wheel 覆盖范围 →
+    引导切 Python 版本；Python 在范围内但 PySide6 没装 → 引导安装命令。
 
-    分两种失败场景给出不同指引：
-      1) 当前 Python 不在 PySide6 wheel 覆盖范围 → 引导切 Python 版本
-      2) Python 在范围内但 PySide6 没装 → 引导安装命令
+    :param app_name:    应用显示名（出现在 emoji 行后），用于错误提示开头。
+    :param install_cmd: 推荐的安装命令（如 ``uv sync --extra gui``）。
+    :param run_cmd:     成功安装后的启动命令（如 ``uv run manga-gui``）。
+    :param doctor_cmd:  可选诊断命令（如 ``uv run manga-cli doctor``）。
     """
     try:
         import PySide6  # noqa: F401

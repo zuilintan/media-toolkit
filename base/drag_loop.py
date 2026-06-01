@@ -1,21 +1,12 @@
-"""
-drag_loop.py — CLI 拖入循环工具
+"""CLI 拖入循环工具（持续读 stdin → 解析路径 → 逐个调 ``process_one``）。
 
-通用形态:
-  - 持续等待用户在终端拖入路径（可同时多个）
-  - 解析后逐个调用 ``process_one(path)``
-  - Ctrl+C / EOF 退出
+设计要点：
 
-设计要点
---------
 - ``process_one`` 形参收窄为 ``Callable[[Path], None]``；调用方有额外状态
   （目标目录、配置等）一律通过闭包绑定，避免本工具与业务参数耦合。
-- 进度/警告通过可选 ``reporter`` 回调输出，缺省走 stdout/stderr；
-  GUI 路由由调用方注入。
-- 启动 banner 由 ``title`` 参数控制：传入显示名（如 ``'classify'``）即自动
-  打印统一格式 4 行 banner；不传则不打印（脚本化 / 嵌入场景）。
-
-依赖: 仅标准库
+- 进度/警告通过可选 ``reporter`` 回调输出（GUI 路由由调用方注入）。
+- 启动 banner 由 ``title`` 参数控制：传入显示名即自动打印统一格式 4 行 banner，
+  不传则不打印（脚本化 / 嵌入场景）。
 """
 
 from __future__ import annotations
@@ -55,12 +46,11 @@ def run_drag_loop(
     prompt:      str = '📂 拖入目录，Enter 处理: ',
     reporter:    Reporter = _default_reporter,
 ) -> None:
-    """循环拖入模式：持续读 stdin，解析路径，逐个调 process_one。
-
-    Args:
-        title: 非 None 时打印统一启动 banner（"🔁  {title} 循环拖入模式…"）。
+    """循环拖入模式：持续读 stdin，解析路径，逐个调 ``process_one``。
 
     Ctrl+C / EOF 退出。
+
+    :param title: 非 ``None`` 时打印统一启动 banner（``"🔁  {title} 循环拖入模式…"``）。
     """
     if title is not None:
         reporter('info', f'\n{_BANNER_SEP}')

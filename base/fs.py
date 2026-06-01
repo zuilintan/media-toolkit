@@ -1,20 +1,8 @@
-"""
-fs.py — 文件/路径安全操作原语
+"""文件/路径安全操作原语（深度守卫 + SMB 大小写两步法 + 可注入 reporter）。
 
-包含:
-  - guard_path / strict_exists  — 路径校验
-  - is_smb_path                 — SMB 路径识别（Windows 专有）
-  - execute_rename / try_rename — 安全重命名（含 SMB 大小写两步法）
-  - safe_unlink / safe_rmdir    — 带深度守卫的删除
-  - safe_rmtree                 — 带深度守卫的递归删除
-  - move_dir                    — src 作为子放入 target 目录（同名合并覆盖）
-  - merge_into                  — src 的内容递归 move 到 dst 内（不嵌套）
-
-设计原则:
-  - 仅依赖标准库，不引入任何业务模块
-  - 调试日志走标准 logging（logger 名 ``base.fs``）
-  - 面向用户的状态信息通过可选 ``reporter`` 回调输出，默认走 print；
-    宿主应用（module.manga / module.artifact）可注入自身的 emit / warn / error 实现 GUI 日志路由
+调试日志走标准 :mod:`logging`（logger 名 ``base.fs``）；面向用户的状态信息通过
+可选 ``reporter`` 回调输出（默认走 stdout/stderr），GUI 宿主可注入自身的
+emit / warn / error 实现日志路由。
 """
 
 from __future__ import annotations
@@ -83,11 +71,12 @@ def execute_rename(old: Path, new: Path) -> None:
 
 
 def try_rename(src: Path, dst: Path) -> str:
-    """尝试重命名，返回状态:
-    - ``"same"``   — 完全相同，无需操作
-    - ``"exists"`` — 目标已存在（且不同于源）
-    - ``"ok"``     — 重命名成功
-    异常由调用方处理。
+    """尝试重命名；异常由调用方处理。
+
+    :return:
+        - ``"same"``   — 完全相同，无需操作
+        - ``"exists"`` — 目标已存在（且不同于源）
+        - ``"ok"``     — 重命名成功
     """
     if str(src) == str(dst):
         return 'same'
@@ -140,14 +129,11 @@ def move_dir(
 ) -> bool:
     """将目录 src 移动到 target，已存在同名目录则逐项合并并覆盖。
 
-    Args:
-        src:      源目录。
-        target:   目标父目录路径；不存在会自动创建。
-        reporter: 进度/警告输出回调。默认走 stdout/stderr；GUI 场景
-                  可注入 ``lambda lvl, msg: emit(msg)`` 类闭包路由到日志框。
-
-    Returns:
-        移动/合并成功（无失败）返回 True。
+    :param src:      源目录。
+    :param target:   目标父目录路径；不存在会自动创建。
+    :param reporter: 进度/警告输出回调。默认走 stdout/stderr；GUI 场景
+                     可注入 ``lambda lvl, msg: emit(msg)`` 类闭包路由到日志框。
+    :return: 无失败时为 ``True``。
     """
     target_path = Path(target)
     target_path.mkdir(parents=True, exist_ok=True)
@@ -190,28 +176,20 @@ def merge_into(
     *,
     reporter: Reporter = _default_reporter,
 ) -> dict:
-    """把 src 内的所有内容递归 move 到 dst 内（不嵌套 src.name）。
+    """把 src 内的所有内容递归 move 到 dst 内（不嵌套 ``src.name``）。
 
-    与 ``move_dir`` 的区别:
-      - ``move_dir(src, target)`` 把 src 作为子放入 target，即
-        ``target/src.name``
-      - ``merge_into(src, dst)`` 把 src 的内容直接合并到 dst 中
-        （src 本身不出现在 dst 内）
+    与 :func:`move_dir` 的区别：前者把 src 作为子放入 target（``target/src.name``），
+    后者把 src 的内容直接合并到 dst 中（src 本身不出现在 dst 内）。
 
-    冲突策略:
-      - 文件冲突 → 删旧覆盖（safe_unlink + shutil.move）
-      - 子目录冲突 → 递归合并
+    冲突策略：文件冲突 → :func:`safe_unlink` + ``shutil.move``；子目录冲突 → 递归合并。
 
-    源目录是否清空由调用方决定（本函数只做合并，不删 src 本身）；可读
-    返回值 ``moved == src.iterdir() count`` 推断。
+    源目录是否清空由调用方决定（本函数只做合并，不删 src 本身），可据返回值
+    ``moved == src.iterdir() count`` 推断。
 
-    Args:
-        src:      源目录。
-        dst:      目标目录；不存在会自动创建。
-        reporter: 进度/警告输出回调。
-
-    Returns:
-        ``{'moved': N, 'overwritten': M, 'failed': K}``
+    :param src:      源目录。
+    :param dst:      目标目录；不存在会自动创建。
+    :param reporter: 进度/警告输出回调。
+    :return: ``{'moved': N, 'overwritten': M, 'failed': K}``。
     """
     dst.mkdir(parents=True, exist_ok=True)
     moved = overwritten = failed = 0

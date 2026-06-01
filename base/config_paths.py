@@ -1,10 +1,10 @@
-"""
-config_paths.py — 跨平台用户配置目录定位（仅标准库）
+"""跨平台用户配置目录定位（独立于 PySide6，CLI/GUI 都可调用）。
 
-独立于 PySide6，CLI/GUI 都可调用。三平台约定:
-  Windows : %LOCALAPPDATA%/<app>           （fallback: ~/AppData/Local/<app>）
-  macOS   : ~/Library/Application Support/<app>
-  Linux   : $XDG_CONFIG_HOME/<app>          (fallback: ~/.config/<app>)
+三平台约定::
+
+    Windows : %LOCALAPPDATA%/<app>           （fallback: ~/AppData/Local/<app>）
+    macOS   : ~/Library/Application Support/<app>
+    Linux   : $XDG_CONFIG_HOME/<app>         （fallback: ~/.config/<app>）
 """
 
 from __future__ import annotations

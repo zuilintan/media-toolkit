@@ -1,29 +1,23 @@
-"""
-shell.py — 跨业务的单窗口宿主
+"""跨业务的单窗口宿主（左侧 vertical Tab 切大模块）。
 
-UI 布局
--------
-QMainWindow (Shell)
-└── QTabWidget (West, tabBarAutoHide)   ← 左侧"大模块"切换
-    ├── manga module (任意 QWidget)
-    ├── artifact module
-    └── ...
+布局：``QMainWindow(Shell)`` → ``QTabWidget(West, tabBarAutoHide)``，
+内部装载若干"大模块" QWidget（manga / artifact / ...）。
 
-使用
-----
+用法::
+
     shell = Shell(title='media-toolkit', config_key_prefix='shell')
     shell.register_module('manga', MangaModule())
     shell.register_module('artifact', ArtifactModule())
     shell.show()
 
-关键约定
---------
-- 装载的 module 是任意 QWidget；shell 不约束其内部结构
-- 仅注册一个 module 时，左侧 tab bar 自动隐藏（UX 等价于"独立 module 窗口"）
-- 首次 register 的 module 若提供 ``default_sink`` kwarg，自动调
-  ``set_output`` 让初始输出有去处；后续 module 各自管自己的 sink
-- 几何/侧栏状态用 base.gui.config 持久化，键名带 ``config_key_prefix``
-  避免 manga-only / artifact-only / 双模块场景互相覆盖
+关键约定：
+
+- 装载的 module 是任意 ``QWidget``，shell 不约束其内部结构。
+- 仅注册一个 module 时，左侧 tab bar 自动隐藏（UX 等价于"独立 module 窗口"）。
+- 首次 :meth:`Shell.register_module` 的 module 若提供 ``default_sink``，自动调
+  :func:`~base.console.set_output` 让初始输出有去处；后续 module 各自管自己的 sink。
+- 几何/侧栏状态用 :mod:`base.gui.config` 持久化，键名带 ``config_key_prefix``，
+  避免 manga-only / artifact-only / 双模块场景互相覆盖。
 """
 
 from __future__ import annotations
@@ -70,11 +64,11 @@ class Shell(QMainWindow):
     ) -> None:
         """添加一个大模块 Tab。
 
-        Args:
-            label:        左侧 Tab 标签。
-            module:       任意 QWidget；shell 不约束内部结构。
-            default_sink: 首个注册的 module 若提供，自动 set_output 让
-                          初始输出有归宿。同名后续 module 即使提供也忽略。
+        :param label:        左侧 Tab 标签。
+        :param module:       任意 ``QWidget``；shell 不约束内部结构。
+        :param default_sink: 首个注册的 module 若提供，自动调
+                             :func:`~base.console.set_output` 让初始输出有归宿；
+                             后续 module 即使提供也忽略。
         """
         self._tabs.addTab(module, label)
         if default_sink is not None and not self._sink_set:

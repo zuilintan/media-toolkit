@@ -1,19 +1,12 @@
-"""
-base/doctor.py — 通用环境体检引擎
+"""通用环境体检引擎（各 CLI 的 ``doctor`` 子命令共用）。
 
-提供 run_doctor(checks) 供各 CLI 的 doctor 子命令调用，各模块只需声明
-自身所需的包列表，无需重复实现检查与渲染逻辑。
-
-CheckSpec: (显示名, distribution 名, 所属组, 安装提示)
-
-输出形如::
+各模块只需声明自身所需的 :data:`CheckSpec` 列表传给 :func:`run_doctor`，
+无需重复实现检查与渲染逻辑。输出形如::
 
     Python:    3.13.3       ✅
     zhconv:    1.4.3        ✅
     Pillow:    12.2.0       ✅
     PySide6:   未安装        ⚠️  uv sync --extra gui
-
-依赖: 仅标准库 + base.console
 """
 
 from __future__ import annotations
@@ -28,7 +21,7 @@ from base.console import emit
 PYSIDE6_PY_MIN = (3, 10)
 PYSIDE6_PY_MAX_EXCL = (3, 14)
 
-# 类型别名：(显示名, distribution 名, 所属组, 安装提示)
+#: 体检项规格：``(显示名, distribution 名, 所属组, 安装提示)``。
 CheckSpec = tuple[str, str, str, str]
 
 
