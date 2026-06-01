@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog='manga-cli',
-        description='manga-toolkit 统一命令行工具（name + meta）',
+        description='manga-toolkit 统一命令行工具（rename + meta）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             '示例:\n'
