@@ -246,7 +246,7 @@ uv sync --extra gui
 uv run manga-gui
 ```
 
-主窗口为「上方四个子命令 Tab（pack / rename / cover / meta）+ 下方独立日志栈」。每个 Tab 流程一致：
+主窗口为「上方四个子命令 Tab（打包 / 命名 / 封面 / 元数据）+ 下方独立日志栈」。每个 Tab 流程一致：
 
 1. 选择 / 拖入根目录
 2. 调整选项（如 make-cover 的 `smart` / `quality`，所有子命令的 `jobs`）

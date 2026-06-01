@@ -1,6 +1,6 @@
 """通用 plan 调度：进度反馈 + 可选 ``ProcessPoolExecutor``。
 
-四个 *-kit 的 plan 阶段都符合「列出 items → 对每项 ``worker(item)`` → 收集结果」
+所有业务子命令的 plan 阶段都符合「列出 items → 对每项 ``worker(item)`` → 收集结果」
 骨架，统一抽到 :func:`run_plans`。
 
 设计要点
