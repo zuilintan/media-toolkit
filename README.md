@@ -5,7 +5,7 @@
 > - **manga**（漫画工具）：批量规范文件名、写 ComicInfo.xml、生成统一比例封面、序号化打包 STORED zip。  
 >   入口：CLI `manga-cli` / GUI `manga-gui`（PySide6）。
 > - **artifact**（文件工具）：把拖入的文件/文件夹按"作者名"自动归类到预设工作目录（支持别名）。  
->   入口：CLI `artifact-cli classify` / GUI `artifact-gui`；首次启动会自动在 `<user_config>/media-toolkit/config/artifact.json` 落盘空配置，编辑 `workdirs` 后即可使用（GUI 有「📂 打开 artifact.json」按钮）。
+>   入口：CLI `artifact-cli classify` / GUI `artifact-gui`；首次启动会自动在 `<user_config>/media-toolkit/config/artifact.json` 落盘空配置，编辑 `workdirs` 后即可使用（GUI 有「📝 修改配置」+「🔁 重载配置」按钮）。
 >
 > 双模块单窗口入口：`app-gui`（同窗口装载 manga + artifact 两个 module）。
 

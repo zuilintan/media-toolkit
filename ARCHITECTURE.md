@@ -119,8 +119,9 @@ ${XDG_CONFIG_HOME:-~/.config}/media-toolkit/config/    (Linux)
 │                     splitter sizes / Shell 窗口几何）；平铺 key，无 schema
 ├── artifact.json   — artifact 业务配置（workdirs / search_url_template）；
 │                     缺失时由 base.app_config.JsonConfig 落盘 {"artifact.workdirs": []}；
-│                     GUI ClassifyTab 提供「📂 打开 artifact.json」按钮调系统关联
-│                     程序编辑，编辑后点「🔄 刷新别名」即重新读取
+│                     GUI ClassifyTab 提供「📝 修改配置」（关联程序打开）+
+│                     「🔁 重载配置」（重读 workdirs + re-scan 别名）+
+│                     「🔄 刷新别名」（仅 re-scan 别名）三个按钮
 └── manga.json      — manga 业务运行期配置；当前仅占位 {"$schema_version": 1}
 ```
 

@@ -1,7 +1,7 @@
 """artifact 业务配置加载（统一 ``<user_config>/media-toolkit/config/artifact.json``）。
 
 无参 :func:`load_config` 缺失时自动创建空 workdirs；用户可在 GUI 中点
-「打开 artifact.json」用关联程序编辑，编辑保存后点「刷新别名」重新读取。
+「修改配置」用关联程序编辑，编辑保存后点「重载配置」重新读取。
 
 显式传入 ``path`` 时保持严格语义：不存在 → :exc:`FileNotFoundError`
 （用于显式自定义路径场景与测试，避免悄悄落盘到非默认位置）。

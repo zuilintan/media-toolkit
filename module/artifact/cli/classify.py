@@ -126,7 +126,7 @@ def cmd_classify(args: argparse.Namespace) -> int:
     if not cfg.workdirs:
         sys.stderr.write(
             '❌ 配置中 artifact.workdirs 为空\n'
-            '  编辑 GUI「打开 artifact.json」按钮指向的文件填入 workdirs 后重试。\n'
+            '  编辑 GUI「修改配置」按钮指向的文件填入 workdirs 后重试。\n'
         )
         return 2
 

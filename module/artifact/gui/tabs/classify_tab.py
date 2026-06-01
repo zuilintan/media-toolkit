@@ -1,11 +1,12 @@
 """``artifact`` 的 ``classify`` 业务子 Tab。
 
-布局：``QVBoxLayout`` → 按钮行（打开 artifact.json + 刷新别名）+ WorkDirs 摘要
-label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
+布局：``QVBoxLayout`` → 按钮行（修改配置 + 重载配置 + 刷新别名）+ WorkDirs
+摘要 label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
 
 业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config`
-→ 显示 WorkDirs（空则弹错并禁用拖入）；用户可点「打开 artifact.json」用关联
-程序编辑配置，编辑保存后点「刷新别名」重新读取 workdirs + re-scan 别名；
+→ 显示 WorkDirs（空则提示且禁用拖入）；用户可点「修改配置」用关联程序编辑
+artifact.json，编辑保存后点「重载配置」重新读取 workdirs 并 re-scan 别名；
+若仅新增了 ``[别名]：*.txt`` 文件（workdirs 未变），点「刷新别名」即可。
 拖入 → 逐个 :meth:`ClassifyTab._process_one` → 候选 0/1/N 分支 →
 :func:`~module.artifact.gui.widgets.candidate_dialog.ask_candidate`
 → :func:`~module.artifact.workflow.classify.ops.classify_one`。
@@ -68,22 +69,29 @@ class ClassifyTab(QWidget):
         self._workdirs_paths: list[Path] = []
         self._alias_map: dict[str, Path] = {}
 
-        self._open_cfg_btn = QPushButton('📂 打开 artifact.json')
-        self._open_cfg_btn.setToolTip(
+        self._edit_cfg_btn = QPushButton('📝 修改配置')
+        self._edit_cfg_btn.setToolTip(
             f'用关联程序打开配置文件：\n{config_path()}\n'
-            '编辑保存后点「刷新别名」生效。'
+            '编辑保存后点「重载配置」生效。'
         )
-        self._open_cfg_btn.clicked.connect(self._on_open_config)
+        self._edit_cfg_btn.clicked.connect(self._on_edit_config)
 
-        self._refresh_btn = QPushButton('🔄 刷新别名')
-        self._refresh_btn.setToolTip(
-            '重新读取 artifact.json + 扫描所有 WorkDir 下的 [别名]：*.txt'
+        self._reload_cfg_btn = QPushButton('🔁 重载配置')
+        self._reload_cfg_btn.setToolTip(
+            '重新读取 artifact.json（workdirs）+ 扫描所有 WorkDir 下的 [别名]：*.txt'
         )
-        self._refresh_btn.clicked.connect(self._on_refresh)
+        self._reload_cfg_btn.clicked.connect(self._on_reload_config)
+
+        self._refresh_alias_btn = QPushButton('🔄 刷新别名')
+        self._refresh_alias_btn.setToolTip(
+            '仅重新扫描所有 WorkDir 下的 [别名]：*.txt（不重读 artifact.json）'
+        )
+        self._refresh_alias_btn.clicked.connect(self._on_refresh_alias)
 
         btn_lay = QHBoxLayout()
-        btn_lay.addWidget(self._open_cfg_btn)
-        btn_lay.addWidget(self._refresh_btn)
+        btn_lay.addWidget(self._edit_cfg_btn)
+        btn_lay.addWidget(self._reload_cfg_btn)
+        btn_lay.addWidget(self._refresh_alias_btn)
         btn_lay.addStretch(1)
 
         self._workdirs_label = QLabel('（配置加载中...）')
@@ -107,8 +115,8 @@ class ClassifyTab(QWidget):
         if not self._cfg.workdirs:
             self._workdirs_paths = []
             self._workdirs_label.setText(
-                '⚠️ artifact.workdirs 为空 —— 点「📂 打开 artifact.json」'
-                '编辑后再点「🔄 刷新别名」。'
+                '⚠️ artifact.workdirs 为空 —— 点「📝 修改配置」'
+                '编辑后再点「🔁 重载配置」。'
             )
             self._drop.setEnabled(False)
             return
@@ -121,7 +129,8 @@ class ClassifyTab(QWidget):
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
-        self._refresh_btn.setEnabled(False)
+        self._reload_cfg_btn.setEnabled(False)
+        self._refresh_alias_btn.setEnabled(False)
         self._scan_thread = _AliasThread(list(self._workdirs_paths), self._sink, self)
         self._scan_thread.scan_done.connect(self._on_scan_done)
         self._scan_thread.start()
@@ -129,24 +138,31 @@ class ClassifyTab(QWidget):
     @Slot(object)
     def _on_scan_done(self, alias_map) -> None:
         self._alias_map = alias_map
-        self._refresh_btn.setEnabled(True)
+        self._reload_cfg_btn.setEnabled(True)
+        self._refresh_alias_btn.setEnabled(True)
 
     # ── 按钮回调 ──────────────────────────────────────────────────────
-    def _on_open_config(self) -> None:
+    def _on_edit_config(self) -> None:
         """用 OS 关联程序打开 artifact.json（不存在则给提示）。"""
         path = config_path()
         if not path.exists():
             # load_config() 启动时已落盘；走到这里通常是被人为删除
             QMessageBox.warning(
                 self, '配置缺失',
-                f'未找到 {path}\n点「🔄 刷新别名」会自动重建空配置。',
+                f'未找到 {path}\n点「🔁 重载配置」会自动重建空配置。',
             )
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
-    def _on_refresh(self) -> None:
+    def _on_reload_config(self) -> None:
         """重读 artifact.json → 更新 workdirs → 重新扫描别名。"""
         self._load_workdirs()
+        if not self._workdirs_paths:
+            return
+        self._do_scan_aliases()
+
+    def _on_refresh_alias(self) -> None:
+        """仅重新扫描别名（workdirs 未变时使用，省略一次 IO）。"""
         if not self._workdirs_paths:
             return
         self._do_scan_aliases()
