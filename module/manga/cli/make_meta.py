@@ -34,7 +34,11 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
         emit(SEP2)
         return 0
 
-    print_make_meta_preview(plans)
+    print_make_meta_preview(
+        plans,
+        sample_per_group=args.sample_per_group,
+        rare_threshold=args.rare_threshold,
+    )
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.writable and p.changed)
@@ -87,3 +91,7 @@ def add_make_meta_args(p: argparse.ArgumentParser) -> None:
     p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',
                    help='plan 阶段并行进程数（1=串行，默认；'
                         '0=自动 min(cpu, 4)；≥ 4 个文件时才真正启用并行）')
+    p.add_argument('--sample-per-group', type=int, default=3, metavar='K',
+                   help='预览阶段每类差异展示的样本卡数（默认 3；0=全量，不折叠）')
+    p.add_argument('--rare-threshold', type=int, default=5, metavar='N',
+                   help='出现 ≤ N 次的差异类视为稀有，强制全量渲染（默认 5）')

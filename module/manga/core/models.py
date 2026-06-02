@@ -172,6 +172,15 @@ class MakeMetaPlan:
         return self.existing_xml is None or self.existing_xml != self.new_xml
 
     @property
+    def diff_keys(self) -> frozenset[str]:
+        """新旧字段值不一致的 tag 集合（供预览分组用，不含 Notes 之外的逻辑过滤）。"""
+        keys = set(self.fields) | set(self.existing_fields)
+        return frozenset(
+            k for k in keys
+            if self.existing_fields.get(k, '') != self.fields.get(k, '')
+        )
+
+    @property
     def existing_encoding(self) -> str:
         """现有 XML 的声明编码；无现有版本返回 ``''``。"""
         return _detect_xml_encoding(self.existing_xml)

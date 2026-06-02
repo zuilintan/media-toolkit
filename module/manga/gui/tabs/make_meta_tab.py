@@ -29,10 +29,27 @@ class MakeMetaTab(BaseTab):
         self._jobs.setToolTip(
             'plan 阶段并行进程数；1=串行（默认），0=自动 min(cpu, 4)'
         )
+        self._sample_per_group = QSpinBox()
+        self._sample_per_group.setRange(0, 999)
+        self._sample_per_group.setValue(3)
+        self._sample_per_group.setToolTip(
+            '预览阶段每类差异展示的样本卡数（默认 3；0=全量，不折叠）'
+        )
+        self._rare_threshold = QSpinBox()
+        self._rare_threshold.setRange(0, 999)
+        self._rare_threshold.setValue(5)
+        self._rare_threshold.setToolTip(
+            '出现 ≤ N 次的差异类视为稀有，强制全量渲染（默认 5）'
+        )
         box = QGroupBox('选项')
         lay = QHBoxLayout(box)
         lay.addWidget(QLabel('并行 jobs:'))
         lay.addWidget(self._jobs)
+        lay.addSpacing(16)
+        lay.addWidget(QLabel('每组样本:'))
+        lay.addWidget(self._sample_per_group)
+        lay.addWidget(QLabel('稀有阈值:'))
+        lay.addWidget(self._rare_threshold)
         lay.addStretch(1)
         return box
 
@@ -46,7 +63,11 @@ class MakeMetaTab(BaseTab):
         return apply_plans
 
     def _render_preview(self, plans: list[MakeMetaPlan]) -> None:
-        print_make_meta_preview(plans)
+        print_make_meta_preview(
+            plans,
+            sample_per_group=self._sample_per_group.value(),
+            rare_threshold=self._rare_threshold.value(),
+        )
 
     def _count_actionable(self, plans: list[MakeMetaPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)

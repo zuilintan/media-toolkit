@@ -108,11 +108,55 @@ def print_std_title_preview(plans: list[StdTitlePlan]) -> None:
 # make_meta 预览（结构与 std_title 对齐）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_make_meta_preview(plans: list[MakeMetaPlan]) -> None:
-    """逐卡片打印 ComicInfo 写入计划。
+def _emit_make_meta_card(plan: MakeMetaPlan, idx: int) -> None:
+    """单个 ComicInfo 计划的完整卡片（diff 表 + warnings + encoding 行）。"""
+    emit(f'   📄 [{idx}] {plan.filename}')
+    emit_parse_debug(plan.mi)
+    print_make_meta_diff_table(
+        plan.existing_fields, plan.fields, plan.pub_conflict,
+        indent='     ',
+    )
+    for w in plan.mi.warnings:
+        emit(f'     🟡 {w}')
+    cur_enc = plan.existing_encoding or '—'
+    new_enc = plan.new_encoding
+    enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
+                else cur_enc)
+    emit(f'     Encoding: {enc_line}')
+    emit()
 
-    只渲染 ``writable && changed`` 的卡片；其余（已是最新 / 出版商冲突 / 有警告）
-    仅作计数提示。卡片骨架与 :func:`print_std_title_preview` 对齐。
+
+def _diff_signature(plan: MakeMetaPlan) -> tuple[bool, frozenset[str]]:
+    """分组键：``(是否首次新增 ComicInfo.xml, 改动字段集合)``。"""
+    return (plan.existing_xml is None, plan.diff_keys)
+
+
+def _format_signature(is_new: bool, keys: frozenset[str]) -> str:
+    """分组键的人类可读形式：``新增 [Publisher+Tags]`` / ``修改 [Title]``。"""
+    tag = '新增' if is_new else '修改'
+    key_str = '+'.join(sorted(keys)) if keys else '(无字段变动)'
+    return f'{tag} [{key_str}]'
+
+
+def print_make_meta_preview(
+    plans: list[MakeMetaPlan],
+    *,
+    sample_per_group: int = 3,
+    rare_threshold:   int = 5,
+) -> None:
+    """按差异签名分组渲染 ComicInfo 写入计划，避免万级文件下日志爆炸。
+
+    分组键 = ``(是否首次新增 XML, 改动字段集合)``。各组按出现次数降序输出：
+
+    - **稀有组**（``count ≤ rare_threshold``）→ 全量渲染（用户真正想审的特例）
+    - **常见组** → 仅渲染前 ``sample_per_group`` 个样本卡，其余折叠为计数行
+    - ``sample_per_group == 0`` 时强制全量渲染（小批量场景退化为旧行为）
+
+    冲突 / 警告同样采样输出（默认前 ``sample_per_group``）以兼顾"看全特例"和"不刷屏"。
+
+    :param plans: :func:`~module.manga.workflow.make_meta.preview_plans` 的产物。
+    :param sample_per_group: 常见组的样本卡数；``0`` 表示全量。
+    :param rare_threshold:   出现次数 ≤ 此值的组视为稀有，强制全量渲染。
     """
     changed   = [p for p in plans if p.writable and p.changed]
     unchanged = [p for p in plans if p.writable and not p.changed]
@@ -122,28 +166,56 @@ def print_make_meta_preview(plans: list[MakeMetaPlan]) -> None:
     _print_preview_header('预览')
 
     if changed:
-        emit()
-        for idx, p in enumerate(changed, 1):
-            emit(f'   📄 [{idx}] {p.filename}')
-            emit_parse_debug(p.mi)
-            print_make_meta_diff_table(
-                p.existing_fields, p.fields, p.pub_conflict,
-                indent='     ',
+        # ── 分组 + 汇总 ────────────────────────────────────────────────
+        groups: dict[tuple[bool, frozenset[str]], list[MakeMetaPlan]] = {}
+        for p in changed:
+            groups.setdefault(_diff_signature(p), []).append(p)
+        sorted_groups = sorted(groups.items(), key=lambda kv: -len(kv[1]))
+
+        emit(f'\n📊 计划处理 {len(changed)} 个，共 {len(groups)} 类差异：')
+        for (is_new, keys), gp in sorted_groups:
+            mark = '  ⚠ 稀有' if len(gp) <= rare_threshold else ''
+            emit(f'   • {_format_signature(is_new, keys)} ─ {len(gp)} 个{mark}')
+
+        # ── 逐组渲染（稀有 → 全量；常见 → 前 K 个样本）─────────────────
+        for (is_new, keys), gp in sorted_groups:
+            is_rare = len(gp) <= rare_threshold
+            show_n  = (
+                len(gp)
+                if sample_per_group <= 0 or is_rare
+                else min(sample_per_group, len(gp))
             )
-            for w in p.mi.warnings:
-                emit(f'     🟡 {w}')
-            cur_enc = p.existing_encoding or '—'
-            new_enc = p.new_encoding
-            enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
-                        else cur_enc)
-            emit(f'     Encoding: {enc_line}')
-            emit()
+            note = '稀有，全量' if is_rare and len(gp) > 1 else ''
+            emit(f'\n{SEP}')
+            head = f'  ▸ {_format_signature(is_new, keys)} ─ {len(gp)} 个'
+            emit(f'{head}{f"（{note}）" if note else ""}')
+            emit(SEP)
+            for idx, p in enumerate(gp[:show_n], 1):
+                _emit_make_meta_card(p, idx)
+            if show_n < len(gp):
+                emit(f'   … 另有 {len(gp) - show_n} 个同类条目已折叠')
     else:
         emit('\n没有需要写入的 ComicInfo.xml。')
 
+    # ── 冲突 / 警告（独立段，采样输出避免再次刷屏）──────────────────────
+    cap = sample_per_group if sample_per_group > 0 else None
+    if conflict:
+        emit(f'\n⛔ 出版商冲突: {len(conflict)} 个（apply 阶段会自动跳过）')
+        shown = conflict if cap is None else conflict[:cap]
+        for p in shown:
+            emit(f'   • {p.filename}')
+            for pc in (p.pub_conflict or []):
+                emit(f'     - {os.path.basename(pc)}')
+        if cap is not None and len(conflict) > cap:
+            emit(f'   … 另有 {len(conflict) - cap} 个未列出')
 
-    if conflict:  emit(f'⛔  出版商冲突: {len(conflict)} 个')
-    if warns:     emit(f'🟡  有警告:    {len(warns)} 个')
+    if warns:
+        emit(f'\n🟡 有警告: {len(warns)} 个')
+        shown = warns if cap is None else warns[:cap]
+        for p in shown:
+            emit(f'   • {p.filename}: {", ".join(p.mi.warnings)}')
+        if cap is not None and len(warns) > cap:
+            emit(f'   … 另有 {len(warns) - cap} 个未列出')
 
     _print_preview_footer(
         len(plans),
