@@ -3,10 +3,11 @@
 布局：
 
 - 顶部文件名 + 状态标签
-- :class:`~PySide6.QtWidgets.QTableWidget` 三列（Tag / 旧 / 新），新列对差异行
-  着色，对齐 LogView 的语义但摆脱等宽字符串拼接
+- :class:`~PySide6.QtWidgets.QTableWidget` 两列（Tag / 值）。无差异 tag 占 1 行；
+  有差异 tag 占 2 行（旧上 / 新下），Tag 列 ``setSpan(row, 0, 2, 1)`` 跨 2 行
+  合并，旧 / 新值上下对齐方便逐字符比对，用底色 + 行首图标进一步标识
 - 底部 warnings / 出版商冲突 / encoding 行（按需可见）
-- Close 按钮
+- 「执行写入」（可写时）+ Close
 
 模态弹窗，由 :class:`~module.manga.gui.widgets.make_meta_tree.MakeMetaTree`
 的双击信号触发。
@@ -26,8 +27,11 @@ from PySide6.QtWidgets import (
 from module.manga.core.config import COMICINFO_TAGS
 from module.manga.core.models import MakeMetaPlan
 
-# 差异行新值底色：与 LogView 的红色高亮同语义、不同呈现（避免文本被 ANSI 控制）
-_DIFF_BG = QColor('#3a2a2a')
+# 差异行底色：
+# - 新值（高亮变更）：偏红，对应 LogView 中 highlight_diff 的 RED 语义
+# - 旧值（参照对照）：偏暗中性色，凸显二者不同但视觉上不喧宾夺主
+_NEW_BG = QColor('#3a2a2a')
+_OLD_BG = QColor('#2c2c2c')
 
 
 class MakeMetaDetailDialog(QDialog):
@@ -59,38 +63,58 @@ class MakeMetaDetailDialog(QDialog):
         lay.addWidget(QLabel(f'状态: {_status_label(plan)}'))
 
         # ── diff 表格 ────────────────────────────────────────────────
-        table = QTableWidget(len(COMICINFO_TAGS), 3, self)
-        table.setHorizontalHeaderLabels(['Tag', '旧值', '新值'])
+        # 先扁平化为行列表：无差异 tag → 1 行；差异 tag → 2 行（旧上 / 新下），
+        # Tag 列稍后用 setSpan 跨 2 行合并，使旧 / 新值在「值」列上下对齐
+        rows: list[tuple[str, str, str]] = []   # (tag, value, kind: ''/'old'/'new')
+        spans: list[int] = []                   # 跨 2 行合并的起始行索引
+        for tag in COMICINFO_TAGS:
+            ov = plan.existing_fields.get(tag, '')
+            nv = plan.fields.get(tag, '')
+            if ov == nv:
+                rows.append((tag, ov, ''))
+            else:
+                spans.append(len(rows))
+                rows.append((tag, ov, 'old'))
+                rows.append(('',  nv, 'new'))
+
+        table = QTableWidget(len(rows), 2, self)
+        table.setHorizontalHeaderLabels(['Tag', '值'])
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setSelectionBehavior(QAbstractItemView.SelectItems)
         table.setAlternatingRowColors(True)
         table.setShowGrid(False)
         table.setWordWrap(False)
 
-        diff_brush = QBrush(_DIFF_BG)
-        for row, tag in enumerate(COMICINFO_TAGS):
-            ov = plan.existing_fields.get(tag, '')
-            nv = plan.fields.get(tag, '')
+        bold       = QFont(); bold.setBold(True)
+        old_brush  = QBrush(_OLD_BG)
+        new_brush  = QBrush(_NEW_BG)
+        for r, (tag, val, kind) in enumerate(rows):
             tag_item = QTableWidgetItem(tag)
-            old_item = QTableWidgetItem(ov)
-            new_item = QTableWidgetItem(nv)
-            if ov != nv:
-                bold = QFont(); bold.setBold(True)
+            val_item = QTableWidgetItem(val)
+            val_item.setToolTip(val)            # 长值悬停看全
+            if kind == 'old':
                 tag_item.setFont(bold)
-                new_item.setFont(bold)
-                new_item.setBackground(diff_brush)
                 tag_item.setToolTip('该字段在新旧之间存在差异')
-            for it in (old_item, new_item):
-                it.setToolTip(it.text())   # 长值悬停看全
-            table.setItem(row, 0, tag_item)
-            table.setItem(row, 1, old_item)
-            table.setItem(row, 2, new_item)
+                val_item.setBackground(old_brush)
+                val_item.setText(f'旧  {val}')  # 行首图标避免位置混淆（仍能被复制为带前缀，
+                                                # 实际单元格内容用 setData(Qt.UserRole) 留真值）
+                val_item.setData(Qt.UserRole, val)
+            elif kind == 'new':
+                val_item.setFont(bold)
+                val_item.setBackground(new_brush)
+                val_item.setText(f'新  {val}')
+                val_item.setData(Qt.UserRole, val)
+            table.setItem(r, 0, tag_item)
+            table.setItem(r, 1, val_item)
+
+        # Tag 列在差异行上跨合并 2 行（视觉上「该 tag 的旧 / 新」共享一个标签）
+        for start in spans:
+            table.setSpan(start, 0, 2, 1)
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
         table.resizeRowsToContents()
 
         # 右键复制单元格内容（QTableWidget 默认无 Ctrl+C / 复制菜单）
@@ -135,8 +159,11 @@ class MakeMetaDetailDialog(QDialog):
         item = self._table.itemAt(pos)
         if item is None:
             return
-        text = item.text()
-        # 空值也允许复制（避免「为什么右键没反应」的疑惑）
+        # 差异行值列保存了带「旧/新」前缀的显示文本，但 UserRole 里有真值；
+        # 复制时优先取真值，避免把展示用前缀也复制进去
+        raw = item.data(Qt.UserRole)
+        text = raw if isinstance(raw, str) else item.text()
+
         global_pos = self._table.viewport().mapToGlobal(pos)
         preview    = text if len(text) <= 30 else f'{text[:30]}…'
         label      = f'复制单元格：{preview}' if text else '复制单元格（空值）'
