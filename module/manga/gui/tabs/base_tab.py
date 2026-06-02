@@ -83,6 +83,8 @@ class BaseTab(QWidget):
         btn_lay.addWidget(self._scan_btn)
         btn_lay.addWidget(self._apply_btn)
         btn_lay.addWidget(self._cancel_btn)
+        for b in self._extra_action_buttons():
+            btn_lay.addWidget(b)
         btn_lay.addStretch(1)
 
         self._status = QLabel('待扫描')
@@ -107,6 +109,15 @@ class BaseTab(QWidget):
     def _build_options_box(self) -> QWidget | None:
         """返回放在「目录」组下方的选项组（``QGroupBox``）；无可返回 ``None``。"""
         return None
+
+    def _extra_action_buttons(self) -> list[QPushButton]:
+        """子类钩子：在「取消」之后追加的按钮（如 make_meta 的「导出预览」）。
+
+        在 :meth:`__init__` 中尚未跑到子类 ``__init__`` 主体时被调用，因此
+        实现里不能依赖子类自己的实例属性；按需 ``self._xxx_btn = QPushButton(...)``
+        并 ``return [self._xxx_btn]`` 即可。
+        """
+        return []
 
     def _load_settings(self) -> None:
         """从持久化配置恢复控件状态；在 :meth:`_build_options_box` 之后调用。

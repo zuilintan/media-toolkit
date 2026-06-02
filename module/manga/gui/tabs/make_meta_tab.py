@@ -5,11 +5,13 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
+    QFileDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+    QSpinBox, QWidget,
 )
 
 from module.manga.core.models import MakeMetaPlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.presentation.export import export_plans
 from module.manga.presentation.view import print_make_meta_preview
 from module.manga.workflow.make_meta import apply_plans, preview_plans
 
@@ -53,6 +55,15 @@ class MakeMetaTab(BaseTab):
         lay.addStretch(1)
         return box
 
+    def _extra_action_buttons(self) -> list[QPushButton]:
+        self._export_btn = QPushButton('导出预览')
+        self._export_btn.setToolTip(
+            '将本次预览结构化导出（CSV / JSON）便于批量审查'
+        )
+        self._export_btn.setEnabled(False)
+        self._export_btn.clicked.connect(self._on_export)
+        return [self._export_btn]
+
     def _banner_subtitle(self) -> str:
         return 'CBZ ComicInfo.xml 批量工具'
 
@@ -77,3 +88,36 @@ class MakeMetaTab(BaseTab):
         unchanged = sum(1 for p in plans if p.writable and not p.changed)
         return {'可写入': writable, '无变化': unchanged,
                 '冲突': len(plans) - writable - unchanged}
+
+    # ── 钩子：扫描完成后启用导出；busy 时禁用 ─────────────────────────
+    def _on_planned(self, plans: list[MakeMetaPlan]) -> None:
+        super()._on_planned(plans)
+        self._export_btn.setEnabled(bool(self._plans))
+
+    def _on_busy(self, busy: bool) -> None:
+        super()._on_busy(busy)
+        if busy:
+            self._export_btn.setEnabled(False)
+
+    # ── 导出 ──────────────────────────────────────────────────────────
+    def _on_export(self) -> None:
+        if not self._plans:
+            return
+        path, sel = QFileDialog.getSaveFileName(
+            self, '导出预览', 'make_meta_preview.csv',
+            'CSV (*.csv);;JSON (*.json)',
+        )
+        if not path:
+            return
+        # Windows 下 QFileDialog 不自动追加后缀，按所选 filter 补
+        lp = path.lower()
+        if sel.startswith('CSV') and not lp.endswith('.csv'):
+            path += '.csv'
+        elif sel.startswith('JSON') and not lp.endswith('.json'):
+            path += '.json'
+        try:
+            out = export_plans(self._plans, path)
+        except Exception as e:  # noqa: BLE001 — UI 层兜底
+            QMessageBox.warning(self, '导出失败', str(e))
+            return
+        self._status.setText(f'已导出预览到 {out}')
