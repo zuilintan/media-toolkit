@@ -54,6 +54,7 @@ class MakeMetaTree(QTreeWidget):
         self.setSelectionMode(QTreeWidget.SingleSelection)
 
         self.itemExpanded.connect(self._on_expanded)
+        self.itemCollapsed.connect(self._on_collapsed)
         self.itemDoubleClicked.connect(self._on_double_clicked)
         self.header().sectionResized.connect(self._on_section_resized)
 
@@ -61,6 +62,11 @@ class MakeMetaTree(QTreeWidget):
         self._groups: dict[QTreeWidgetItem, list[MakeMetaPlan]] = {}
         # 已 materialize 出真子项的组
         self._populated: set[QTreeWidgetItem] = set()
+        # 用户手动展开 / 折叠状态（filter 自己驱动的 setExpanded 不计入），
+        # 清空过滤词时按此状态回滚，保留用户的浏览上下文
+        self._user_expanded: dict[QTreeWidgetItem, bool] = {}
+        # _apply_filter_now 内置位：屏蔽自身调用 setExpanded 对 _user_expanded 的污染
+        self._in_filter_update: bool = False
         # 当前过滤词（lower）
         self._filter_text: str = ''
 
@@ -72,6 +78,7 @@ class MakeMetaTree(QTreeWidget):
         self.clear()
         self._groups.clear()
         self._populated.clear()
+        self._user_expanded.clear()
         if not plans:
             return
 
@@ -145,37 +152,44 @@ class MakeMetaTree(QTreeWidget):
 
     # ── 过滤 ──────────────────────────────────────────────────────────
     def _apply_filter_now(self) -> None:
-        text = self._filter_text
-        for group, plans in self._groups.items():
-            if not text:
-                group.setHidden(False)
-                if group in self._populated:
-                    for j in range(group.childCount()):
-                        group.child(j).setHidden(False)
-                group.setExpanded(False)   # 复位
-                continue
+        # 屏蔽 itemExpanded/itemCollapsed 对 _user_expanded 的污染
+        self._in_filter_update = True
+        try:
+            text = self._filter_text
+            for group, plans in self._groups.items():
+                if not text:
+                    # 清空过滤词 → 恢复用户的展开 / 折叠状态（默认折叠），
+                    # 而非粗暴强制全部折叠丢失浏览上下文
+                    group.setHidden(False)
+                    if group in self._populated:
+                        for j in range(group.childCount()):
+                            group.child(j).setHidden(False)
+                    group.setExpanded(self._user_expanded.get(group, False))
+                    continue
 
-            title_match = text in group.text(0).lower()
-            if title_match:
+                title_match = text in group.text(0).lower()
+                if title_match:
+                    group.setHidden(False)
+                    if group in self._populated:
+                        for j in range(group.childCount()):
+                            group.child(j).setHidden(False)
+                    group.setExpanded(True)
+                    continue
+
+                # 文件名匹配 → 需要 materialize
+                matching = {id(p) for p in plans if text in p.filename.lower()}
+                if not matching:
+                    group.setHidden(True)
+                    continue
                 group.setHidden(False)
-                if group in self._populated:
-                    for j in range(group.childCount()):
-                        group.child(j).setHidden(False)
+                self._populate(group)
+                for j in range(group.childCount()):
+                    child = group.child(j)
+                    plan  = child.data(0, _PLAN_ROLE)
+                    child.setHidden(id(plan) not in matching)
                 group.setExpanded(True)
-                continue
-
-            # 文件名匹配 → 需要 materialize
-            matching = {id(p) for p in plans if text in p.filename.lower()}
-            if not matching:
-                group.setHidden(True)
-                continue
-            group.setHidden(False)
-            self._populate(group)
-            for j in range(group.childCount()):
-                child = group.child(j)
-                plan  = child.data(0, _PLAN_ROLE)
-                child.setHidden(id(plan) not in matching)
-            group.setExpanded(True)
+        finally:
+            self._in_filter_update = False
 
     # ── 列宽持久化 ────────────────────────────────────────────────────
     def _restore_column_widths(self) -> None:
@@ -192,8 +206,18 @@ class MakeMetaTree(QTreeWidget):
 
     # ── 信号回调 ──────────────────────────────────────────────────────
     def _on_expanded(self, item: QTreeWidgetItem) -> None:
-        if item in self._groups and item not in self._populated:
+        if item not in self._groups:
+            return
+        if item not in self._populated:
             self._populate(item)
+        # 只记录用户驱动的展开；filter 自己驱动的 setExpanded 经
+        # _in_filter_update 屏蔽，避免反过来污染回滚目标
+        if not self._in_filter_update:
+            self._user_expanded[item] = True
+
+    def _on_collapsed(self, item: QTreeWidgetItem) -> None:
+        if item in self._groups and not self._in_filter_update:
+            self._user_expanded[item] = False
 
     def _on_double_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
         plan = item.data(0, _PLAN_ROLE)
