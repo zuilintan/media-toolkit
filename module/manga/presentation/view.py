@@ -108,7 +108,7 @@ def print_std_title_preview(plans: list[StdTitlePlan]) -> None:
 # make_meta 预览（结构与 std_title 对齐）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _emit_make_meta_card(plan: MakeMetaPlan, idx: int) -> None:
+def emit_make_meta_card(plan: MakeMetaPlan, idx: int) -> None:
     """单个 ComicInfo 计划的完整卡片（diff 表 + warnings + encoding 行）。"""
     emit(f'   📄 [{idx}] {plan.filename}')
     emit_parse_debug(plan.mi)
@@ -126,12 +126,12 @@ def _emit_make_meta_card(plan: MakeMetaPlan, idx: int) -> None:
     emit()
 
 
-def _diff_signature(plan: MakeMetaPlan) -> tuple[bool, frozenset[str]]:
+def diff_signature(plan: MakeMetaPlan) -> tuple[bool, frozenset[str]]:
     """分组键：``(是否首次新增 ComicInfo.xml, 改动字段集合)``。"""
     return (plan.existing_xml is None, plan.diff_keys)
 
 
-def _format_signature(is_new: bool, keys: frozenset[str]) -> str:
+def format_signature(is_new: bool, keys: frozenset[str]) -> str:
     """分组键的人类可读形式：``新增 [Publisher+Tags]`` / ``修改 [Title]``。"""
     tag = '新增' if is_new else '修改'
     key_str = '+'.join(sorted(keys)) if keys else '(无字段变动)'
@@ -169,13 +169,13 @@ def print_make_meta_preview(
         # ── 分组 + 汇总 ────────────────────────────────────────────────
         groups: dict[tuple[bool, frozenset[str]], list[MakeMetaPlan]] = {}
         for p in changed:
-            groups.setdefault(_diff_signature(p), []).append(p)
+            groups.setdefault(diff_signature(p), []).append(p)
         sorted_groups = sorted(groups.items(), key=lambda kv: -len(kv[1]))
 
         emit(f'\n📊 计划处理 {len(changed)} 个，共 {len(groups)} 类差异：')
         for (is_new, keys), gp in sorted_groups:
             mark = '  ⚠ 稀有' if len(gp) <= rare_threshold else ''
-            emit(f'   • {_format_signature(is_new, keys)} ─ {len(gp)} 个{mark}')
+            emit(f'   • {format_signature(is_new, keys)} ─ {len(gp)} 个{mark}')
 
         # ── 逐组渲染（稀有 → 全量；常见 → 前 K 个样本）─────────────────
         for (is_new, keys), gp in sorted_groups:
@@ -187,11 +187,11 @@ def print_make_meta_preview(
             )
             note = '稀有，全量' if is_rare and len(gp) > 1 else ''
             emit(f'\n{SEP}')
-            head = f'  ▸ {_format_signature(is_new, keys)} ─ {len(gp)} 个'
+            head = f'  ▸ {format_signature(is_new, keys)} ─ {len(gp)} 个'
             emit(f'{head}{f"（{note}）" if note else ""}')
             emit(SEP)
             for idx, p in enumerate(gp[:show_n], 1):
-                _emit_make_meta_card(p, idx)
+                emit_make_meta_card(p, idx)
             if show_n < len(gp):
                 emit(f'   … 另有 {len(gp) - show_n} 个同类条目已折叠')
     else:

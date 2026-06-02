@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 
 from module.manga.core.models import MakeMetaPlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.gui.widgets.make_meta_detail import MakeMetaDetailDialog
+from module.manga.gui.widgets.make_meta_tree import MakeMetaTree
 from module.manga.presentation.export import export_plans
 from module.manga.presentation.view import print_make_meta_preview
 from module.manga.workflow.make_meta import apply_plans, preview_plans
@@ -23,6 +25,17 @@ class MakeMetaTab(BaseTab):
     no_change_msg    = '没有需要写入的文件'
     root_label       = 'CBZ 根目录:'
     root_placeholder = '递归扫描所有 .cbz'
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        # BaseTab 末尾是 addStretch(1)；替换为树视图占满剩余空间，
+        # 与 LogView 文本预览互为补充：LogView 看采样总览，树看完整可导航明细
+        root_lay = self.layout()
+        stretch_item = root_lay.takeAt(root_lay.count() - 1)
+        del stretch_item   # QSpacerItem 由 takeAt 转交所有权
+        self._tree = MakeMetaTree(self)
+        self._tree.plan_double_clicked.connect(self._on_plan_double_clicked)
+        root_lay.addWidget(self._tree, 1)
 
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()
@@ -89,10 +102,20 @@ class MakeMetaTab(BaseTab):
         return {'可写入': writable, '无变化': unchanged,
                 '冲突': len(plans) - writable - unchanged}
 
-    # ── 钩子：扫描完成后启用导出；busy 时禁用 ─────────────────────────
+    # ── 钩子：扫描完成后启用导出 / 填充树；busy 时禁用 ─────────────────
+    def _on_scan(self) -> None:
+        super()._on_scan()
+        # super 校验通过才会把 _plans 置 None；据此清空树，避免老数据残留
+        if self._plans is None:
+            self._tree.set_plans([])
+
     def _on_planned(self, plans: list[MakeMetaPlan]) -> None:
         super()._on_planned(plans)
         self._export_btn.setEnabled(bool(self._plans))
+        self._tree.set_plans(self._plans or [])
+
+    def _on_plan_double_clicked(self, plan: MakeMetaPlan) -> None:
+        MakeMetaDetailDialog(plan, parent=self).exec()
 
     def _on_busy(self, busy: bool) -> None:
         super()._on_busy(busy)
