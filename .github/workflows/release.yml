@@ -23,8 +23,8 @@ jobs:
       - name: Checkout (tag)
         uses: actions/checkout@v4
         with:
-          # 手动触发时 checkout 指定 tag；push tag 触发时默认 checkout 该 tag
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          # 手动触发时 checkout 指定 tag；push tag 触发时 ref_name 即纯 tag 名
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
           # git-cliff 需要完整 commit/tag 历史界定 --latest 的范围
           fetch-depth: 0
 
@@ -67,15 +67,16 @@ jobs:
       - name: Smoke test exe (启动后立即结束即视为失败)
         shell: pwsh
         run: |
+          # onefile 需先解包到 %TEMP% 再起 Qt，runner 冷启动留 20s 余量
           $exe = "dist/media-toolkit-gui-${{ steps.tag.outputs.name }}.exe"
           $p = Start-Process -FilePath $exe -PassThru
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 20
           if ($p.HasExited) {
-            Write-Error "exe 启动 10s 内退出 (ExitCode=$($p.ExitCode))，打包可能有问题"
+            Write-Error "exe 启动 20s 内退出 (ExitCode=$($p.ExitCode))，打包可能有问题"
             exit 1
           }
           Stop-Process -Id $p.Id -Force
-          Write-Host "OK: exe 启动 10s 仍在运行"
+          Write-Host "OK: exe 启动 20s 仍在运行"
 
       - name: Generate changelog (git-cliff)
         # 按 conventional commits 分类生成"当前 tag 范围"的 changelog
