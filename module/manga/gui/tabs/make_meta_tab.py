@@ -5,8 +5,8 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QFileDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-    QSpinBox, QWidget,
+    QFileDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from module.manga.core.models import MakeMetaPlan
@@ -28,14 +28,26 @@ class MakeMetaTab(BaseTab):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        # BaseTab 末尾是 addStretch(1)；替换为树视图占满剩余空间，
+        # BaseTab 末尾是 addStretch(1)；替换为「搜索框 + 树」面板占满剩余空间，
         # 与 LogView 文本预览互为补充：LogView 看采样总览，树看完整可导航明细
         root_lay = self.layout()
         stretch_item = root_lay.takeAt(root_lay.count() - 1)
         del stretch_item   # QSpacerItem 由 takeAt 转交所有权
+
+        self._search = QLineEdit(self)
+        self._search.setPlaceholderText('过滤：文件名 / 分组（大小写不敏感）')
+        self._search.setClearButtonEnabled(True)
         self._tree = MakeMetaTree(self)
         self._tree.plan_double_clicked.connect(self._on_plan_double_clicked)
-        root_lay.addWidget(self._tree, 1)
+        self._search.textChanged.connect(self._tree.apply_filter)
+
+        panel = QWidget(self)
+        panel_lay = QVBoxLayout(panel)
+        panel_lay.setContentsMargins(0, 0, 0, 0)
+        panel_lay.setSpacing(4)
+        panel_lay.addWidget(self._search)
+        panel_lay.addWidget(self._tree, 1)
+        root_lay.addWidget(panel, 1)
 
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()

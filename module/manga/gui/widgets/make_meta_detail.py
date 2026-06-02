@@ -1,52 +1,116 @@
 """单个 :class:`~module.manga.core.models.MakeMetaPlan` 的完整详情对话框。
 
-模态弹窗：复用 :class:`~base.gui.log_view.LogView` 渲染，同字体 / 同 ANSI
-着色 / 同等宽对齐策略，与主 LogView 视觉一致。
+布局：
 
-工作流：
-1. 临时把 :func:`~base.console.set_output` 切到本对话框自带的 :class:`~base.gui.qt_sink.QtSink`；
-2. 调 :func:`~module.manga.presentation.view.emit_make_meta_card` 渲染；
-3. 恢复主线程原 sink，避免影响 Tab 后续的 emit。
+- 顶部文件名 + 状态标签
+- :class:`~PySide6.QtWidgets.QTableWidget` 三列（Tag / 旧 / 新），新列对差异行
+  着色，对齐 LogView 的语义但摆脱等宽字符串拼接
+- 底部 warnings / 出版商冲突 / encoding 行（按需可见）
+- Close 按钮
 
-注意：调用方应在主线程触发；线程本地 sink 保证不会污染其他线程。
+模态弹窗，由 :class:`~module.manga.gui.widgets.make_meta_tree.MakeMetaTree`
+的双击信号触发。
 """
 
 from __future__ import annotations
+import os
 
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
+    QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel,
+    QTableWidget, QTableWidgetItem, QVBoxLayout,
+)
 
-from base.console import get_output, set_output
-from base.gui.log_view import LogView
-from base.gui.qt_sink import QtSink
+from module.manga.core.config import COMICINFO_TAGS
 from module.manga.core.models import MakeMetaPlan
-from module.manga.presentation.view import emit_make_meta_card
+
+# 差异行新值底色：与 LogView 的红色高亮同语义、不同呈现（避免文本被 ANSI 控制）
+_DIFF_BG = QColor('#3a2a2a')
 
 
 class MakeMetaDetailDialog(QDialog):
-    """单 plan 的完整 diff 表格弹窗。"""
+    """单 plan 的完整 diff 表格弹窗（QTableWidget 实现）。"""
 
     def __init__(self, plan: MakeMetaPlan, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f'详情 — {plan.filename}')
-        self.resize(900, 600)
+        self.resize(820, 600)
 
-        self._log = LogView(self)
-        sink = QtSink(self)
-        sink.text_written.connect(self._log.append_text)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
 
-        prev = get_output()
-        set_output(sink)
-        try:
-            emit_make_meta_card(plan, 1)
-            sink.flush()
-        finally:
-            set_output(prev)
+        # ── 头部：文件名 + 状态 ──────────────────────────────────────
+        title = QLabel(f'📄 {plan.filename}')
+        f = title.font(); f.setBold(True); title.setFont(f)
+        lay.addWidget(title)
 
+        lay.addWidget(QLabel(f'状态: {_status_label(plan)}'))
+
+        # ── diff 表格 ────────────────────────────────────────────────
+        table = QTableWidget(len(COMICINFO_TAGS), 3, self)
+        table.setHorizontalHeaderLabels(['Tag', '旧值', '新值'])
+        table.verticalHeader().setVisible(False)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.setWordWrap(False)
+
+        diff_brush = QBrush(_DIFF_BG)
+        for row, tag in enumerate(COMICINFO_TAGS):
+            ov = plan.existing_fields.get(tag, '')
+            nv = plan.fields.get(tag, '')
+            tag_item = QTableWidgetItem(tag)
+            old_item = QTableWidgetItem(ov)
+            new_item = QTableWidgetItem(nv)
+            if ov != nv:
+                bold = QFont(); bold.setBold(True)
+                tag_item.setFont(bold)
+                new_item.setFont(bold)
+                new_item.setBackground(diff_brush)
+                tag_item.setToolTip('该字段在新旧之间存在差异')
+            for it in (old_item, new_item):
+                it.setToolTip(it.text())   # 长值悬停看全
+            table.setItem(row, 0, tag_item)
+            table.setItem(row, 1, old_item)
+            table.setItem(row, 2, new_item)
+
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        table.resizeRowsToContents()
+        lay.addWidget(table, 1)
+
+        # ── 附加信息（按需显示）──────────────────────────────────────
+        if plan.mi.warnings:
+            lay.addWidget(QLabel(
+                '🟡 警告: ' + '; '.join(plan.mi.warnings)
+            ))
+        if plan.pub_conflict:
+            names = ', '.join(os.path.basename(p) for p in plan.pub_conflict)
+            warn = QLabel(f'⛔ 出版商冲突文件: {names}')
+            warn.setWordWrap(True)
+            lay.addWidget(warn)
+        cur_enc = plan.existing_encoding or '—'
+        new_enc = plan.new_encoding
+        enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
+                    else cur_enc)
+        lay.addWidget(QLabel(f'Encoding: {enc_line}'))
+
+        # ── 关闭按钮 ─────────────────────────────────────────────────
         btns = QDialogButtonBox(QDialogButtonBox.Close, parent=self)
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
-
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.addWidget(self._log, 1)
         lay.addWidget(btns)
+
+
+def _status_label(p: MakeMetaPlan) -> str:
+    if not p.writable:
+        return '⛔ 出版商冲突（跳过）'
+    if not p.changed:
+        return '─ 已是最新（无需写入）'
+    if p.existing_xml is None:
+        return '✨ 新增 ComicInfo.xml'
+    return '✏️ 修改已有 ComicInfo.xml'
