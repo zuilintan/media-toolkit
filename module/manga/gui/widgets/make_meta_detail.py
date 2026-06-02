@@ -17,11 +17,11 @@ from __future__ import annotations
 import os
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QDialog, QDialogButtonBox, QHeaderView,
-    QLabel, QMenu, QPushButton, QTableWidget, QTableWidgetItem, QToolTip,
-    QVBoxLayout,
+    QLabel, QMenu, QPushButton, QStyledItemDelegate, QTableWidget,
+    QTableWidgetItem, QToolTip, QVBoxLayout,
 )
 
 from module.manga.core.config import COMICINFO_TAGS
@@ -31,7 +31,34 @@ from module.manga.core.models import MakeMetaPlan
 # - 新值（高亮变更）：偏红，对应 LogView 中 highlight_diff 的 RED 语义
 # - 旧值（参照对照）：偏暗中性色，凸显二者不同但视觉上不喧宾夺主
 _NEW_BG = QColor('#3a2a2a')
-_OLD_BG = QColor('#2c2c2c')
+_OLD_BG = QColor('#262c34')
+# Tag 之间的分隔线颜色（与全局 palette.BORDER 对齐）
+_TAG_BORDER = QColor('#363c45')
+
+
+class _TagBoundaryDelegate(QStyledItemDelegate):
+    """在每个 tag 起始行上方画一条细线，让多行合并的 tag 与下一个 tag 明显分隔。
+
+    判定规则：Tag 列（0 列）该行的文本非空 → 此行是某 tag 的起始行；
+    差异行的「新值」行 Tag 列为空（被 setSpan 合并隐藏），不画线。
+    """
+
+    def paint(self, painter, option, index) -> None:   # noqa: N802 — Qt API 命名
+        super().paint(painter, option, index)
+        row = index.row()
+        if row == 0:
+            return
+        table = self.parent()
+        head  = table.item(row, 0) if table is not None else None
+        if head is None or not head.text():
+            return
+        painter.save()
+        pen = QPen(_TAG_BORDER)
+        pen.setWidth(1)
+        painter.setPen(pen)
+        r = option.rect
+        painter.drawLine(r.topLeft(), r.topRight())
+        painter.restore()
 
 
 class MakeMetaDetailDialog(QDialog):
@@ -82,9 +109,12 @@ class MakeMetaDetailDialog(QDialog):
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectItems)
-        table.setAlternatingRowColors(True)
+        # 不开按行交替色：跨行合并后「按行」alternating 反而混淆同一 tag 的两行
+        # 改用 _TagBoundaryDelegate 在 tag 边界画细线，按语义分组
+        table.setAlternatingRowColors(False)
         table.setShowGrid(False)
         table.setWordWrap(False)
+        table.setItemDelegate(_TagBoundaryDelegate(table))
 
         bold       = QFont(); bold.setBold(True)
         old_brush  = QBrush(_OLD_BG)
