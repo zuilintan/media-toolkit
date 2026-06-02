@@ -54,6 +54,19 @@ jobs:
             echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check tag matches pyproject.toml version
+        # 防止忘记同步：tag = vX.Y.Z 必须与 pyproject [project].version = X.Y.Z 一致
+        shell: bash
+        run: |
+          tag_ver="${{ steps.tag.outputs.name }}"
+          tag_ver="${tag_ver#v}"
+          proj_ver=$(uv run python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text('utf-8'))['project']['version'])")
+          if [ "$tag_ver" != "$proj_ver" ]; then
+            echo "::error::tag $tag_ver 与 pyproject.toml version $proj_ver 不一致，请先升 pyproject 再打 tag"
+            exit 1
+          fi
+          echo "OK: tag 与 pyproject 版本均为 $tag_ver"
+
       - name: Build GUI exe (PyInstaller, onefile windowed)
         run: |
           uv run pyinstaller --noconfirm --windowed --onefile `
