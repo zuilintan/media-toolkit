@@ -11,7 +11,7 @@ FILE_EXTS: frozenset[str] = frozenset({".zip", ".cbz"})
 
 # ── make_meta ─────────────────────────────────────────────────────────────────
 
-SCRIPT_NAME: str    = "manga-cli"
+SCRIPT_NAME: str    = "media-toolkit"
 SCRIPT_VERSION: str = __version__
 
 COMICINFO_FILENAME: str = "ComicInfo.xml"

@@ -116,20 +116,20 @@ def collect_fields(
         'Genre':       build_genre(info),
         'PageCount':   str(page_count) if page_count else '',
         'Tags':        existing_tags or '',
-        'Notes':       f'"metadata creator": "{SCRIPT_NAME} {SCRIPT_VERSION}"',
+        'Notes':       f'"metadata_creator": "{SCRIPT_NAME} {SCRIPT_VERSION}"',
     }
 
 
-#: ``"metadata creator"`` Notes 形态，识别仅本工具自动产出的版本号差异
+#: ``"metadata_creator"`` Notes 形态，识别仅本工具自动产出的版本号差异
 _METADATA_CREATOR_RE = re.compile(
-    rf'^"metadata creator":\s*"{re.escape(SCRIPT_NAME)}\s+\S+"$'
+    rf'^"metadata_creator":\s*"{re.escape(SCRIPT_NAME)}\s+\S+"$'
 )
 
 
 def _only_creator_version_differs(
     existing: dict[str, str], new: dict[str, str],
 ) -> bool:
-    """旧 / 新字段除 ``Notes`` 外完全相同，且双方 ``Notes`` 都是 metadata creator 形态。
+    """旧 / 新字段除 ``Notes`` 外完全相同，且双方 ``Notes`` 都是 metadata_creator 形态。
 
     用于避免本工具版本升级导致仅 ``Notes`` 中 :data:`~module.manga.core.config.SCRIPT_VERSION`
     变动的无意义改写。

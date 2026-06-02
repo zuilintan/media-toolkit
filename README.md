@@ -244,20 +244,20 @@ Publisher → Writer → Title → Volume → Number → Series → Format →
 LanguageISO → Genre → Tags → PageCount → Notes
 ```
 
-| ComicInfo 字段 | 来源 |
-|---|---|
-| `Publisher` | 同目录 `[社团]：XX.txt` 文件名 |
-| `Writer` | 文件名中的 `[作者]` |
-| `Title` | 文件名（去除标签括号） |
-| `Volume` | `VOL.XX` |
-| `Number` | `CH.XX` 数字部分，**或** 独立分编词（番外篇 / 后日谈 / …） |
-| `Series` | `(系列名)` |
-| `Format` | 合集类分编词（`总集篇`）；其它情况留空 |
-| `LanguageISO` | `[zh]` / `[ja]` / `[ko]` / `[en]` / `[zxx]` |
-| `Genre` | uncensored / colorized / ongoing |
-| `Tags` | 保留 CBZ 内已有值（不覆盖） |
+| ComicInfo 字段 | 来源                                                                |
+|---|-------------------------------------------------------------------|
+| `Publisher` | 同目录 `[社团]：XX.txt` 文件名                                             |
+| `Writer` | 文件名中的 `[作者]`                                                      |
+| `Title` | 文件名（去除标签括号）                                                       |
+| `Volume` | `VOL.XX`                                                          |
+| `Number` | `CH.XX` 数字部分，**或** 独立分编词（番外篇 / 后日谈 / …）                           |
+| `Series` | `(系列名)`                                                           |
+| `Format` | 合集类分编词（`总集篇`）；其它情况留空                                              |
+| `LanguageISO` | `[zh]` / `[ja]` / `[ko]` / `[en]` / `[zxx]`                       |
+| `Genre` | uncensored / colorized / ongoing                                  |
+| `Tags` | 保留 CBZ 内已有值（不覆盖）                                                  |
 | `PageCount` | 压缩包内图片文件数（jpg / jpeg / png / bmp / gif / psd / webp / avif / jxl） |
-| `Notes` | `"metadata creator": "manga-cli 0.1.0"` |
+| `Notes` | `"metadata_creator": "media-toolkit 0.1.0"` |
 
 ---
 
