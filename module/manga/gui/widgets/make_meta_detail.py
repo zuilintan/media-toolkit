@@ -3,9 +3,9 @@
 布局：
 
 - 顶部文件名 + 状态标签
-- :class:`~PySide6.QtWidgets.QTableWidget` 两列（Tag / 值）。无差异 tag 占 1 行；
-  有差异 tag 占 2 行（旧上 / 新下），Tag 列 ``setSpan(row, 0, 2, 1)`` 跨 2 行
-  合并，旧 / 新值上下对齐方便逐字符比对，用底色 + 行首图标进一步标识
+- :class:`~PySide6.QtWidgets.QTableWidget` 两列（标签 / 值）。无差异 tag 占 1 行；
+  有差异 tag 占 2 行（旧上 / 新下），标签列 ``setSpan(row, 0, 2, 1)`` 跨 2 行
+  合并，旧 / 新值上下对齐方便逐字符比对，用底色区分（无需文字标识）
 - 底部 warnings / 出版商冲突 / encoding 行（按需可见）
 - 「执行写入」（可写时）+ Close
 
@@ -37,27 +37,35 @@ _TAG_BORDER = QColor('#363c45')
 
 
 class _TagBoundaryDelegate(QStyledItemDelegate):
-    """在每个 tag 起始行上方画一条细线，让多行合并的 tag 与下一个 tag 明显分隔。
+    """画两类细线：
 
-    判定规则：Tag 列（0 列）该行的文本非空 → 此行是某 tag 的起始行；
-    差异行的「新值」行 Tag 列为空（被 setSpan 合并隐藏），不画线。
+    - 标签起始行上方画水平线（多行合并的 tag 与下一个 tag 明显分隔）；
+      判定规则：标签列（0 列）该行的文本非空 → 此行是某 tag 的起始行；
+      差异行的「新值」行标签列为空（被 setSpan 合并隐藏），不画线
+    - 标签列右侧画竖线（列间分隔，showGrid=False 下手动补）
     """
 
     def paint(self, painter, option, index) -> None:   # noqa: N802 — Qt API 命名
         super().paint(painter, option, index)
-        row = index.row()
-        if row == 0:
-            return
         table = self.parent()
-        head  = table.item(row, 0) if table is not None else None
-        if head is None or not head.text():
-            return
+        row, col = index.row(), index.column()
+        r = option.rect
+
         painter.save()
         pen = QPen(_TAG_BORDER)
         pen.setWidth(1)
         painter.setPen(pen)
-        r = option.rect
-        painter.drawLine(r.topLeft(), r.topRight())
+
+        # tag 边界横线
+        if row > 0 and table is not None:
+            head = table.item(row, 0)
+            if head is not None and head.text():
+                painter.drawLine(r.topLeft(), r.topRight())
+
+        # 列间竖线（仅标签列右侧）
+        if col == 0:
+            painter.drawLine(r.topRight(), r.bottomRight())
+
         painter.restore()
 
 
@@ -105,7 +113,7 @@ class MakeMetaDetailDialog(QDialog):
                 rows.append(('',  nv, 'new'))
 
         table = QTableWidget(len(rows), 2, self)
-        table.setHorizontalHeaderLabels(['Tag', '值'])
+        table.setHorizontalHeaderLabels(['标签', '值'])
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectItems)
@@ -127,14 +135,9 @@ class MakeMetaDetailDialog(QDialog):
                 tag_item.setFont(bold)
                 tag_item.setToolTip('该字段在新旧之间存在差异')
                 val_item.setBackground(old_brush)
-                val_item.setText(f'旧  {val}')  # 行首图标避免位置混淆（仍能被复制为带前缀，
-                                                # 实际单元格内容用 setData(Qt.UserRole) 留真值）
-                val_item.setData(Qt.UserRole, val)
             elif kind == 'new':
                 val_item.setFont(bold)
                 val_item.setBackground(new_brush)
-                val_item.setText(f'新  {val}')
-                val_item.setData(Qt.UserRole, val)
             table.setItem(r, 0, tag_item)
             table.setItem(r, 1, val_item)
 
@@ -189,11 +192,7 @@ class MakeMetaDetailDialog(QDialog):
         item = self._table.itemAt(pos)
         if item is None:
             return
-        # 差异行值列保存了带「旧/新」前缀的显示文本，但 UserRole 里有真值；
-        # 复制时优先取真值，避免把展示用前缀也复制进去
-        raw = item.data(Qt.UserRole)
-        text = raw if isinstance(raw, str) else item.text()
-
+        text       = item.text()
         global_pos = self._table.viewport().mapToGlobal(pos)
         preview    = text if len(text) <= 30 else f'{text[:30]}…'
         label      = f'复制单元格：{preview}' if text else '复制单元格（空值）'
