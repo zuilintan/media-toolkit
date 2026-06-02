@@ -15,11 +15,12 @@
 from __future__ import annotations
 import os
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QDialog, QDialogButtonBox, QHeaderView,
-    QLabel, QMenu, QTableWidget, QTableWidgetItem, QToolTip, QVBoxLayout,
+    QLabel, QMenu, QPushButton, QTableWidget, QTableWidgetItem, QToolTip,
+    QVBoxLayout,
 )
 
 from module.manga.core.config import COMICINFO_TAGS
@@ -30,10 +31,19 @@ _DIFF_BG = QColor('#3a2a2a')
 
 
 class MakeMetaDetailDialog(QDialog):
-    """单 plan 的完整 diff 表格弹窗（QTableWidget 实现）。"""
+    """单 plan 的完整 diff 表格弹窗（QTableWidget 实现）。
+
+    :ivar apply_requested: 「执行写入」按钮点击时发出（仅对 writable + changed
+        的 plan 显示）；具体写入由
+        :class:`~module.manga.gui.tabs.make_meta_tab.MakeMetaTab` 统一处理，
+        成功后会调 :meth:`accept` 关闭本对话框。
+    """
+
+    apply_requested = Signal(object)   # MakeMetaPlan
 
     def __init__(self, plan: MakeMetaPlan, parent=None) -> None:
         super().__init__(parent)
+        self._plan = plan
         self.setWindowTitle(f'详情 — {plan.filename}')
         self.resize(820, 600)
 
@@ -106,10 +116,18 @@ class MakeMetaDetailDialog(QDialog):
                     else cur_enc)
         lay.addWidget(QLabel(f'Encoding: {enc_line}'))
 
-        # ── 关闭按钮 ─────────────────────────────────────────────────
+        # ── 底部按钮 ─────────────────────────────────────────────────
         btns = QDialogButtonBox(QDialogButtonBox.Close, parent=self)
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
+        if plan.writable and plan.changed:
+            apply_btn = QPushButton('执行写入', self)
+            apply_btn.setToolTip('只对当前文件写入 ComicInfo.xml')
+            apply_btn.setProperty('primary', True)
+            apply_btn.clicked.connect(
+                lambda: self.apply_requested.emit(self._plan)
+            )
+            btns.addButton(apply_btn, QDialogButtonBox.ActionRole)
         lay.addWidget(btns)
 
     # ── 右键菜单：复制单元格 ──────────────────────────────────────────

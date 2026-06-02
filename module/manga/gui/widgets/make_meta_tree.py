@@ -19,7 +19,7 @@ LogView 是流式文本，万级 plan 时只能采样展示；本树视图把全
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
 from base.gui.config import get_config
 from module.manga.core.models import MakeMetaPlan
@@ -36,9 +36,13 @@ class MakeMetaTree(QTreeWidget):
     """预览导航树：顶层 = 分组，子项 = 单个 plan。
 
     :ivar plan_double_clicked: 双击具体 plan 行时发出，参数为 :class:`MakeMetaPlan`。
+    :ivar plan_apply_requested: 在 plan 行右键 → 「执行写入」时发出；由
+        :class:`~module.manga.gui.tabs.make_meta_tab.MakeMetaTab` 统一做
+        confirm / 写入 / 状态刷新。
     """
 
-    plan_double_clicked = Signal(object)   # MakeMetaPlan
+    plan_double_clicked  = Signal(object)   # MakeMetaPlan
+    plan_apply_requested = Signal(object)   # MakeMetaPlan
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -195,6 +199,58 @@ class MakeMetaTree(QTreeWidget):
         plan = item.data(0, _PLAN_ROLE)
         if isinstance(plan, MakeMetaPlan):
             self.plan_double_clicked.emit(plan)
+
+    # ── 右键菜单：单条执行 ─────────────────────────────────────────────
+    def contextMenuEvent(self, event) -> None:   # noqa: N802 — Qt API 命名
+        item = self.itemAt(event.pos())
+        if item is None:
+            return
+        plan = item.data(0, _PLAN_ROLE)
+        if not isinstance(plan, MakeMetaPlan):
+            return   # 分组节点不响应
+        # 不可写 / 无变化 → 没有可执行的操作，不弹菜单（避免「点了没反应」）
+        if not (plan.writable and plan.changed):
+            return
+        menu = QMenu(self)
+        act  = menu.addAction(f'执行写入：{plan.filename}')
+        if menu.exec(event.globalPos()) is act:
+            self.plan_apply_requested.emit(plan)
+
+    # ── 局部刷新：单条执行成功后调用 ───────────────────────────────────
+    def remove_plan(self, plan: MakeMetaPlan) -> None:
+        """从树中移除指定 plan：保留过滤 / 展开状态，避免整树重建。
+
+        同一 plan 可能出现在多个组里（如 changed 组 + 警告组），逐组扫描。
+        组内最后一项被移除 → 整组从顶层移除。
+        """
+        for group in list(self._groups.keys()):
+            plans = self._groups[group]
+            if plan not in plans:
+                continue
+            new_plans = [p for p in plans if p is not plan]
+            self._groups[group] = new_plans
+
+            # 更新组标题尾部的 (count)
+            title = group.text(0)
+            idx   = title.rfind(' (')
+            if idx > 0:
+                group.setText(0, f'{title[:idx]} ({len(new_plans)})')
+
+            # 移除已 materialize 的子项
+            if group in self._populated:
+                for j in range(group.childCount()):
+                    child = group.child(j)
+                    if child.data(0, _PLAN_ROLE) is plan:
+                        group.removeChild(child)
+                        break
+
+            # 整组空了 → 整组从顶层移除
+            if not new_plans:
+                top_idx = self.indexOfTopLevelItem(group)
+                if top_idx >= 0:
+                    self.takeTopLevelItem(top_idx)
+                self._groups.pop(group, None)
+                self._populated.discard(group)
 
 
 def _status_text(p: MakeMetaPlan) -> str:

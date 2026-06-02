@@ -9,13 +9,14 @@ from PySide6.QtWidgets import (
     QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from base.console import emit, set_output
 from module.manga.core.models import MakeMetaPlan
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.gui.widgets.make_meta_detail import MakeMetaDetailDialog
 from module.manga.gui.widgets.make_meta_tree import MakeMetaTree
 from module.manga.presentation.export import export_plans
 from module.manga.presentation.view import print_make_meta_preview
-from module.manga.workflow.make_meta import apply_plans, preview_plans
+from module.manga.workflow.make_meta import apply_plan, apply_plans, preview_plans
 
 
 class MakeMetaTab(BaseTab):
@@ -39,6 +40,7 @@ class MakeMetaTab(BaseTab):
         self._search.setClearButtonEnabled(True)
         self._tree = MakeMetaTree(self)
         self._tree.plan_double_clicked.connect(self._on_plan_double_clicked)
+        self._tree.plan_apply_requested.connect(self._apply_single)
         self._search.textChanged.connect(self._tree.apply_filter)
 
         panel = QWidget(self)
@@ -127,7 +129,61 @@ class MakeMetaTab(BaseTab):
         self._tree.set_plans(self._plans or [])
 
     def _on_plan_double_clicked(self, plan: MakeMetaPlan) -> None:
-        MakeMetaDetailDialog(plan, parent=self).exec()
+        dlg = MakeMetaDetailDialog(plan, parent=self)
+        # 详情对话框只发意图，写入仍走 _apply_single；成功后关闭对话框
+        dlg.apply_requested.connect(
+            lambda p, d=dlg: self._apply_single(p, dialog=d)
+        )
+        dlg.exec()
+
+    # ── 单条执行（共用入口：树右键 + 详情按钮）─────────────────────────
+    def _apply_single(self, plan: MakeMetaPlan, *, dialog=None) -> None:
+        """对单个 plan 写入 ComicInfo.xml，并局部更新树 / 状态行。
+
+        :param dialog: 若来自详情对话框，成功后调用其 ``accept()`` 关闭。
+        """
+        if self._thread is not None and self._thread.isRunning():
+            QMessageBox.warning(self, '忙', '后台任务运行中，请先取消')
+            return
+        if not (plan.writable and plan.changed):
+            return
+        if QMessageBox.question(
+            self, '确认',
+            f'对单个文件写入 ComicInfo.xml？\n\n{plan.filename}',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        ) != QMessageBox.Yes:
+            return
+
+        # 确保写入日志落到本 Tab 的 LogView（sink 线程本地，用户可能切过 Tab）
+        set_output(self._sink)
+        emit(f'\n▶ 单条写入: {plan.filename}')
+        result = apply_plan(plan)
+        if result != 'ok':
+            QMessageBox.warning(
+                self, '写入失败', f'{plan.filename}\n详情见日志',
+            )
+            return
+
+        # 状态更新：从 plans 列表移除 + 树局部刷新 + 状态行
+        if self._plans:
+            self._plans = [p for p in self._plans if p is not plan]
+        self._tree.remove_plan(plan)
+        self._refresh_post_apply_ui()
+        if dialog is not None:
+            dialog.accept()
+
+    def _refresh_post_apply_ui(self) -> None:
+        if not self._plans:
+            self._apply_btn.setEnabled(False)
+            self._export_btn.setEnabled(False)
+            self._status.setText('扫描完成：所有项目已处理')
+            return
+        n    = self._count_actionable(self._plans)
+        cats = self._classify_plans(self._plans)
+        parts = ' / '.join(f'{v} {k}' for k, v in cats.items() if v)
+        self._status.setText(f'剩余：{len(self._plans)} 项（{parts}）')
+        self._apply_btn.setEnabled(n > 0)
 
     def _on_busy(self, busy: bool) -> None:
         super()._on_busy(busy)
