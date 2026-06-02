@@ -175,6 +175,9 @@ class BaseTab(QWidget):
         )
 
     def _on_planned(self, plans: list[Any]) -> None:
+        # sink 是线程本地的，且用户可能已切到别的 Tab：在主线程回调里重新绑定，
+        # 保证 emit 落到本 Tab 的 LogView。
+        set_output(self._sink)
         plans = [p for p in plans if p is not None]
         self._plans = plans
         if not plans:
@@ -221,6 +224,7 @@ class BaseTab(QWidget):
         )
 
     def _on_applied(self, fail: int) -> None:
+        set_output(self._sink)
         ok = self._actionable_n - fail
         self._status.setText(
             f'写入完成：成功 {ok} / 失败 {fail}'
@@ -231,6 +235,7 @@ class BaseTab(QWidget):
         self._apply_btn.setEnabled(False)
 
     def _on_task_failed(self, msg: str) -> None:
+        set_output(self._sink)
         self._status.setText('任务失败')
         emit(f'❌ 后台任务异常:\n{msg}')
         emit(SEP2)

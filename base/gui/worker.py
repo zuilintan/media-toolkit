@@ -23,6 +23,8 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from base.console import get_output, set_output
+
 
 class Worker(QObject):
     """通用阻塞任务的 worker（QThread 配套）。"""
@@ -36,6 +38,9 @@ class Worker(QObject):
         self._fn     = fn
         self._args   = args
         self._cancel = threading.Event()
+        # 主线程构造时快照 sink；:meth:`run` 在 worker 线程内重新 set_output，
+        # 避免后续主线程切到其他 Tab 调 :func:`~base.console.set_output` 影响本任务。
+        self._sink_out = get_output()
         # 注入回调 → 信号（始终在主/工作线程调用，安全）
         kwargs['on_progress'] = lambda c, t: self.progress.emit(c, t)
         kwargs['cancel_token'] = self._cancel
@@ -47,6 +52,8 @@ class Worker(QObject):
 
     @Slot()
     def run(self) -> None:
+        if self._sink_out is not None:
+            set_output(self._sink_out)
         try:
             result = self._fn(*self._args, **self._kwargs)
         except Exception as e:  # noqa: BLE001 — worker 必须吸收一切异常

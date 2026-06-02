@@ -5,6 +5,10 @@
 GUI 可用 :func:`set_output` 接管。唯独 :func:`debug` 经 :mod:`logging` 写入 stderr，
 其捕获由 logging handler 负责，与用户输出通道解耦。
 
+sink 是**线程本地**的（:class:`threading.local`），多个后台 worker 线程并发跑长任务时
+各自的 :func:`emit` 不会互相串扰；跨线程传递由 :class:`~base.gui.worker.Worker` 在
+构造时捕获主线程 sink，再在 ``run()`` 内 :func:`set_output` 继承。
+
 领域对象的渲染（StdTitlePlan / MakeMetaPlan 等）位于 presentation 层。
 """
 
@@ -12,6 +16,7 @@ from __future__ import annotations
 import inspect
 import logging
 import sys
+import threading
 from itertools import zip_longest
 from typing import TextIO
 
@@ -31,18 +36,29 @@ SEP2 = '═' * 72
 # 输出通道（可注入 sink）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 当前输出 sink；None 表示动态使用 sys.stdout（兼容终端重定向 / pytest 捕获）。
-_out: TextIO | None = None
+# 线程本地 sink；缺省（属性未设）等价于使用 :data:`sys.stdout`，
+# 兼容终端重定向 / pytest 捕获，并避免多 worker 线程串扰。
+_tls = threading.local()
 
 
 def set_output(stream: TextIO | None) -> None:
-    """设置全局输出 sink（GUI 传入自定义可写对象；None 恢复为 sys.stdout）。"""
-    global _out
-    _out = stream
+    """设置**当前线程**的输出 sink（GUI 传入自定义可写对象；None 恢复为 sys.stdout）。
+
+    线程本地存储意味着每个后台 worker 线程必须在线程内显式调用本函数，否则会
+    回退到 sys.stdout。:class:`~base.gui.worker.Worker` 负责跨线程继承主线程
+    sink；新增其他后台线程时应仿照其做法。
+    """
+    _tls.out = stream
+
+
+def get_output() -> TextIO | None:
+    """读取当前线程的输出 sink；``None`` 表示走默认 :data:`sys.stdout`。"""
+    return getattr(_tls, 'out', None)
 
 
 def _sink() -> TextIO:
-    return sys.stdout if _out is None else _out
+    out = getattr(_tls, 'out', None)
+    return sys.stdout if out is None else out
 
 
 def emit(*args: object, sep: str = ' ', end: str = '\n', flush: bool = False) -> None:
