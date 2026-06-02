@@ -15,10 +15,11 @@
 from __future__ import annotations
 import os
 
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel,
-    QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QAbstractItemView, QApplication, QDialog, QDialogButtonBox, QHeaderView,
+    QLabel, QMenu, QTableWidget, QTableWidgetItem, QToolTip, QVBoxLayout,
 )
 
 from module.manga.core.config import COMICINFO_TAGS
@@ -81,6 +82,12 @@ class MakeMetaDetailDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
         table.resizeRowsToContents()
+
+        # 右键复制单元格内容（QTableWidget 默认无 Ctrl+C / 复制菜单）
+        table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        table.customContextMenuRequested.connect(self._on_table_context_menu)
+        self._table = table
+
         lay.addWidget(table, 1)
 
         # ── 附加信息（按需显示）──────────────────────────────────────
@@ -104,6 +111,24 @@ class MakeMetaDetailDialog(QDialog):
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
         lay.addWidget(btns)
+
+    # ── 右键菜单：复制单元格 ──────────────────────────────────────────
+    def _on_table_context_menu(self, pos: QPoint) -> None:
+        item = self._table.itemAt(pos)
+        if item is None:
+            return
+        text = item.text()
+        # 空值也允许复制（避免「为什么右键没反应」的疑惑）
+        global_pos = self._table.viewport().mapToGlobal(pos)
+        preview    = text if len(text) <= 30 else f'{text[:30]}…'
+        label      = f'复制单元格：{preview}' if text else '复制单元格（空值）'
+
+        menu = QMenu(self)
+        act  = menu.addAction(label)
+        chosen = menu.exec(global_pos)
+        if chosen is act:
+            QApplication.clipboard().setText(text)
+            QToolTip.showText(global_pos, '✅ 已复制', self._table)
 
 
 def _status_label(p: MakeMetaPlan) -> str:
