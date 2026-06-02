@@ -187,7 +187,7 @@ def print_make_meta_preview(
             )
             note = '稀有，全量' if is_rare and len(gp) > 1 else ''
             emit(f'\n{SEP}')
-            head = f'  ▸ {format_signature(is_new, keys)} ─ {len(gp)} 个'
+            head = f'   ▸  {format_signature(is_new, keys)} ─ {len(gp)} 个'
             emit(f'{head}{f"（{note}）" if note else ""}')
             emit(SEP)
             for idx, p in enumerate(gp[:show_n], 1):
