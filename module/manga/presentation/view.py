@@ -85,7 +85,13 @@ def print_std_title_preview(plans: list[StdTitlePlan]) -> None:
             if p.info is not None:
                 emit_parse_debug(p.info)
             emit(f'     旧: {p.old_name}')
-            emit(f'     新: {highlight_diff(p.old_name, p.new_name, RED)}')
+            if p.old_name != p.new_name:
+                emit(f'     新: {highlight_diff(p.old_name, p.new_name, RED)}')
+            src_parent = os.path.dirname(p.src_path)
+            if os.path.normcase(src_parent) != os.path.normcase(p.author_dir):
+                emit(f'     📁 归入: ./{os.path.basename(p.author_dir)}/')
+            if p.publisher_file:
+                emit(f'     📌 标识: {os.path.basename(p.publisher_file)}')
             if p.info:
                 for w in p.info.warnings:
                     emit(f'     🟡 {w}')

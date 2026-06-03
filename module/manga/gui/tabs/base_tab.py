@@ -58,13 +58,10 @@ class BaseTab(QWidget):
         self._plans: list[Any] | None = None
 
         # ── UI 装配 ───────────────────────────────────────────────────
-        self._root_picker = PathPicker(
-            self.root_label, self.root_placeholder,
-            history_key=f'{self.cmd_name}.root',
-        )
-        dir_box = QGroupBox('目录')
+        input_widget = self._create_input_widget()
+        dir_box = QGroupBox(self._input_box_title())
         dir_lay = QVBoxLayout(dir_box)
-        dir_lay.addWidget(self._root_picker)
+        dir_lay.addWidget(input_widget)
 
         self._scan_btn  = QPushButton('预览')
         self._scan_btn.setToolTip('预览 [Enter]')
@@ -106,6 +103,23 @@ class BaseTab(QWidget):
         self._load_settings()
 
     # ── 子类策略钩子 ───────────────────────────────────────────────────
+    def _input_box_title(self) -> str:
+        """「输入」组的标题；默认为「目录」，单文件 Tab 可覆盖为「输入」。"""
+        return '目录'
+
+    def _create_input_widget(self) -> QWidget:
+        """返回放入「输入」组的核心控件。
+
+        默认：根目录 :class:`~base.gui.path_picker.PathPicker`（赋给
+        :attr:`_root_picker`，供默认 :meth:`_validate_scan_target` 使用）。
+        子类可覆盖为多输入项列表等更复杂的控件。
+        """
+        self._root_picker = PathPicker(
+            self.root_label, self.root_placeholder,
+            history_key=f'{self.cmd_name}.root',
+        )
+        return self._root_picker
+
     def _build_options_box(self) -> QWidget | None:
         """返回放在「目录」组下方的选项组（``QGroupBox``）；无可返回 ``None``。"""
         return None
@@ -134,9 +148,34 @@ class BaseTab(QWidget):
             lambda val: cfg.set(f'{self.cmd_name}.jobs', val)
         )
 
-    def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        """返回 ``(plan_fn, args, kwargs)``，:class:`BaseTab` 据此在 worker 线程调用。"""
+    def _plan_call(self, target: Any) -> tuple[Callable[..., Any], tuple, dict]:
+        """返回 ``(plan_fn, args, kwargs)``，:class:`BaseTab` 据此在 worker 线程调用。
+
+        ``target`` 来自 :meth:`_validate_scan_target`（默认为根目录字符串）。
+        """
         raise NotImplementedError
+
+    def _validate_scan_target(self) -> Any | None:
+        """返回 :meth:`_plan_call` 所需输入；校验失败已 emit / 弹窗后返回 ``None``。
+
+        默认：从 :attr:`_root_picker` 取根目录并校验。子类可覆盖处理多输入项 /
+        交互式弹窗（如 std_title 的单文件作者推导）。
+        """
+        root = self._root_picker.path()
+        if not root:
+            QMessageBox.warning(self, '提示', '请先选择根目录')
+            return None
+        if not Path(root).is_dir():
+            QMessageBox.warning(self, '提示', f'不是有效目录:\n{root}')
+            return None
+        return root
+
+    def _format_banner_target(self, target: Any) -> object:
+        """把 :meth:`_validate_scan_target` 的返回值格式化为 banner 显示对象。
+
+        默认透传（根目录字符串）。子类可覆盖（如 ``f'单文件模式（{n} 个）'``）。
+        """
+        return target
 
     def _apply_fn(self) -> Callable[[list, bool], int]:
         """返回 apply 函数（签名 ``(plans, dry_run) -> fail``）。"""
@@ -162,12 +201,8 @@ class BaseTab(QWidget):
 
     # ── 通用回调 ───────────────────────────────────────────────────────
     def _on_scan(self) -> None:
-        root = self._root_picker.path()
-        if not root:
-            QMessageBox.warning(self, '提示', '请先选择根目录')
-            return
-        if not Path(root).is_dir():
-            QMessageBox.warning(self, '提示', f'不是有效目录:\n{root}')
+        target = self._validate_scan_target()
+        if target is None:
             return
 
         set_output(self._sink)
@@ -176,9 +211,10 @@ class BaseTab(QWidget):
         self._status.setText('扫描中...')
 
         print_run_banner(
-            self.cmd_name, self._banner_subtitle(), root, mode_apply=False,
+            self.cmd_name, self._banner_subtitle(),
+            self._format_banner_target(target), mode_apply=False,
         )
-        fn, args, kwargs = self._plan_call(root)
+        fn, args, kwargs = self._plan_call(target)
         self._run(
             fn, *args, **kwargs,
             on_finished=self._on_planned,

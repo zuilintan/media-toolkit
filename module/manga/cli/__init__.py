@@ -74,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
             '常用模式:\n'
             '  manga-cli std-title --root <dir>         # 批量预览\n'
             '  manga-cli std-title --root <dir> --apply # 批量执行\n'
+            '  manga-cli std-title --file <path>        # 单文件预览（可重复 --file）\n'
             '  manga-cli std-title --examples           # 内置解析示例\n'
         ),
     )

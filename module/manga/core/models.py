@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 
 _XML_ENCODING_RE = re.compile(rb'<\?xml[^?]*?encoding=[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
@@ -122,16 +123,29 @@ class MangaInfo:
 
 @dataclass
 class StdTitlePlan:
-    """单个源文件（``.zip`` / ``.cbz``）的标题标准化重命名计划。"""
-    author_dir: str
-    author:     str
-    old_name:   str
-    new_name:   str
-    info:       MangaInfo | None
+    """单个源文件（``.zip`` / ``.cbz``）的标题标准化重命名计划。
+
+    :ivar src_path:       源文件完整路径（apply 阶段 rename 的源端）。
+    :ivar author_dir:     **目标**作者目录完整路径；apply 时必要时创建。
+        批量模式下与 ``src_path`` 父目录一致；单文件模式下当 ``[]`` 抽取的作者
+        与父目录不一致时，会指向父目录下新建的 ``{author}/`` 子目录。
+    :ivar publisher_file: 发版商标识文件完整路径（``[社团]：XX.txt``），仅在
+        ``[社团 (作者)]`` 形态被采纳时非 ``None``；apply 阶段幂等落盘。
+    """
+    src_path:       str
+    author_dir:     str
+    author:         str
+    old_name:       str
+    new_name:       str
+    info:           MangaInfo | None
+    publisher_file: str | None = None
 
     @property
     def changed(self) -> bool:
-        return self.old_name != self.new_name
+        return (
+            self.old_name != self.new_name
+            or Path(self.src_path).parent != Path(self.author_dir)
+        )
 
     @property
     def needs_review(self) -> bool:
