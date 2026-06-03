@@ -11,12 +11,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QButtonGroup, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton,
     QRadioButton, QVBoxLayout, QWidget,
 )
+
+from base.gui.palette import PRIMARY
 
 from module.manga.core.config import FILE_EXTS
 from module.manga.workflow.std_title import (
@@ -153,6 +155,7 @@ class InputListWidget(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._inputs: list[StdTitleInput] = []
+        self.setAcceptDrops(True)
 
         self._list = QListWidget()
         self._list.setSelectionMode(QListWidget.ExtendedSelection)
@@ -206,29 +209,53 @@ class InputListWidget(QWidget):
         d = QFileDialog.getExistingDirectory(self, '添加目录', '')
         if not d:
             return
-        root = Path(d)
-        # 智能判断：根目录下直接含 zip/cbz → 作者目录模式；否则按库根模式
-        direct = [p for p in root.iterdir()
-                  if p.is_file() and p.suffix.lower() in FILE_EXTS]
-        if direct:
-            # 作者目录模式：root 自己是作者目录，名字即作者
-            self._add_paths(sorted(direct))
-        else:
-            # 库根模式：root 下子目录视为作者目录
-            paths: list[Path] = []
-            for sub in sorted(root.iterdir()):
-                if not sub.is_dir():
-                    continue
-                paths.extend(
-                    p for p in sorted(sub.iterdir())
-                    if p.is_file() and p.suffix.lower() in FILE_EXTS
-                )
-            if not paths:
-                QMessageBox.information(
-                    self, '提示', f'目录内未找到 .zip / .cbz 文件:\n{root}'
-                )
-                return
-            self._add_paths(paths)
+        self._add_dirs_smart([Path(d)])
+
+    def _add_dirs_smart(self, dirs: list[Path]) -> None:
+        """对每个目录智能展开：直接含 ``.zip/.cbz`` → 作者目录；否则视为库根。
+
+        与原 ``_add_dir`` 行为一致，抽出供拖放复用。
+        """
+        paths: list[Path] = []
+        for root in dirs:
+            direct = [p for p in root.iterdir()
+                      if p.is_file() and p.suffix.lower() in FILE_EXTS]
+            if direct:
+                paths.extend(sorted(direct))
+            else:
+                for sub in sorted(root.iterdir()):
+                    if not sub.is_dir():
+                        continue
+                    paths.extend(
+                        p for p in sorted(sub.iterdir())
+                        if p.is_file() and p.suffix.lower() in FILE_EXTS
+                    )
+        if not paths:
+            QMessageBox.information(
+                self, '提示',
+                '目录内未找到 .zip / .cbz 文件',
+            )
+            return
+        self._add_paths(paths)
+
+    def _add_dirs_as_files(self, dirs: list[Path]) -> None:
+        """把每个目录视为「文件容器」：仅取其直接子项中的 ``.zip/.cbz``。
+
+        不向下钻；仅一层。供拖放时用户选「文件」分支调用。
+        """
+        paths: list[Path] = []
+        for root in dirs:
+            paths.extend(sorted(
+                p for p in root.iterdir()
+                if p.is_file() and p.suffix.lower() in FILE_EXTS
+            ))
+        if not paths:
+            QMessageBox.information(
+                self, '提示',
+                '所选目录内未找到 .zip / .cbz 文件',
+            )
+            return
+        self._add_paths(paths)
 
     def _add_paths(self, paths: list[Path]) -> None:
         """对每个路径运行作者推导，弹窗解决冲突 / 缺失，加入列表。
@@ -262,6 +289,91 @@ class InputListWidget(QWidget):
         item = QListWidgetItem(label)
         item.setToolTip(inp.src_path)
         self._list.addItem(item)
+
+    # ── 拖放 ──────────────────────────────────────────────────────────
+    def _collect_drop_paths(self, e: QDropEvent | QDragEnterEvent) -> list[Path]:
+        if not e.mimeData().hasUrls():
+            return []
+        paths: list[Path] = []
+        for url in e.mimeData().urls():
+            if url.isLocalFile():
+                p = Path(url.toLocalFile())
+                if p.exists():
+                    paths.append(p)
+        return paths
+
+    def dragEnterEvent(self, e: QDragEnterEvent) -> None:   # noqa: N802 — Qt API 命名
+        paths = self._collect_drop_paths(e)
+        if not paths:
+            e.ignore()
+            return
+        # 至少一项是目录、或是受支持的文件即接受
+        usable = any(
+            p.is_dir() or (p.is_file() and p.suffix.lower() in FILE_EXTS)
+            for p in paths
+        )
+        if not usable:
+            e.ignore()
+            return
+        self._list.setStyleSheet(f'QListWidget {{ border: 2px solid {PRIMARY}; }}')
+        e.acceptProposedAction()
+
+    def dragLeaveEvent(self, e: QDragLeaveEvent) -> None:   # noqa: N802 — Qt API 命名
+        self._list.setStyleSheet('')
+        e.accept()
+
+    def dropEvent(self, e: QDropEvent) -> None:   # noqa: N802 — Qt API 命名
+        self._list.setStyleSheet('')
+        paths = self._collect_drop_paths(e)
+        if not paths:
+            e.ignore()
+            return
+        files = [p for p in paths
+                 if p.is_file() and p.suffix.lower() in FILE_EXTS]
+        dirs  = [p for p in paths if p.is_dir()]
+
+        # 文件直接加（无歧义）
+        if files:
+            self._add_paths(files)
+
+        if dirs:
+            mode = self._ask_folder_mode(dirs)
+            if mode == 'files':
+                self._add_dirs_as_files(dirs)
+            elif mode == 'dirs':
+                self._add_dirs_smart(dirs)
+            # mode is None → 用户取消
+
+        e.acceptProposedAction()
+
+    def _ask_folder_mode(self, dirs: list[Path]) -> str | None:
+        """文件夹拖入时弹窗让用户选择处理方式。
+
+        :return: ``'files'`` / ``'dirs'`` / ``None`` (取消)
+        """
+        names = '、'.join(d.name for d in dirs[:3])
+        if len(dirs) > 3:
+            names += f' 等 {len(dirs)} 项'
+        box = QMessageBox(self)
+        box.setWindowTitle('文件夹拖入')
+        box.setIcon(QMessageBox.Question)
+        box.setText(f'已拖入文件夹：{names}')
+        box.setInformativeText(
+            '请选择视作：\n'
+            '  • 文件 — 取其直接子项中的 .zip / .cbz（不递归）\n'
+            '  • 目录 — 作为「作者目录」或「库根」智能扫描'
+        )
+        btn_files = box.addButton('文件', QMessageBox.AcceptRole)
+        btn_dirs  = box.addButton('目录', QMessageBox.AcceptRole)
+        btn_cancel = box.addButton('取消', QMessageBox.RejectRole)
+        box.setDefaultButton(btn_dirs)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is btn_files:
+            return 'files'
+        if clicked is btn_dirs:
+            return 'dirs'
+        return None
 
     def _remove_selected(self) -> None:
         rows = sorted(

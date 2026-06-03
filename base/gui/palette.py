@@ -179,6 +179,31 @@ QGroupBox::title {{
 QLabel[muted="true"] {{ color: {TEXT_MUTED}; }}
 
 QCheckBox, QRadioButton {{ spacing: 6px; }}
+QCheckBox::indicator, QRadioButton::indicator {{
+    width: 14px; height: 14px;
+    background: {BG_RAISED};
+    border: 1px solid {BORDER_STRONG};
+}}
+QRadioButton::indicator {{ border-radius: 8px; }}
+QCheckBox::indicator    {{ border-radius: 3px; }}
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+    border-color: {PRIMARY};
+}}
+QRadioButton::indicator:checked {{
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
+        fx:0.5, fy:0.5,
+        stop:0 {PRIMARY}, stop:0.45 {PRIMARY},
+        stop:0.55 {BG_RAISED}, stop:1 {BG_RAISED});
+    border-color: {PRIMARY};
+}}
+QCheckBox::indicator:checked {{
+    background: {PRIMARY};
+    border-color: {PRIMARY};
+}}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{
+    border-color: {BORDER};
+    background: {BG};
+}}
 
 QSplitter::handle:vertical   {{ background: {BORDER}; height: 1px; }}
 QSplitter::handle:horizontal {{ background: {BORDER}; width: 1px; }}
