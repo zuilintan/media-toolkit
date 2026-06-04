@@ -1,10 +1,11 @@
 """std_title GUI 的「输入列表」控件与作者选择对话框。
 
 :class:`InputListWidget` 替代 :class:`~base.gui.path_picker.PathPicker`，支持
-按文件 / 目录两种方式增量添加，每行记录 :class:`~module.manga.workflow.std_title.StdTitleInput`。
+按「漫画文件 / 漫画作者文件夹」两种语义增量添加。
 
-:class:`AuthorChoiceDialog` 在作者推导冲突 / 缺失时弹出，列出候选项 + 手填项，
-返回 ``(author, publisher)``。
+:class:`AuthorChoiceDialog`：单文件场景，作者推导冲突 / 缺失时弹出。
+:class:`BatchAuthorChoiceDialog`：拖入文件夹且视作「漫画文件」时弹一次，
+所有文件按所选策略统一处理（自动 [] 推导 / 统一用文件夹名 / 统一手填）。
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from module.manga.workflow.std_title import (
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 作者选择对话框（冲突 / 缺失场景）
+# 单文件作者选择对话框（冲突 / 缺失场景）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class AuthorChoiceDialog(QDialog):
@@ -139,15 +140,97 @@ def resolve_author_via_dialog(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 批量作者策略对话框（漫画文件 / 拖入文件夹场景）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+#: 策略标识：``'bracket'`` 自动从 ``[]`` 抽取 / ``'parent'`` 父目录名 / ``'manual'`` 手填
+BatchStrategy = tuple[str, str]   # (kind, manual_author)
+
+
+class BatchAuthorChoiceDialog(QDialog):
+    """批量作者策略选择：让用户一次性决定一批文件的作者来源。
+
+    三种策略:
+
+    - ``bracket`` 自动从文件名 ``[作者]`` / ``[社团 (作者)]`` 抽取（无 ``[]`` 跳过）
+    - ``parent``  统一使用文件夹名作为作者（多文件夹时各文件用其父目录名）
+    - ``manual``  统一使用手填的同一作者名
+
+    返回 :data:`BatchStrategy`；用户取消返回 ``None``。
+    """
+
+    def __init__(
+        self, n_files: int, folder_label: str = '', parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle('批量作者来源')
+        self.setModal(True)
+        self._result: BatchStrategy | None = None
+
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel(f'共 {n_files} 个漫画文件，请选择作者来源：'))
+
+        self._rb_bracket = QRadioButton(
+            '自动推导（从文件名 [作者] / [社团 (作者)] 抽取；无 [] 的文件跳过）'
+        )
+        parent_label = (f'统一使用文件夹名: {folder_label}' if folder_label
+                        else '统一使用各文件父目录名')
+        self._rb_parent  = QRadioButton(parent_label)
+        self._rb_manual  = QRadioButton('统一手动输入:')
+
+        self._manual_edit = QLineEdit()
+        self._manual_edit.setPlaceholderText('作者名')
+        self._manual_edit.textEdited.connect(
+            lambda *_: self._rb_manual.setChecked(True)
+        )
+
+        self._group = QButtonGroup(self)
+        for rb in (self._rb_bracket, self._rb_parent, self._rb_manual):
+            self._group.addButton(rb)
+            lay.addWidget(rb)
+        lay.addWidget(self._manual_edit)
+        self._rb_bracket.setChecked(True)
+
+        bb = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        bb.accepted.connect(self._on_accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def _on_accept(self) -> None:
+        if self._rb_bracket.isChecked():
+            self._result = ('bracket', '')
+        elif self._rb_parent.isChecked():
+            self._result = ('parent', '')
+        else:
+            text = self._manual_edit.text().strip()
+            if not text:
+                QMessageBox.warning(self, '提示', '请填写作者名')
+                return
+            self._result = ('manual', text)
+        self.accept()
+
+    def result_strategy(self) -> BatchStrategy | None:
+        return self._result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 输入列表控件
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class InputListWidget(QWidget):
-    """已添加的 :class:`StdTitleInput` 列表，支持文件 / 目录两种增量添加方式。
+    """已添加的 :class:`StdTitleInput` 列表。
 
-    «添加» 按钮含菜单（``添加文件… / 添加目录…``）；目录模式按现有「库根 →
-    作者子目录」结构展开。每个文件添加时自动调用 :func:`resolve_author_via_dialog`，
-    冲突 / 缺失会弹窗交互。
+    «添加…» 按钮含菜单（``添加漫画文件… / 添加漫画作者文件夹…``）：
+
+    - **添加漫画文件**：多选 ``.zip/.cbz`` 文件，逐文件自动 derive，
+      冲突 / 缺失时弹 :class:`AuthorChoiceDialog`
+    - **添加漫画作者文件夹**：选目录，目录名即作者，下层 ``.zip/.cbz`` 全录入，不弹窗
+
+    支持拖放：纯文件按「漫画文件」语义；含文件夹时弹窗让用户选「漫画作者文件夹」
+    或「漫画文件」，前者每个文件夹按其名作为作者直接展开，后者弹一次
+    :class:`BatchAuthorChoiceDialog` 批量套用策略。
     """
 
     inputs_changed = Signal()   # 列表项变更时发出，供外部更新按钮态
@@ -163,10 +246,10 @@ class InputListWidget(QWidget):
         # 添加按钮 + 二级菜单
         self._add_btn  = QPushButton('添加…')
         self._add_menu = QMenu(self._add_btn)
-        act_file = QAction('添加文件…', self)
-        act_dir  = QAction('添加目录…', self)
-        act_file.triggered.connect(self._add_files)
-        act_dir.triggered.connect(self._add_dir)
+        act_file = QAction('添加漫画文件…', self)
+        act_dir  = QAction('添加漫画作者文件夹…', self)
+        act_file.triggered.connect(self._add_manga_files)
+        act_dir.triggered.connect(self._add_author_folder)
         self._add_menu.addAction(act_file)
         self._add_menu.addAction(act_dir)
         self._add_btn.setMenu(self._add_menu)
@@ -197,71 +280,112 @@ class InputListWidget(QWidget):
         self.inputs_changed.emit()
 
     # ── 添加流程 ──────────────────────────────────────────────────────
-    def _add_files(self) -> None:
+    def _add_manga_files(self) -> None:
+        """add menu「添加漫画文件…」：多选文件，逐文件 derive + 弹窗。"""
         files, _ = QFileDialog.getOpenFileNames(
-            self, '添加文件', '',
+            self, '添加漫画文件', '',
             'ZIP/CBZ (*.zip *.cbz);;所有文件 (*)',
         )
         if files:
-            self._add_paths([Path(f) for f in files])
+            self._add_paths_per_file([Path(f) for f in files])
 
-    def _add_dir(self) -> None:
-        d = QFileDialog.getExistingDirectory(self, '添加目录', '')
+    def _add_author_folder(self) -> None:
+        """add menu「添加漫画作者文件夹…」：目录名即作者，下层文件全录入。"""
+        d = QFileDialog.getExistingDirectory(self, '添加漫画作者文件夹', '')
         if not d:
             return
-        self._add_dirs_smart([Path(d)])
+        self._add_author_folders([Path(d)])
 
-    def _add_dirs_smart(self, dirs: list[Path]) -> None:
-        """对每个目录智能展开：直接含 ``.zip/.cbz`` → 作者目录；否则视为库根。
+    # ── 漫画作者文件夹批量录入（不弹窗） ─────────────────────────────
+    def _add_author_folders(self, dirs: list[Path]) -> None:
+        """每个目录的 ``name`` 作为作者，下层 ``.zip/.cbz`` 直接录入。
 
-        与原 ``_add_dir`` 行为一致，抽出供拖放复用。
+        publisher 仍按文件名 ``[社团 (作者)]`` 抽取（社团信息不丢失）。
         """
-        paths: list[Path] = []
+        added = 0
+        empty_dirs: list[str] = []
         for root in dirs:
-            direct = [p for p in root.iterdir()
-                      if p.is_file() and p.suffix.lower() in FILE_EXTS]
-            if direct:
-                paths.extend(sorted(direct))
-            else:
-                for sub in sorted(root.iterdir()):
-                    if not sub.is_dir():
-                        continue
-                    paths.extend(
-                        p for p in sorted(sub.iterdir())
-                        if p.is_file() and p.suffix.lower() in FILE_EXTS
-                    )
-        if not paths:
-            QMessageBox.information(
-                self, '提示',
-                '目录内未找到 .zip / .cbz 文件',
-            )
-            return
-        self._add_paths(paths)
-
-    def _add_dirs_as_files(self, dirs: list[Path]) -> None:
-        """把每个目录视为「文件容器」：仅取其直接子项中的 ``.zip/.cbz``。
-
-        不向下钻；仅一层。供拖放时用户选「文件」分支调用。
-        """
-        paths: list[Path] = []
-        for root in dirs:
-            paths.extend(sorted(
+            author = root.name
+            files  = sorted(
                 p for p in root.iterdir()
                 if p.is_file() and p.suffix.lower() in FILE_EXTS
-            ))
-        if not paths:
+            )
+            if not files:
+                empty_dirs.append(root.name)
+                continue
+            for f in files:
+                deriv = derive_author(str(f))
+                inp   = build_input(str(f), author, deriv.bracket_publisher)
+                self._inputs.append(inp)
+                self._append_list_item(inp)
+                added += 1
+        if added:
+            self.inputs_changed.emit()
+        if empty_dirs:
             QMessageBox.information(
                 self, '提示',
-                '所选目录内未找到 .zip / .cbz 文件',
+                '以下文件夹内未找到 .zip / .cbz 文件：\n  '
+                + '\n  '.join(empty_dirs),
+            )
+
+    # ── 漫画文件批量录入（弹一次策略窗，套用所有文件） ───────────────
+    def _add_files_in_folders_batch(self, dirs: list[Path]) -> None:
+        files: list[Path] = []
+        for d in dirs:
+            files.extend(sorted(
+                p for p in d.iterdir()
+                if p.is_file() and p.suffix.lower() in FILE_EXTS
+            ))
+        if not files:
+            QMessageBox.information(
+                self, '提示', '所选文件夹内未找到 .zip / .cbz 文件',
             )
             return
-        self._add_paths(paths)
 
-    def _add_paths(self, paths: list[Path]) -> None:
-        """对每个路径运行作者推导，弹窗解决冲突 / 缺失，加入列表。
+        folder_label = dirs[0].name if len(dirs) == 1 else ''
+        dlg = BatchAuthorChoiceDialog(len(files), folder_label, parent=self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        strategy = dlg.result_strategy()
+        if strategy is None:
+            return
+        self._apply_batch_strategy(files, strategy)
 
-        用户在弹窗中取消 → 跳过该项（其它继续）。
-        """
+    def _apply_batch_strategy(
+        self, files: list[Path], strategy: BatchStrategy,
+    ) -> None:
+        kind, manual = strategy
+        added = skipped = 0
+        for f in files:
+            deriv = derive_author(str(f))
+            if kind == 'bracket':
+                if not deriv.bracket_author:
+                    skipped += 1
+                    continue
+                author, publisher = deriv.bracket_author, deriv.bracket_publisher
+            elif kind == 'parent':
+                if not deriv.parent_author:
+                    skipped += 1
+                    continue
+                author    = deriv.parent_author
+                publisher = deriv.bracket_publisher   # 仍允许抽社团
+            else:  # manual
+                author    = manual
+                publisher = deriv.bracket_publisher
+            inp = build_input(str(f), author, publisher)
+            self._inputs.append(inp)
+            self._append_list_item(inp)
+            added += 1
+        if added:
+            self.inputs_changed.emit()
+        if skipped:
+            QMessageBox.information(
+                self, '部分跳过',
+                f'已跳过 {skipped} 个文件（按所选策略无法推导作者）',
+            )
+
+    # ── 逐文件 derive + 弹窗（add menu 选文件 + 拖入纯文件） ─────────
+    def _add_paths_per_file(self, paths: list[Path]) -> None:
         added = 0
         for p in paths:
             if p.suffix.lower() not in FILE_EXTS:
@@ -307,7 +431,6 @@ class InputListWidget(QWidget):
         if not paths:
             e.ignore()
             return
-        # 至少一项是目录、或是受支持的文件即接受
         usable = any(
             p.is_dir() or (p.is_file() and p.suffix.lower() in FILE_EXTS)
             for p in paths
@@ -332,16 +455,16 @@ class InputListWidget(QWidget):
                  if p.is_file() and p.suffix.lower() in FILE_EXTS]
         dirs  = [p for p in paths if p.is_dir()]
 
-        # 文件直接加（无歧义）
+        # 文件按「漫画文件」逐项处理（与 add menu 一致）
         if files:
-            self._add_paths(files)
+            self._add_paths_per_file(files)
 
         if dirs:
             mode = self._ask_folder_mode(dirs)
-            if mode == 'files':
-                self._add_dirs_as_files(dirs)
-            elif mode == 'dirs':
-                self._add_dirs_smart(dirs)
+            if mode == 'author_folder':
+                self._add_author_folders(dirs)
+            elif mode == 'files':
+                self._add_files_in_folders_batch(dirs)
             # mode is None → 用户取消
 
         e.acceptProposedAction()
@@ -349,7 +472,7 @@ class InputListWidget(QWidget):
     def _ask_folder_mode(self, dirs: list[Path]) -> str | None:
         """文件夹拖入时弹窗让用户选择处理方式。
 
-        :return: ``'files'`` / ``'dirs'`` / ``None`` (取消)
+        :return: ``'author_folder'`` / ``'files'`` / ``None`` (取消)
         """
         names = '、'.join(d.name for d in dirs[:3])
         if len(dirs) > 3:
@@ -360,19 +483,19 @@ class InputListWidget(QWidget):
         box.setText(f'已拖入文件夹：{names}')
         box.setInformativeText(
             '请选择视作：\n'
-            '  • 文件 — 取其直接子项中的 .zip / .cbz（不递归）\n'
-            '  • 目录 — 作为「作者目录」或「库根」智能扫描'
+            '  • 漫画作者文件夹 — 文件夹名即作者，下层 .zip / .cbz 直接录入\n'
+            '  • 漫画文件 — 把下层 .zip / .cbz 视为独立文件，弹窗一次选作者来源'
         )
-        btn_files = box.addButton('文件', QMessageBox.AcceptRole)
-        btn_dirs  = box.addButton('目录', QMessageBox.AcceptRole)
-        btn_cancel = box.addButton('取消', QMessageBox.RejectRole)
-        box.setDefaultButton(btn_dirs)
+        btn_author = box.addButton('漫画作者文件夹', QMessageBox.AcceptRole)
+        btn_files  = box.addButton('漫画文件',       QMessageBox.AcceptRole)
+        box.addButton('取消', QMessageBox.RejectRole)
+        box.setDefaultButton(btn_author)
         box.exec()
         clicked = box.clickedButton()
+        if clicked is btn_author:
+            return 'author_folder'
         if clicked is btn_files:
             return 'files'
-        if clicked is btn_dirs:
-            return 'dirs'
         return None
 
     def _remove_selected(self) -> None:
