@@ -173,6 +173,10 @@ QGroupBox::title {{
     margin-left: 8px;
     color: {TEXT_MUTED};
     font-weight: 600;
+    /* 与 GroupBox 实际背景（继承自父 QWidget 的 BG）同色，让 title 文字遮住
+       下方边框线又无色差。BG_RAISED 是 pane 自身的色，但子 GroupBox 仍以 BG
+       作底，用 BG_RAISED 会反而显得突兀。 */
+    background: {BG};
 }}
 
 /* 次要文本 label：setProperty('muted', True) */
@@ -227,5 +231,11 @@ QToolTip {{
     color: {TOOLTIP_FG};
     border: 1px solid {BORDER};
     padding: 4px 8px;
+}}
+
+/* IDE 风格底部状态栏 —— MangaModule 等模块底栏（objectName=StatusBar） */
+QWidget#StatusBar {{
+    background: {BG_SUBTLE};
+    border-top: 1px solid {BORDER};
 }}
 """

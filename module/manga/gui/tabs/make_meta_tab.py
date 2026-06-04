@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from base.console import emit, set_output
+from base.gui import BUTTON_COL_WIDTH
 from base.gui.path_list import PathListWidget
 from module.manga.core.models import MakeMetaPlan
 from module.manga.gui.tabs.base_tab import BaseTab
@@ -80,13 +81,20 @@ class MakeMetaTab(BaseTab):
         self._tree.plan_apply_requested.connect(self._apply_single)
         self._search.textChanged.connect(self._tree.apply_filter)
 
-        panel = QWidget(self)
-        panel_lay = QVBoxLayout(panel)
-        panel_lay.setContentsMargins(0, 0, 0, 0)
+        # 过滤 + 树视图包入「预览」框，与输入框 / 选项框 / 状态框视觉一致
+        panel_box = QGroupBox('预览', self)
+        panel_lay = QVBoxLayout(panel_box)
         panel_lay.setSpacing(4)
         panel_lay.addWidget(self._search)
         panel_lay.addWidget(self._tree, 1)
-        root_lay.addWidget(panel, 1)
+        # 右侧空出与按钮列等宽的占位，使预览框右边界与上方各行对齐
+        panel_row = QHBoxLayout()
+        panel_row.setContentsMargins(0, 0, 0, 0)
+        panel_row.addWidget(panel_box, 1)
+        spacer = QWidget(self)
+        spacer.setFixedWidth(BUTTON_COL_WIDTH)
+        panel_row.addWidget(spacer)
+        root_lay.addLayout(panel_row, 1)
 
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()
@@ -214,12 +222,12 @@ class MakeMetaTab(BaseTab):
         if not self._plans:
             self._apply_btn.setEnabled(False)
             self._export_btn.setEnabled(False)
-            self._status.setText('扫描完成：所有项目已处理')
+            self._set_status('扫描完成：所有项目已处理')
             return
         n    = self._count_actionable(self._plans)
         cats = self._classify_plans(self._plans)
         parts = ' / '.join(f'{v} {k}' for k, v in cats.items() if v)
-        self._status.setText(f'剩余：{len(self._plans)} 项（{parts}）')
+        self._set_status(f'剩余：{len(self._plans)} 项（{parts}）')
         self._apply_btn.setEnabled(n > 0)
 
     def _on_busy(self, busy: bool) -> None:
@@ -248,4 +256,4 @@ class MakeMetaTab(BaseTab):
         except Exception as e:  # noqa: BLE001 — UI 层兜底
             QMessageBox.warning(self, '导出失败', str(e))
             return
-        self._status.setText(f'已导出预览到 {out}')
+        self._set_status(f'已导出预览到 {out}')

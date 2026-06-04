@@ -21,7 +21,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QListWidget, QListWidgetItem, QMenu,
+    QFileDialog, QListWidget, QListWidgetItem, QMenu,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -62,6 +62,9 @@ class PathListWidget(QWidget):
 
         self._list = QListWidget()
         self._list.setSelectionMode(QListWidget.ExtendedSelection)
+        # 默认 sizeHint 约 256 px，对横排上下叠加的 GUI 偏高；锁个上限让输入区
+        # 紧凑——长列表仍可滚动浏览
+        self._list.setMaximumHeight(128)
 
         # 「添加」按钮:文件 + 目录都启用 → 二级菜单;仅一个 → 按钮直点
         accepts_file = self._exts is None or len(self._exts) > 0
@@ -90,16 +93,15 @@ class PathListWidget(QWidget):
         self._remove_btn.clicked.connect(self._remove_selected)
         self._clear_btn.clicked.connect(self.clear)
 
-        btn_lay = QHBoxLayout()
-        btn_lay.addWidget(self._add_btn)
-        btn_lay.addWidget(self._remove_btn)
-        btn_lay.addWidget(self._clear_btn)
-        btn_lay.addStretch(1)
-
+        # 按钮交由外部（base_tab）摆放到输入区右侧；本控件内部只剩列表
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addLayout(btn_lay)
         lay.addWidget(self._list, 1)
+
+    def action_buttons(self) -> list[QPushButton]:
+        """供外部（:class:`~module.manga.gui.tabs.base_tab.BaseTab`）取走按钮，
+        统一摆到输入区右侧的纵向按钮列。"""
+        return [self._add_btn, self._remove_btn, self._clear_btn]
 
     # ── 公共 API ──────────────────────────────────────────────────────
     def paths(self) -> list[Path]:

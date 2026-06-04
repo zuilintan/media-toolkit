@@ -83,7 +83,7 @@ class StdTitleTab(BaseTab):
         if not self._input_list.inputs():
             self._plans = None
             self._apply_btn.setEnabled(False)
-            self._status.setText('待扫描')
+            self._set_status('待扫描')
 
     def _on_applied(self, fail: int) -> None:
         # apply 后所有列表项的 src_path 都已失效（文件被移走 / 改名），

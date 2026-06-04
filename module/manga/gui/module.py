@@ -3,15 +3,19 @@
 布局::
 
     MangaModule (QWidget)
-    └── QSplitter (Vertical)
-        ├── QTabWidget       — 打包 / 命名 / 封面 / 元数据 四个子 Tab
-        └── log_panel        — QStackedWidget：每子 Tab 各有一个 LogView
+    └── QVBoxLayout
+        ├── QSplitter (Vertical)
+        │   ├── QTabWidget       — 打包 / 命名 / 封面 / 元数据 四个子 Tab
+        │   └── log_panel        — QStackedWidget + 日志按钮列
+        └── status_bar           — IDE 风格底栏（左侧主状态 + 预留可扩展位）
 
 注意:
 
 - 窗口标题 / 几何由 ``Shell`` 持有；本模块只管 splitter 状态持久化
 - 业务快捷键（Enter / Ctrl+Enter / Ctrl+L）用 ``WidgetWithChildrenShortcut`` 上下文，
   避免多模块共存时跨模块触发
+- 各 Tab 的状态文本走 :attr:`BaseTab.status_changed` 推到底栏，切 Tab 时同步当前
+  Tab 的最近状态
 """
 
 from __future__ import annotations
@@ -19,10 +23,11 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QFileDialog, QHBoxLayout, QLineEdit, QPushButton,
+    QAbstractSpinBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QSplitter, QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from base.gui import make_btn_col
 from base.gui.config import get_config
 from base.gui.log_view import LogView
 from module.manga.gui.tabs.make_cover_tab import MakeCoverTab
@@ -47,6 +52,9 @@ class MangaModule(QWidget):
         self._tab_list = [tab0, tab1, tab2, tab3]
         for tab in self._tab_list:
             tab.busy_changed.connect(self._on_tab_busy)
+            tab.status_changed.connect(
+                lambda text, t=tab: self._on_tab_status(t, text)
+            )
 
         self._tabs = QTabWidget()
         self._tabs.addTab(tab0, '1. 打包')
@@ -63,6 +71,7 @@ class MangaModule(QWidget):
             self._logs.append(log)
 
         self._tabs.currentChanged.connect(self._log_stack.setCurrentIndex)
+        self._tabs.currentChanged.connect(self._sync_status_to_current)
 
         export_btn = QPushButton('导出日志')
         export_btn.setToolTip('将当前日志保存为 .txt')
@@ -71,16 +80,14 @@ class MangaModule(QWidget):
         clear_btn.setToolTip('清空日志 [Ctrl+L]')
         clear_btn.clicked.connect(self._clear_current_log)
 
-        log_btn_col = QVBoxLayout()
-        log_btn_col.addWidget(export_btn)
-        log_btn_col.addWidget(clear_btn)
-        log_btn_col.addStretch(1)
+        # LogView 没 GroupBox 包裹，按钮列顶部不留 GroupBox 偏移
+        log_btn_wrap = make_btn_col([export_btn, clear_btn], top_margin=0)
 
         log_panel = QWidget()
         lh = QHBoxLayout(log_panel)
         lh.setContentsMargins(0, 0, 0, 0)
         lh.addWidget(self._log_stack, 1)
-        lh.addLayout(log_btn_col)
+        lh.addWidget(log_btn_wrap)
 
         self._splitter = QSplitter(Qt.Vertical)
         self._splitter.addWidget(self._tabs)
@@ -89,9 +96,23 @@ class MangaModule(QWidget):
         self._splitter.setStretchFactor(1, 1)
         self._splitter.setSizes([280, 520])
 
+        # ── 底部状态栏（IDE 风格）─────────────────────────────────────
+        # 左侧主状态文本；右侧用 stretch 撑住，后续可在右边 addWidget 追加
+        # 更多字段（进度、模式、cwd 等）
+        self._status_label = QLabel(self._tab_list[0].status_text())
+        self._status_label.setProperty('muted', True)
+        status_bar = QWidget()
+        status_bar.setObjectName('StatusBar')
+        sb_lay = QHBoxLayout(status_bar)
+        sb_lay.setContentsMargins(10, 3, 10, 3)
+        sb_lay.addWidget(self._status_label)
+        sb_lay.addStretch(1)
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(self._splitter)
+        outer.setSpacing(0)
+        outer.addWidget(self._splitter, 1)
+        outer.addWidget(status_bar)
 
         self._restore_splitter()
         self._install_shortcuts()
@@ -105,6 +126,16 @@ class MangaModule(QWidget):
     def _on_tab_busy(self, busy: bool) -> None:
         self._busy_count += 1 if busy else -1
         self.busy_changed.emit(self._busy_count > 0)
+
+    def _on_tab_status(self, tab, text: str) -> None:
+        """仅当 ``tab`` 是当前选中 Tab 时把文本推到底栏——避免后台 Tab 的状态
+        在用户切到别的 Tab 后还覆盖底栏。"""
+        if self._tab_list[self._tabs.currentIndex()] is tab:
+            self._status_label.setText(text)
+
+    def _sync_status_to_current(self, idx: int) -> None:
+        """切 Tab 后把底栏文本同步成新当前 Tab 的最近状态。"""
+        self._status_label.setText(self._tab_list[idx].status_text())
 
     def _clear_current_log(self) -> None:
         self._logs[self._tabs.currentIndex()].clear_log()

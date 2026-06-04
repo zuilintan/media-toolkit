@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from base.gui import BUTTON_COL_WIDTH, make_btn_col
 from base.gui.config import get_config
 from base.gui.path_picker import PathPicker
 from base.gui.qt_sink import QtSink
@@ -40,7 +41,8 @@ def _run_apply(apply_fn: Callable[..., int], plans: list, **kwargs) -> int:
 class BaseTab(QWidget):
     """子命令 Tab 通用基类（UI 骨架 + 任务调度 + 状态机）。"""
 
-    busy_changed = Signal(bool)
+    busy_changed   = Signal(bool)
+    status_changed = Signal(str)   # 推到 MangaModule 底部状态栏
 
     # ── 子类必须覆盖的类常量 ───────────────────────────────────────────
     cmd_name:        str = ''          # QSettings key 前缀（snake_case 标识符）
@@ -79,35 +81,52 @@ class BaseTab(QWidget):
         self._cancel_btn.setVisible(False)
         self._cancel_btn.clicked.connect(self._on_cancel)
 
-        # 动作按钮放到输入区右侧的纵向列：让出更多横向空间给列表本身
-        btn_col = QVBoxLayout()
-        btn_col.addWidget(self._scan_btn)
-        btn_col.addWidget(self._apply_btn)
-        btn_col.addWidget(self._cancel_btn)
-        for b in self._extra_action_buttons():
-            btn_col.addWidget(b)
-        btn_col.addStretch(1)
-
+        # 输入按钮列：输入控件暴露的「添加 / 移除选中 / 清空」，摆到输入框右侧
+        input_btn_col = make_btn_col(
+            getattr(input_widget, 'action_buttons', lambda: [])()
+        )
         input_row = QHBoxLayout()
         input_row.addWidget(dir_box, 1)
-        input_row.addLayout(btn_col)
+        input_row.addWidget(input_btn_col)
 
+        # 动作按钮列：预览 / 执行 / 取消 (+ 子类扩展)，摆到选项框右侧
+        action_btns = [self._scan_btn, self._apply_btn, self._cancel_btn]
+        action_btns.extend(self._extra_action_buttons())
+        action_btn_col = make_btn_col(action_btns)
+
+        # 状态文本本地存储；不入布局——由 status_changed signal 推到
+        # MangaModule 底部状态栏统一展示
         self._status = QLabel('待扫描')
-        self._status.setProperty('muted', True)
 
         root_lay = QVBoxLayout(self)
         root_lay.setContentsMargins(10, 10, 10, 10)
         root_lay.setSpacing(8)
         root_lay.addLayout(input_row)
-        # 子类的选项组（jobs / smart / quality 等）
+        # 子类的选项组（jobs / smart / quality 等）：与动作按钮并排
         opt_box = self._build_options_box()
+        opt_row = QHBoxLayout()
         if opt_box is not None:
-            root_lay.addWidget(opt_box)
-        root_lay.addWidget(self._status)
+            opt_row.addWidget(opt_box, 1)
+        else:
+            # 无选项框时仍要让按钮列右贴，左侧空出与选项框等宽的伸缩区
+            opt_row.addStretch(1)
+        opt_row.addWidget(action_btn_col)
+        root_lay.addLayout(opt_row)
         root_lay.addStretch(1)
 
         self.busy_changed.connect(self._on_busy)
         self._load_settings()
+
+    # ── 状态文本接口 ───────────────────────────────────────────────────
+    def _set_status(self, text: str) -> None:
+        """更新本 Tab 状态文本，并向 :class:`~module.manga.gui.module.MangaModule`
+        底部状态栏推送。"""
+        self._status.setText(text)
+        self.status_changed.emit(text)
+
+    def status_text(self) -> str:
+        """供 :class:`~module.manga.gui.module.MangaModule` 切 Tab 时同步底栏。"""
+        return self._status.text()
 
     # ── 子类策略钩子 ───────────────────────────────────────────────────
     def _input_box_title(self) -> str:
@@ -122,7 +141,7 @@ class BaseTab(QWidget):
         if not self._has_inputs():
             self._plans = None
             self._apply_btn.setEnabled(False)
-            self._status.setText('待扫描')
+            self._set_status('待扫描')
 
     def _has_inputs(self) -> bool:
         """是否已有可扫描的输入；子类按自己的 input 控件覆盖。"""
@@ -229,7 +248,7 @@ class BaseTab(QWidget):
         set_output(self._sink)
         self._plans = None
         self._apply_btn.setEnabled(False)
-        self._status.setText('扫描中...')
+        self._set_status('扫描中...')
 
         print_run_banner(
             self.cmd_name, self._banner_subtitle(),
@@ -251,7 +270,7 @@ class BaseTab(QWidget):
         if not plans:
             emit('\n  没有需要处理的文件。')
             emit(SEP2)
-            self._status.setText('扫描完成：无可处理项')
+            self._set_status('扫描完成：无可处理项')
             return
         self._render_preview(plans)
         n = self._count_actionable(plans)
@@ -260,7 +279,7 @@ class BaseTab(QWidget):
         parts = ' / '.join(
             f'{v} {k}' for k, v in cats.items() if v
         )
-        self._status.setText(f'扫描完成：{len(plans)} 项（{parts}）')
+        self._set_status(f'扫描完成：{len(plans)} 项（{parts}）')
         self._apply_btn.setEnabled(n > 0)
 
     def _on_apply(self) -> None:
@@ -282,7 +301,7 @@ class BaseTab(QWidget):
             return
 
         self._actionable_n = n
-        self._status.setText('写入中...')
+        self._set_status('写入中...')
         self._run(
             _run_apply,
             self._apply_fn(),
@@ -294,7 +313,7 @@ class BaseTab(QWidget):
     def _on_applied(self, fail: int) -> None:
         set_output(self._sink)
         ok = self._actionable_n - fail
-        self._status.setText(
+        self._set_status(
             f'写入完成：成功 {ok} / 失败 {fail}'
             if fail else f'写入完成：全部成功 ({ok})'
         )
@@ -304,7 +323,7 @@ class BaseTab(QWidget):
 
     def _on_task_failed(self, msg: str) -> None:
         set_output(self._sink)
-        self._status.setText('任务失败')
+        self._set_status('任务失败')
         emit(f'❌ 后台任务异常:\n{msg}')
         emit(SEP2)
 
@@ -312,7 +331,7 @@ class BaseTab(QWidget):
         if self._worker is not None:
             self._worker.cancel()
             self._cancel_btn.setEnabled(False)
-            self._status.setText('取消中...')
+            self._set_status('取消中...')
 
     def _on_busy(self, busy: bool) -> None:
         self._scan_btn.setEnabled(not busy)
@@ -349,7 +368,7 @@ class BaseTab(QWidget):
             self._worker.failed.connect(on_failed)
 
         self._worker.progress.connect(
-            lambda c, t: self._status.setText(f'{c}/{t}')
+            lambda c, t: self._set_status(f'{c}/{t}')
         )
 
         self._thread.finished.connect(self._worker.deleteLater)

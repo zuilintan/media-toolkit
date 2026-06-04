@@ -29,7 +29,8 @@ class PackPicTab(BaseTab):
         self._input_list = PathListWidget(
             accept_file_exts=(), accept_dirs=True, expand_dirs_on_add=False,
             dir_dialog_title='添加目录（智能识别根 / 单本漫画）',
-            add_dir_label='添加目录…',
+            # 按钮列窄（2 列 grid，约 53 px），仅展示精炼文本；菜单 / 弹窗仍含语义
+            add_dir_label='添加…',
         )
         self._input_list.paths_changed.connect(self._on_inputs_changed)
         return self._input_list
