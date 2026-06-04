@@ -9,9 +9,10 @@
 """
 
 from __future__ import annotations
+from enum import Enum
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QButtonGroup, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
@@ -21,11 +22,23 @@ from PySide6.QtWidgets import (
 
 from base.gui.palette import PRIMARY
 
+from module.artifact.gui.widgets.drop_area import urls_to_paths
 from module.manga.core.config import FILE_EXTS
 from module.manga.workflow.std_title import (
     AuthorDerivation, StdTitleInput,
     build_input, derive_author,
 )
+
+
+class BatchStrategyKind(Enum):
+    """:class:`BatchAuthorChoiceDialog` 的三种批量作者来源策略。"""
+    BRACKET = 'bracket'
+    PARENT  = 'parent'
+    MANUAL  = 'manual'
+
+
+#: :meth:`BatchAuthorChoiceDialog.result_strategy` 返回值；MANUAL 时第二项为手填作者
+BatchStrategy = tuple[BatchStrategyKind, str]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -82,7 +95,6 @@ class AuthorChoiceDialog(QDialog):
         )
         lay.addWidget(self._manual_edit)
 
-        # 默认勾选第一个候选；都没有则默认手填
         if self._options:
             self._options[0][0].setChecked(True)
         else:
@@ -143,20 +155,12 @@ def resolve_author_via_dialog(
 # 批量作者策略对话框（漫画文件 / 拖入文件夹场景）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-#: 策略标识：``'bracket'`` 自动从 ``[]`` 抽取 / ``'parent'`` 父目录名 / ``'manual'`` 手填
-BatchStrategy = tuple[str, str]   # (kind, manual_author)
-
-
 class BatchAuthorChoiceDialog(QDialog):
     """批量作者策略选择：让用户一次性决定一批文件的作者来源。
 
-    三种策略:
-
-    - ``bracket`` 自动从文件名 ``[作者]`` / ``[社团 (作者)]`` 抽取（无 ``[]`` 跳过）
-    - ``parent``  统一使用文件夹名作为作者（多文件夹时各文件用其父目录名）
-    - ``manual``  统一使用手填的同一作者名
-
-    返回 :data:`BatchStrategy`；用户取消返回 ``None``。
+    三种策略见 :class:`BatchStrategyKind`：``BRACKET`` 自动从 ``[]`` 抽取（无
+    ``[]`` 跳过）/ ``PARENT`` 统一用文件夹名 / ``MANUAL`` 统一手填。返回
+    :data:`BatchStrategy`；用户取消返回 ``None``。
     """
 
     def __init__(
@@ -201,15 +205,15 @@ class BatchAuthorChoiceDialog(QDialog):
 
     def _on_accept(self) -> None:
         if self._rb_bracket.isChecked():
-            self._result = ('bracket', '')
+            self._result = (BatchStrategyKind.BRACKET, '')
         elif self._rb_parent.isChecked():
-            self._result = ('parent', '')
+            self._result = (BatchStrategyKind.PARENT, '')
         else:
             text = self._manual_edit.text().strip()
             if not text:
                 QMessageBox.warning(self, '提示', '请填写作者名')
                 return
-            self._result = ('manual', text)
+            self._result = (BatchStrategyKind.MANUAL, text)
         self.accept()
 
     def result_strategy(self) -> BatchStrategy | None:
@@ -223,16 +227,13 @@ class BatchAuthorChoiceDialog(QDialog):
 class InputListWidget(QWidget):
     """已添加的 :class:`StdTitleInput` 列表。
 
-    «添加…» 按钮含菜单（``添加漫画文件… / 添加漫画作者文件夹…``）：
+    add menu 与拖放行为完全对齐：
 
-    - **添加漫画文件**：多选 ``.zip/.cbz`` 文件，逐文件自动 derive，
-      冲突 / 缺失时弹 :class:`AuthorChoiceDialog`
-    - **添加漫画作者文件夹**：选目录，目录名即作者，下层 ``.zip/.cbz`` 全录入，不弹窗
-      （快速通道，用户明确"这是作者目录"时用）
-
-    支持拖放：纯文件按「漫画文件」语义；含文件夹时直接弹
-    :class:`BatchAuthorChoiceDialog`（默认选「统一用文件夹名」，等价于
-    「漫画作者文件夹」语义；用户可改选 ``[]`` 自动推导 / 手填）。
+    - **文件**（add menu「添加漫画文件…」/ 拖入纯文件）：逐文件自动 derive，
+      仅冲突 / 缺失时弹 :class:`AuthorChoiceDialog`
+    - **文件夹**（add menu「添加漫画作者文件夹…」/ 拖入含文件夹）：弹
+      :class:`BatchAuthorChoiceDialog`，默认「统一用文件夹名」（等价于
+      「漫画作者文件夹」语义），用户可改选 ``[]`` 自动推导 / 手填
     """
 
     inputs_changed = Signal()   # 列表项变更时发出，供外部更新按钮态
@@ -277,6 +278,8 @@ class InputListWidget(QWidget):
         return list(self._inputs)
 
     def clear(self) -> None:
+        if not self._inputs:
+            return
         self._inputs.clear()
         self._list.clear()
         self.inputs_changed.emit()
@@ -292,45 +295,13 @@ class InputListWidget(QWidget):
             self._add_paths_per_file([Path(f) for f in files])
 
     def _add_author_folder(self) -> None:
-        """add menu「添加漫画作者文件夹…」：目录名即作者，下层文件全录入。"""
+        """add menu「添加漫画作者文件夹…」：与拖入文件夹一致，弹批量策略窗。"""
         d = QFileDialog.getExistingDirectory(self, '添加漫画作者文件夹', '')
         if not d:
             return
-        self._add_author_folders([Path(d)])
+        self._add_files_in_folders_batch([Path(d)])
 
-    # ── 漫画作者文件夹批量录入（不弹窗） ─────────────────────────────
-    def _add_author_folders(self, dirs: list[Path]) -> None:
-        """每个目录的 ``name`` 作为作者，下层 ``.zip/.cbz`` 直接录入。
-
-        publisher 仍按文件名 ``[社团 (作者)]`` 抽取（社团信息不丢失）。
-        """
-        added = 0
-        empty_dirs: list[str] = []
-        for root in dirs:
-            author = root.name
-            files  = sorted(
-                p for p in root.iterdir()
-                if p.is_file() and p.suffix.lower() in FILE_EXTS
-            )
-            if not files:
-                empty_dirs.append(root.name)
-                continue
-            for f in files:
-                deriv = derive_author(str(f))
-                inp   = build_input(str(f), author, deriv.bracket_publisher)
-                self._inputs.append(inp)
-                self._append_list_item(inp)
-                added += 1
-        if added:
-            self.inputs_changed.emit()
-        if empty_dirs:
-            QMessageBox.information(
-                self, '提示',
-                '以下文件夹内未找到 .zip / .cbz 文件：\n  '
-                + '\n  '.join(empty_dirs),
-            )
-
-    # ── 漫画文件批量录入（弹一次策略窗，套用所有文件） ───────────────
+    # ── 文件夹批量录入（弹一次策略窗，套用所有文件） ─────────────────
     def _add_files_in_folders_batch(self, dirs: list[Path]) -> None:
         files: list[Path] = []
         for d in dirs:
@@ -360,18 +331,18 @@ class InputListWidget(QWidget):
         added = skipped = 0
         for f in files:
             deriv = derive_author(str(f))
-            if kind == 'bracket':
+            if kind is BatchStrategyKind.BRACKET:
                 if not deriv.bracket_author:
                     skipped += 1
                     continue
                 author, publisher = deriv.bracket_author, deriv.bracket_publisher
-            elif kind == 'parent':
+            elif kind is BatchStrategyKind.PARENT:
                 if not deriv.parent_author:
                     skipped += 1
                     continue
                 author    = deriv.parent_author
                 publisher = deriv.bracket_publisher   # 仍允许抽社团
-            else:  # manual
+            else:
                 author    = manual
                 publisher = deriv.bracket_publisher
             inp = build_input(str(f), author, publisher)
@@ -414,22 +385,13 @@ class InputListWidget(QWidget):
             label += f'   📌 {publisher}'
         item = QListWidgetItem(label)
         item.setToolTip(inp.src_path)
+        # 把 StdTitleInput 引用绑到 item 上，避免 _remove_selected 依赖位置索引
+        item.setData(Qt.UserRole, inp)
         self._list.addItem(item)
 
     # ── 拖放 ──────────────────────────────────────────────────────────
-    def _collect_drop_paths(self, e: QDropEvent | QDragEnterEvent) -> list[Path]:
-        if not e.mimeData().hasUrls():
-            return []
-        paths: list[Path] = []
-        for url in e.mimeData().urls():
-            if url.isLocalFile():
-                p = Path(url.toLocalFile())
-                if p.exists():
-                    paths.append(p)
-        return paths
-
     def dragEnterEvent(self, e: QDragEnterEvent) -> None:   # noqa: N802 — Qt API 命名
-        paths = self._collect_drop_paths(e)
+        paths = urls_to_paths(e.mimeData().urls())
         if not paths:
             e.ignore()
             return
@@ -449,7 +411,7 @@ class InputListWidget(QWidget):
 
     def dropEvent(self, e: QDropEvent) -> None:   # noqa: N802 — Qt API 命名
         self._list.setStyleSheet('')
-        paths = self._collect_drop_paths(e)
+        paths = urls_to_paths(e.mimeData().urls())
         if not paths:
             e.ignore()
             return
@@ -469,12 +431,12 @@ class InputListWidget(QWidget):
         e.acceptProposedAction()
 
     def _remove_selected(self) -> None:
-        rows = sorted(
-            (self._list.row(i) for i in self._list.selectedItems()),
-            reverse=True,
-        )
-        for r in rows:
-            self._list.takeItem(r)
-            del self._inputs[r]
-        if rows:
-            self.inputs_changed.emit()
+        items = self._list.selectedItems()
+        if not items:
+            return
+        # 按 id() 比对，避免 StdTitleInput 默认结构相等（同名输入）的歧义
+        drop = {id(item.data(Qt.UserRole)) for item in items}
+        self._inputs = [x for x in self._inputs if id(x) not in drop]
+        for item in items:
+            self._list.takeItem(self._list.row(item))
+        self.inputs_changed.emit()
