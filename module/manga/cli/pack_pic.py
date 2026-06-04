@@ -1,10 +1,7 @@
 """图片目录序号化重命名 + STORED zip 打包的子命令实现。
 
-两种输入(可组合,至少指定一项):
-
-- ``--root <dir>``  根目录(可重复):递归识别其下打包单位
-- ``--unit <dir>``  打包单位(可重复):直接指定一个打包单位目录(image leaf
-  或 wrapper);workflow 层会按 FLAT / NESTED 自动识别。
+输入:``--root <dir>``(可重复)。workflow 层智能识别 FLAT / NESTED / CONTAINER,
+传入根目录与单本漫画目录均可。
 """
 
 from __future__ import annotations
@@ -13,25 +10,24 @@ import argparse
 
 from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.presentation.view import print_pack_pic_preview, print_run_banner
-from module.manga.workflow.pack_pic import apply_plans, preview_plans_for_targets
+from module.manga.workflow.pack_pic import apply_plans, preview_plans_for_dirs
 from module.manga.cli import validate_dirs
 
 
 def cmd_pack_pic(args: argparse.Namespace) -> int:
     """图片打包子命令调度。"""
-    if not args.root and not args.unit:
-        error('请指定 --root <dir> 或 --unit <dir>(可重复,可组合)')
+    if not args.root:
+        error('请指定 --root <dir>(可重复)')
         return 2
 
-    roots = validate_dirs(args.root)
-    units = validate_dirs(args.unit)
-    if roots is None or units is None:
+    dirs = validate_dirs(args.root)
+    if dirs is None:
         return 2
 
-    banner_target = f'根 {len(roots)} / 单位 {len(units)}'
+    banner_target = f'已添加 {len(dirs)} 个目录'
     print_run_banner(args.command, '图片目录序号化重命名 + STORED zip 打包',
                      banner_target, args.apply)
-    plans = preview_plans_for_targets(roots, units, jobs=args.jobs)
+    plans = preview_plans_for_dirs(dirs, jobs=args.jobs)
 
     if not plans:
         emit('\n  没有识别出可打包的单位。')
@@ -81,10 +77,8 @@ def cmd_pack_pic(args: argparse.Namespace) -> int:
 def add_pack_pic_args(p: argparse.ArgumentParser) -> None:
     """挂载图片打包子命令的参数。"""
     p.add_argument('--root',    action='append', default=[], metavar='DIR',
-                   help='待处理根目录（可重复指定）；递归识别其下图片目录单位')
-    p.add_argument('--unit',    action='append', default=[], metavar='DIR',
-                   help='直接指定单个打包单位目录（可重复指定）；'
-                        'workflow 层按 FLAT / NESTED 自动识别')
+                   help='待处理目录（可重复）；智能识别 FLAT / NESTED / CONTAINER，'
+                        '传入根目录与单本漫画目录均可')
     p.add_argument('--apply',   action='store_true',
                    help='实际执行重命名 + 打包（不加此参数则仅预览）')
     p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',

@@ -487,48 +487,36 @@ def _progress_line(idx: int, total: int, plan: PackPicPlan) -> str:
     return f'   {icon} [{idx}/{total}] {plan.name}'
 
 
-def preview_plans_for_targets(
-    roots: list[str],
-    units: list[str],
-    jobs:  int = 1,
-    on_progress=None,
-    cancel_token=None,
+def preview_plans_for_dirs(
+    dirs: list[str], jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[PackPicPlan]:
-    """对显式 ``roots`` / ``units`` 列表识别打包单位并 plan。
+    """智能识别目录列表中的打包单位。
 
-    - ``roots`` 中每项视为高层容器，走 :func:`_find_units_in_root`（不会把根本身
-      当 NESTED）；
-    - ``units`` 中每项视为打包单位（image leaf 或 wrapper），走
-      :func:`_find_units` ，能正确处理 FLAT / NESTED / 1-child wrapper。
-    - 同一物理目录可能既在 ``roots`` 又在 ``units``（用户重复添加）/ 或 ``roots``
-      下钻到的 unit 与 ``units`` 显式条目重合：按目录字符串 dedupe。
+    每个目录走 :func:`_find_units` —— 自带 FLAT / NESTED / CONTAINER 三态识别:
 
-    :param jobs: 1=串行；>1=并行 plan；0=自动 ``min(cpu, 4)``。识别本身始终在主
-        进程串行执行，并行的只是已识别单位的 plan 构建。
+    - 纯图目录 → FLAT，整作一档
+    - 元数据图 + 子目录 / 子目录像话号 → NESTED，整作一档（分章节合压）
+    - 多个 image-leaf 子目录且不像话号 → CONTAINER 下钻，每子目录独立成档
+    - 1-child wrapper（作者目录里只一本漫画） → 下钻
+
+    同一物理目录重复添加按字符串去重。
     """
     found: list[tuple[Path, str]] = []
-    for r in roots:
-        rp = Path(r)
-        if not rp.exists():
-            error(f'目录不存在: {r}')
+    for d in dirs:
+        dp = Path(d)
+        if not dp.exists():
+            error(f'目录不存在: {d}')
             continue
-        found.extend(_find_units_in_root(rp))
-    for u in units:
-        up = Path(u)
-        if not up.exists():
-            error(f'目录不存在: {u}')
-            continue
-        found.extend(_find_units(up))
+        found.extend(_find_units(dp))
 
-    # dedupe（按目录字符串）；保留首次出现的 kind
     seen: set[str] = set()
     deduped: list[tuple[Path, str]] = []
-    for d, k in found:
-        key = str(d)
+    for unit, k in found:
+        key = str(unit)
         if key in seen:
             continue
         seen.add(key)
-        deduped.append((d, k))
+        deduped.append((unit, k))
 
     if not deduped:
         emit('  未识别出任何打包单位')
@@ -538,7 +526,7 @@ def preview_plans_for_targets(
     nested_n = sum(1 for _, k in deduped if k == 'nested')
     emit(f'  识别打包单位: {len(deduped)} 个（单层 {flat_n}，嵌套 {nested_n}）')
 
-    items: list[tuple[str, str]] = [(str(d), k) for d, k in deduped]
+    items: list[tuple[str, str]] = [(str(unit), k) for unit, k in deduped]
     return run_plans(
         items, preview_plan_unit_item, jobs=jobs, progress_line=_progress_line,
         on_progress=on_progress, cancel_token=cancel_token,
@@ -548,13 +536,28 @@ def preview_plans_for_targets(
 def preview_plans(
     root: str, jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[PackPicPlan]:
-    """从 ``root`` 递归识别打包单位，每单位产出一个 :class:`~module.manga.core.models.PackPicPlan`。
+    """从 ``root`` 递归识别打包单位（``root`` 显式视作高层容器，自身不当 NESTED）。
 
-    与 :mod:`~module.manga.workflow.std_title` 的「root 是高层容器」语义对齐，
-    但走结构化递归：遇到 FLAT / NESTED 立即视作单位（不再下钻），其它情况继续递归。
+    与 :func:`preview_plans_for_dirs` 的差异:此入口走 :func:`_find_units_in_root`,
+    确保「``root`` 下若干 FLAT 子目录」被识别为各自独立单位，而非整体打成 ``root.zip``。
     """
-    return preview_plans_for_targets(
-        [root], [], jobs=jobs,
+    root_path = Path(root)
+    if not root_path.exists():
+        error(f'目录不存在: {root}')
+        return []
+
+    units = _find_units_in_root(root_path)
+    if not units:
+        emit('  未识别出任何打包单位')
+        return []
+
+    flat_n   = sum(1 for _, k in units if k == 'flat')
+    nested_n = sum(1 for _, k in units if k == 'nested')
+    emit(f'  识别打包单位: {len(units)} 个（单层 {flat_n}，嵌套 {nested_n}）')
+
+    items: list[tuple[str, str]] = [(str(d), k) for d, k in units]
+    return run_plans(
+        items, preview_plan_unit_item, jobs=jobs, progress_line=_progress_line,
         on_progress=on_progress, cancel_token=cancel_token,
     )
 

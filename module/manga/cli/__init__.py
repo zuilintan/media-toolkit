@@ -94,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-cli make-cover --root /path/to/cbz --apply\n'
             '  manga-cli make-cover --file /path/to/a.cbz --apply --smart\n'
             '  manga-cli pack-pic   --root /path/to/albums --apply\n'
-            '  manga-cli pack-pic   --unit /path/to/one_album --apply\n'
+            '  manga-cli pack-pic   --root /path/to/one_album --apply\n'
         ),
     )
     parser.add_argument('--debug', action='store_true', help='启用 debug 日志')
@@ -169,8 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
             '示例:\n'
             '  manga-cli pack-pic --root ./albums\n'
             '  manga-cli pack-pic --root ./albums --apply\n'
-            '  manga-cli pack-pic --unit ./albums/album_a --apply\n'
-            '  manga-cli pack-pic --root ./albums --unit ./extra/one --apply\n'
+            '  manga-cli pack-pic --root ./albums/album_a --apply\n'
+            '  manga-cli pack-pic --root ./a --root ./b --apply\n'
         ),
     )
     add_pack_pic_args(p_pack_pic)
