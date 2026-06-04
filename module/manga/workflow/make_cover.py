@@ -318,6 +318,30 @@ def _progress_line(idx: int, total: int, plan: MakeCoverPlan) -> str:
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
+def preview_plans_for_files(
+    files:   list[str],
+    mode:    str = 'center',
+    quality: int = DEFAULT_QUALITY,
+    jobs:    int = 1,
+    on_progress=None,
+    cancel_token=None,
+) -> list[MakeCoverPlan]:
+    """对显式 ``.cbz`` 列表逐个 plan；:func:`preview_plans` 内部使用。
+
+    :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。≥ 4 个文件才启用并行。
+    :param on_progress: 每完成一项即回调 ``f(done, total)``。
+    :param cancel_token: ``threading.Event``，已 set 时提前退出。
+    """
+    return run_plans(
+        files,
+        partial(preview_plan, mode=mode, quality=quality),
+        jobs=jobs,
+        progress_line=_progress_line,
+        on_progress=on_progress,
+        cancel_token=cancel_token,
+    )
+
+
 def preview_plans(
     root:    str,
     mode:    str = 'center',
@@ -326,25 +350,16 @@ def preview_plans(
     on_progress=None,
     cancel_token=None,
 ) -> list[MakeCoverPlan]:
-    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
-
-    :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。≥ 4 个文件才启用并行。
-    :param on_progress: 每完成一项即回调 ``f(done, total)``。
-    :param cancel_token: ``threading.Event``，已 set 时提前退出。
-    """
+    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表（批量入口）。"""
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
     files = [str(fp) for fp in sorted(root_path.rglob('*.cbz'))]
     emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
-    return run_plans(
-        files,
-        partial(preview_plan, mode=mode, quality=quality),
-        jobs=jobs,
-        progress_line=_progress_line,
-        on_progress=on_progress,
-        cancel_token=cancel_token,
+    return preview_plans_for_files(
+        files, mode=mode, quality=quality, jobs=jobs,
+        on_progress=on_progress, cancel_token=cancel_token,
     )
 
 

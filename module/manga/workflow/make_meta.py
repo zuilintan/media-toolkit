@@ -392,10 +392,10 @@ def _progress_line(idx: int, total: int, plan: MakeMetaPlan | None) -> str:
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
-def preview_plans(
-    root: str, jobs: int = 1, on_progress=None, cancel_token=None,
+def preview_plans_for_files(
+    files: list[str], jobs: int = 1, on_progress=None, cancel_token=None,
 ) -> list[MakeMetaPlan]:
-    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表。
+    """对显式 ``.cbz`` 列表逐个 plan；:func:`preview_plans` 内部使用。
 
     无作者的文件（:func:`preview_plan` 返回 ``None``）静默丢弃。
 
@@ -403,17 +403,26 @@ def preview_plans(
     :param on_progress: 每完成一项即回调 ``f(done, total)``。
     :param cancel_token: ``threading.Event``，已 set 时提前退出。
     """
+    raw = run_plans(
+        files, preview_plan, jobs=jobs, progress_line=_progress_line,
+        on_progress=on_progress, cancel_token=cancel_token,
+    )
+    return [p for p in raw if p is not None]
+
+
+def preview_plans(
+    root: str, jobs: int = 1, on_progress=None, cancel_token=None,
+) -> list[MakeMetaPlan]:
+    """递归扫描 ``root`` 下所有 ``.cbz``，返回 plan 列表（批量入口）。"""
     root_path = Path(root)
     if not root_path.exists():
         error(f'目录不存在: {root}')
         return []
     files = [str(fp) for fp in sorted(root_path.rglob('*.cbz'))]
     emit(f'  找到文件: {len(files)} 个 .cbz（含子目录）')
-    raw = run_plans(
-        files, preview_plan, jobs=jobs, progress_line=_progress_line,
-        on_progress=on_progress, cancel_token=cancel_token,
+    return preview_plans_for_files(
+        files, jobs=jobs, on_progress=on_progress, cancel_token=cancel_token,
     )
-    return [p for p in raw if p is not None]
 
 
 def apply_plans(
