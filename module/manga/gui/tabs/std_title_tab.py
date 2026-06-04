@@ -84,3 +84,10 @@ class StdTitleTab(BaseTab):
             self._plans = None
             self._apply_btn.setEnabled(False)
             self._status.setText('待扫描')
+
+    def _on_applied(self, fail: int) -> None:
+        # apply 后所有列表项的 src_path 都已失效（文件被移走 / 改名），
+        # 继续保留列表会误导用户「这些文件还在等待处理」。先清列表（会经
+        # _on_inputs_changed 暂设「待扫描」），再调 super 覆盖为「写入完成…」。
+        self._input_list.clear()
+        super()._on_applied(fail)
