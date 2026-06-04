@@ -32,6 +32,41 @@ def validate_root(root_arg: str) -> Path | None:
     return root
 
 
+def validate_files(files: list[str]) -> list[str] | None:
+    """``--file`` 列表校验：每个必须是已存在的 ``.zip`` / ``.cbz``；
+    任一失败返回 ``None`` 并已 emit。
+
+    :return: 解析为绝对路径字符串的列表；保持入参顺序。
+    """
+    from module.manga.core.config import FILE_EXTS
+
+    out: list[str] = []
+    for f in files:
+        path = Path(f).resolve()
+        if not path.is_file():
+            emit(f'❌ 不是文件: {f}'); return None
+        if path.suffix.lower() not in FILE_EXTS:
+            emit(f'❌ 文件类型不支持（仅 .zip / .cbz）: {f}'); return None
+        out.append(str(path))
+    return out
+
+
+def validate_dirs(dirs: list[str]) -> list[str] | None:
+    """目录列表校验（每个必须存在且是目录）；用于 ``--root`` (append) / ``--unit``。
+
+    :return: 解析为绝对路径字符串的列表；任一失败返回 ``None`` 并已 emit。
+    """
+    out: list[str] = []
+    for d in dirs:
+        p = Path(d).resolve()
+        if not p.exists():
+            emit(f'❌ 目录不存在: {d}'); return None
+        if not p.is_dir():
+            emit(f'❌ 路径不是目录: {d}'); return None
+        out.append(str(p))
+    return out
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLI 主入口（pyproject scripts: manga-cli = "module.manga.cli:main"）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -51,12 +86,15 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             '示例:\n'
             '  manga-cli std-title --root /path/to/manga --apply\n'
+            '  manga-cli std-title --file /path/to/a.cbz\n'
             '  manga-cli std-title --examples\n'
-            '  manga-cli make-meta --root /path/to/cbz\n'
-            '  manga-cli make-meta --root /path/to/cbz --apply\n'
-            '  manga-cli make-meta --examples\n'
+            '  manga-cli make-meta  --root /path/to/cbz\n'
+            '  manga-cli make-meta  --file /path/to/a.cbz --apply\n'
+            '  manga-cli make-meta  --examples\n'
             '  manga-cli make-cover --root /path/to/cbz --apply\n'
-            '  manga-cli make-cover --root /path/to/cbz --apply --smart\n'
+            '  manga-cli make-cover --file /path/to/a.cbz --apply --smart\n'
+            '  manga-cli pack-pic   --root /path/to/albums --apply\n'
+            '  manga-cli pack-pic   --unit /path/to/one_album --apply\n'
         ),
     )
     parser.add_argument('--debug', action='store_true', help='启用 debug 日志')
@@ -92,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-cli make-meta --examples\n'
             '  manga-cli make-meta --root ./manga\n'
             '  manga-cli make-meta --root ./manga --apply\n'
+            '  manga-cli make-meta --file ./manga/a.cbz --apply\n'
         ),
     )
     add_make_meta_args(p_make_meta)
@@ -112,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  manga-cli make-cover --root ./manga\n'
             '  manga-cli make-cover --root ./manga --apply\n'
             '  manga-cli make-cover --root ./manga --apply --smart\n'
+            '  manga-cli make-cover --file ./manga/a.cbz --apply\n'
         ),
     )
     add_make_cover_args(p_make_cover)
@@ -129,6 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
             '示例:\n'
             '  manga-cli pack-pic --root ./albums\n'
             '  manga-cli pack-pic --root ./albums --apply\n'
+            '  manga-cli pack-pic --unit ./albums/album_a --apply\n'
+            '  manga-cli pack-pic --root ./albums --unit ./extra/one --apply\n'
         ),
     )
     add_pack_pic_args(p_pack_pic)

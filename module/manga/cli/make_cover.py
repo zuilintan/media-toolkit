@@ -3,30 +3,55 @@
 源图（``0001.*`` 或 ``cover.*``）→ ``0000.webp``；源为 ``cover.*`` 时写入后
 同步从 ZIP 删除原 ``cover.*``。详见 :mod:`module.manga.workflow.make_cover`。
 
-流程: scan → 全量 plan（含裁剪 + 编码）→ 预览 → 二次确认 → 整批写入。
+两种输入模式（互斥）：
+
+- ``--root <dir>``  批量模式：递归扫描 ``.cbz``
+- ``--file <path>`` 单文件 / 混合模式（可重复）：仅处理列出的 ``.cbz``
 """
 
 from __future__ import annotations
 
 import argparse
 
-from base.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.presentation.view import print_make_cover_preview, print_run_banner
-from module.manga.workflow.make_cover import preview_plans, apply_plans, DEFAULT_QUALITY
-from module.manga.cli import validate_root
+from module.manga.workflow.make_cover import (
+    DEFAULT_QUALITY, apply_plans, preview_plans, preview_plans_for_files,
+)
+from module.manga.cli import validate_files, validate_root
 
 
 def cmd_make_cover(args: argparse.Namespace) -> int:
     """封面写入子命令调度。"""
     mode = 'smart' if args.smart else 'center'
 
-    # ── 批量模式 ──────────────────────────────────────────────────────────────
-    root = validate_root(args.root)
-    if root is None:
+    if args.file and args.root:
+        error('--file 与 --root 互斥')
+        return 2
+    if not args.file and not args.root:
+        error('请指定 --root <dir> 或 --file <path>（可重复）')
         return 2
 
-    print_run_banner(args.command, f'CBZ 封面写入（mode={mode}）', root, args.apply)
-    plans = preview_plans(str(root), mode=mode, quality=args.quality, jobs=args.jobs)
+    # ── 模式分派：单文件 / 批量 ───────────────────────────────────────────────
+    if args.file:
+        files = validate_files(args.file)
+        if files is None:
+            emit(SEP2)
+            return 2
+        banner_target = f'单文件模式（{len(files)} 个文件）'
+        print_run_banner(args.command, f'CBZ 封面写入（mode={mode}）',
+                         banner_target, args.apply)
+        plans = preview_plans_for_files(
+            files, mode=mode, quality=args.quality, jobs=args.jobs,
+        )
+    else:
+        root = validate_root(args.root)
+        if root is None:
+            return 2
+        print_run_banner(args.command, f'CBZ 封面写入（mode={mode}）',
+                         root, args.apply)
+        plans = preview_plans(str(root), mode=mode, quality=args.quality,
+                              jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
@@ -79,6 +104,8 @@ def add_make_cover_args(p: argparse.ArgumentParser) -> None:
     """挂载封面写入子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
+    p.add_argument('--file',    action='append', default=[], metavar='PATH',
+                   help='单个 CBZ 文件路径（可重复指定）；与 --root 互斥')
     p.add_argument('--apply',   action='store_true',
                    help='实际写入封面（不加此参数则仅预览）')
     p.add_argument('--smart',   action='store_true',

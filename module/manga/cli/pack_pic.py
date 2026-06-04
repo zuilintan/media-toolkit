@@ -1,29 +1,37 @@
 """图片目录序号化重命名 + STORED zip 打包的子命令实现。
 
-流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批执行。
-详见 :mod:`module.manga.workflow.pack_pic`。
+两种输入(可组合,至少指定一项):
+
+- ``--root <dir>``  根目录(可重复):递归识别其下打包单位
+- ``--unit <dir>``  打包单位(可重复):直接指定一个打包单位目录(image leaf
+  或 wrapper);workflow 层会按 FLAT / NESTED 自动识别。
 """
 
 from __future__ import annotations
 
 import argparse
 
-from base.console import SEP2, emit, confirm, print_summary
+from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.presentation.view import print_pack_pic_preview, print_run_banner
-from module.manga.workflow.pack_pic import preview_plans, apply_plans
-from module.manga.cli import validate_root
+from module.manga.workflow.pack_pic import apply_plans, preview_plans_for_targets
+from module.manga.cli import validate_dirs
 
 
 def cmd_pack_pic(args: argparse.Namespace) -> int:
     """图片打包子命令调度。"""
-    # ── 批量模式 ──────────────────────────────────────────────────────────────
-    root = validate_root(args.root)
-    if root is None:
+    if not args.root and not args.unit:
+        error('请指定 --root <dir> 或 --unit <dir>(可重复,可组合)')
         return 2
 
+    roots = validate_dirs(args.root)
+    units = validate_dirs(args.unit)
+    if roots is None or units is None:
+        return 2
+
+    banner_target = f'根 {len(roots)} / 单位 {len(units)}'
     print_run_banner(args.command, '图片目录序号化重命名 + STORED zip 打包',
-                     root, args.apply)
-    plans = preview_plans(str(root), jobs=args.jobs)
+                     banner_target, args.apply)
+    plans = preview_plans_for_targets(roots, units, jobs=args.jobs)
 
     if not plans:
         emit('\n  没有识别出可打包的单位。')
@@ -72,9 +80,11 @@ def cmd_pack_pic(args: argparse.Namespace) -> int:
 
 def add_pack_pic_args(p: argparse.ArgumentParser) -> None:
     """挂载图片打包子命令的参数。"""
-    p.add_argument('--root',    default='', metavar='DIR',
-                   help='待处理根目录（递归识别图片目录单位：「仅图片」'
-                        '或「仅含图片子目录」即视为一本漫画）')
+    p.add_argument('--root',    action='append', default=[], metavar='DIR',
+                   help='待处理根目录（可重复指定）；递归识别其下图片目录单位')
+    p.add_argument('--unit',    action='append', default=[], metavar='DIR',
+                   help='直接指定单个打包单位目录（可重复指定）；'
+                        'workflow 层按 FLAT / NESTED 自动识别')
     p.add_argument('--apply',   action='store_true',
                    help='实际执行重命名 + 打包（不加此参数则仅预览）')
     p.add_argument('--jobs', '-j', type=int, default=1, metavar='N',

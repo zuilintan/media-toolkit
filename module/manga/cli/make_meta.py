@@ -1,7 +1,9 @@
 """向 CBZ 写入 ``ComicInfo.xml`` 元数据的子命令实现。
 
-流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。结构与
-:mod:`module.manga.cli.std_title` 对称。
+两种输入模式（互斥）：
+
+- ``--root <dir>``  批量模式：递归扫描 ``.cbz``
+- ``--file <path>`` 单文件 / 混合模式（可重复）：仅处理列出的 ``.cbz``
 """
 
 from __future__ import annotations
@@ -11,8 +13,10 @@ import argparse
 from base.console import SEP2, emit, confirm, error, ok, print_summary
 from module.manga.presentation.view import print_make_meta_preview, print_run_banner
 from module.manga.presentation.export import export_plans
-from module.manga.workflow.make_meta import preview_plans, apply_plans
-from module.manga.cli import validate_root
+from module.manga.workflow.make_meta import (
+    apply_plans, preview_plans, preview_plans_for_files,
+)
+from module.manga.cli import validate_files, validate_root
 from module.manga.extras.examples import run_make_meta_examples
 
 
@@ -22,13 +26,30 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
     if args.examples:
         return 0 if run_make_meta_examples() == 0 else 1
 
-    # ── 批量模式 ──────────────────────────────────────────────────────────────
-    root = validate_root(args.root)
-    if root is None:
+    if args.file and args.root:
+        error('--file 与 --root 互斥')
+        return 2
+    if not args.file and not args.root:
+        error('请指定 --root <dir> 或 --file <path>（可重复）')
         return 2
 
-    print_run_banner(args.command, 'CBZ ComicInfo.xml 批量工具', root, args.apply)
-    plans = preview_plans(str(root), jobs=args.jobs)
+    # ── 模式分派：单文件 / 批量 ───────────────────────────────────────────────
+    if args.file:
+        files = validate_files(args.file)
+        if files is None:
+            emit(SEP2)
+            return 2
+        banner_target = f'单文件模式（{len(files)} 个文件）'
+        print_run_banner(args.command, 'CBZ ComicInfo.xml 批量工具',
+                         banner_target, args.apply)
+        plans = preview_plans_for_files(files, jobs=args.jobs)
+    else:
+        root = validate_root(args.root)
+        if root is None:
+            return 2
+        print_run_banner(args.command, 'CBZ ComicInfo.xml 批量工具',
+                         root, args.apply)
+        plans = preview_plans(str(root), jobs=args.jobs)
 
     if not plans:
         emit('\n  没有需要处理的文件。')
@@ -94,6 +115,8 @@ def add_make_meta_args(p: argparse.ArgumentParser) -> None:
     """挂载元数据写入子命令的参数。"""
     p.add_argument('--root',    default='', metavar='DIR',
                    help='CBZ 文件根目录（递归处理所有子目录）')
+    p.add_argument('--file',    action='append', default=[], metavar='PATH',
+                   help='单个 CBZ 文件路径（可重复指定）；与 --root 互斥')
     p.add_argument('--apply',   action='store_true',
                    help='实际写入 ComicInfo.xml（不加此参数则仅预览）')
     p.add_argument('--examples', action='store_true',
