@@ -79,13 +79,18 @@ class BaseTab(QWidget):
         self._cancel_btn.setVisible(False)
         self._cancel_btn.clicked.connect(self._on_cancel)
 
-        btn_lay = QHBoxLayout()
-        btn_lay.addWidget(self._scan_btn)
-        btn_lay.addWidget(self._apply_btn)
-        btn_lay.addWidget(self._cancel_btn)
+        # 动作按钮放到输入区右侧的纵向列：让出更多横向空间给列表本身
+        btn_col = QVBoxLayout()
+        btn_col.addWidget(self._scan_btn)
+        btn_col.addWidget(self._apply_btn)
+        btn_col.addWidget(self._cancel_btn)
         for b in self._extra_action_buttons():
-            btn_lay.addWidget(b)
-        btn_lay.addStretch(1)
+            btn_col.addWidget(b)
+        btn_col.addStretch(1)
+
+        input_row = QHBoxLayout()
+        input_row.addWidget(dir_box, 1)
+        input_row.addLayout(btn_col)
 
         self._status = QLabel('待扫描')
         self._status.setProperty('muted', True)
@@ -93,12 +98,11 @@ class BaseTab(QWidget):
         root_lay = QVBoxLayout(self)
         root_lay.setContentsMargins(10, 10, 10, 10)
         root_lay.setSpacing(8)
-        root_lay.addWidget(dir_box)
+        root_lay.addLayout(input_row)
         # 子类的选项组（jobs / smart / quality 等）
         opt_box = self._build_options_box()
         if opt_box is not None:
             root_lay.addWidget(opt_box)
-        root_lay.addLayout(btn_lay)
         root_lay.addWidget(self._status)
         root_lay.addStretch(1)
 

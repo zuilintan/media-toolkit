@@ -64,24 +64,23 @@ class MangaModule(QWidget):
 
         self._tabs.currentChanged.connect(self._log_stack.setCurrentIndex)
 
-        log_header = QWidget()
-        hh = QHBoxLayout(log_header)
-        hh.setContentsMargins(0, 0, 0, 0)
         export_btn = QPushButton('导出日志')
         export_btn.setToolTip('将当前日志保存为 .txt')
         export_btn.clicked.connect(self._export_current_log)
         clear_btn = QPushButton('清空日志')
         clear_btn.setToolTip('清空日志 [Ctrl+L]')
         clear_btn.clicked.connect(self._clear_current_log)
-        hh.addStretch(1)
-        hh.addWidget(export_btn)
-        hh.addWidget(clear_btn)
+
+        log_btn_col = QVBoxLayout()
+        log_btn_col.addWidget(export_btn)
+        log_btn_col.addWidget(clear_btn)
+        log_btn_col.addStretch(1)
 
         log_panel = QWidget()
-        lv = QVBoxLayout(log_panel)
-        lv.setContentsMargins(0, 0, 0, 0)
-        lv.addWidget(log_header)
-        lv.addWidget(self._log_stack, 1)
+        lh = QHBoxLayout(log_panel)
+        lh.setContentsMargins(0, 0, 0, 0)
+        lh.addWidget(self._log_stack, 1)
+        lh.addLayout(log_btn_col)
 
         self._splitter = QSplitter(Qt.Vertical)
         self._splitter.addWidget(self._tabs)
