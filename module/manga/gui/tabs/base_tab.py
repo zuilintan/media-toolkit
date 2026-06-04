@@ -18,8 +18,8 @@ from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout,
-    QWidget,
+    QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSizePolicy,
+    QVBoxLayout, QWidget,
 )
 
 from base.gui.config import get_config
@@ -62,6 +62,9 @@ class BaseTab(QWidget):
         dir_box = QGroupBox(self._input_box_title())
         dir_lay = QVBoxLayout(dir_box)
         dir_lay.addWidget(input_widget)
+        # 垂直 Fixed：保证子类若在下方追加 stretch sibling（如 make_meta 的树
+        # 面板）时，输入区不被布局压力压扁——四个 Tab 输入区高度始终一致
+        dir_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
         self._scan_btn  = QPushButton('预览')
         self._scan_btn.setToolTip('预览 [Enter]')
