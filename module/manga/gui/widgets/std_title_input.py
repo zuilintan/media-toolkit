@@ -189,7 +189,8 @@ class BatchAuthorChoiceDialog(QDialog):
             self._group.addButton(rb)
             lay.addWidget(rb)
         lay.addWidget(self._manual_edit)
-        self._rb_bracket.setChecked(True)
+        # 默认「统一使用文件夹名」：拖入文件夹的最常见语义即「作者文件夹」
+        self._rb_parent.setChecked(True)
 
         bb = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
@@ -227,10 +228,11 @@ class InputListWidget(QWidget):
     - **添加漫画文件**：多选 ``.zip/.cbz`` 文件，逐文件自动 derive，
       冲突 / 缺失时弹 :class:`AuthorChoiceDialog`
     - **添加漫画作者文件夹**：选目录，目录名即作者，下层 ``.zip/.cbz`` 全录入，不弹窗
+      （快速通道，用户明确"这是作者目录"时用）
 
-    支持拖放：纯文件按「漫画文件」语义；含文件夹时弹窗让用户选「漫画作者文件夹」
-    或「漫画文件」，前者每个文件夹按其名作为作者直接展开，后者弹一次
-    :class:`BatchAuthorChoiceDialog` 批量套用策略。
+    支持拖放：纯文件按「漫画文件」语义；含文件夹时直接弹
+    :class:`BatchAuthorChoiceDialog`（默认选「统一用文件夹名」，等价于
+    「漫画作者文件夹」语义；用户可改选 ``[]`` 自动推导 / 手填）。
     """
 
     inputs_changed = Signal()   # 列表项变更时发出，供外部更新按钮态
@@ -460,43 +462,11 @@ class InputListWidget(QWidget):
             self._add_paths_per_file(files)
 
         if dirs:
-            mode = self._ask_folder_mode(dirs)
-            if mode == 'author_folder':
-                self._add_author_folders(dirs)
-            elif mode == 'files':
-                self._add_files_in_folders_batch(dirs)
-            # mode is None → 用户取消
+            # 直接走批量策略窗：默认「统一使用文件夹名」== 漫画作者文件夹语义；
+            # 用户改选 [] / 手填即可覆盖另两种场景，无需先做一次路由选择
+            self._add_files_in_folders_batch(dirs)
 
         e.acceptProposedAction()
-
-    def _ask_folder_mode(self, dirs: list[Path]) -> str | None:
-        """文件夹拖入时弹窗让用户选择处理方式。
-
-        :return: ``'author_folder'`` / ``'files'`` / ``None`` (取消)
-        """
-        names = '、'.join(d.name for d in dirs[:3])
-        if len(dirs) > 3:
-            names += f' 等 {len(dirs)} 项'
-        box = QMessageBox(self)
-        box.setWindowTitle('文件夹拖入')
-        box.setIcon(QMessageBox.Question)
-        box.setText(f'已拖入文件夹：{names}')
-        box.setInformativeText(
-            '请选择视作：\n'
-            '  • 漫画作者文件夹 — 文件夹名即作者，下层 .zip / .cbz 直接录入\n'
-            '  • 漫画文件 — 把下层 .zip / .cbz 视为独立文件，弹窗一次选作者来源'
-        )
-        btn_author = box.addButton('漫画作者文件夹', QMessageBox.AcceptRole)
-        btn_files  = box.addButton('漫画文件',       QMessageBox.AcceptRole)
-        box.addButton('取消', QMessageBox.RejectRole)
-        box.setDefaultButton(btn_author)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is btn_author:
-            return 'author_folder'
-        if clicked is btn_files:
-            return 'files'
-        return None
 
     def _remove_selected(self) -> None:
         rows = sorted(
