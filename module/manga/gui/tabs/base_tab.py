@@ -104,8 +104,22 @@ class BaseTab(QWidget):
 
     # ── 子类策略钩子 ───────────────────────────────────────────────────
     def _input_box_title(self) -> str:
-        """「输入」组的标题；默认为「目录」，单文件 Tab 可覆盖为「输入」。"""
-        return '目录'
+        """「输入」组的标题。"""
+        return '输入'
+
+    def _on_inputs_changed(self) -> None:
+        """输入控件清空时复位 apply / status；列表式输入 Tab 通用钩子。
+
+        子类有额外清空动作（如 make_meta 的树视图）可 ``super()`` 后追加。
+        """
+        if not self._has_inputs():
+            self._plans = None
+            self._apply_btn.setEnabled(False)
+            self._status.setText('待扫描')
+
+    def _has_inputs(self) -> bool:
+        """是否已有可扫描的输入；子类按自己的 input 控件覆盖。"""
+        return True
 
     def _create_input_widget(self) -> QWidget:
         """返回放入「输入」组的核心控件。

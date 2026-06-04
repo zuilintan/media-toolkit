@@ -1,29 +1,58 @@
-"""封面写入 GUI Tab；复用 :mod:`module.manga.workflow.make_cover`。"""
+"""封面写入 GUI Tab；复用 :mod:`module.manga.workflow.make_cover`。
+
+输入语义：PathListWidget（接受 .cbz 文件 + 目录；目录在添加时 rglob 展开成 .cbz）。
+"""
 
 from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QCheckBox, QGroupBox, QHBoxLayout, QLabel, QSpinBox, QWidget,
+    QCheckBox, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
 )
 
-from module.manga.core.models import MakeCoverPlan
 from base.gui.config import get_config
+from base.gui.path_list import PathListWidget
+from module.manga.core.models import MakeCoverPlan
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.presentation.view import print_make_cover_preview
 from module.manga.workflow.make_cover import (
-    DEFAULT_QUALITY, apply_plans, preview_plans,
+    DEFAULT_QUALITY, apply_plans, preview_plans_for_files,
 )
 
 
 class MakeCoverTab(BaseTab):
-    cmd_name         = 'make_cover'
-    apply_btn_text   = '执行'
-    confirm_verb     = '执行'
-    no_change_msg    = '没有需要写入的封面'
-    root_label       = 'CBZ 根目录:'
-    root_placeholder = '递归扫描所有 .cbz'
+    cmd_name        = 'make_cover'
+    apply_btn_text  = '执行'
+    confirm_verb    = '执行'
+    no_change_msg   = '没有需要写入的封面'
+
+    def _create_input_widget(self) -> QWidget:
+        self._input_list = PathListWidget(
+            accept_file_exts=('.cbz',),
+            accept_dirs=True,
+            expand_dirs_on_add=True,
+            file_dialog_filter='CBZ (*.cbz);;所有文件 (*)',
+            file_dialog_title='添加 CBZ 文件',
+            dir_dialog_title='添加 CBZ 根目录（递归扫描 .cbz）',
+            add_file_label='添加 CBZ 文件…',
+            add_dir_label='添加 CBZ 根目录…',
+        )
+        self._input_list.paths_changed.connect(self._on_inputs_changed)
+        return self._input_list
+
+    def _validate_scan_target(self) -> Any | None:
+        files = [str(p) for p in self._input_list.paths()]
+        if not files:
+            QMessageBox.warning(self, '提示', '请先添加 .cbz 文件或包含 .cbz 的目录')
+            return None
+        return files
+
+    def _format_banner_target(self, target: Any) -> object:
+        return f'已添加 {len(target)} 个文件'
+
+    def _has_inputs(self) -> bool:
+        return bool(self._input_list.paths())
 
     def _build_options_box(self) -> QWidget:
         self._smart = QCheckBox('smartcrop 显著性裁剪')
@@ -73,8 +102,8 @@ class MakeCoverTab(BaseTab):
     def _banner_subtitle(self) -> str:
         return f'CBZ 封面写入（mode={self._mode()}）'
 
-    def _plan_call(self, root: str) -> tuple[Callable[..., Any], tuple, dict]:
-        return preview_plans, (root,), {
+    def _plan_call(self, target: Any) -> tuple[Callable[..., Any], tuple, dict]:
+        return preview_plans_for_files, (target,), {
             'mode':    self._mode(),
             'quality': self._quality.value(),
             'jobs':    self._jobs.value(),
