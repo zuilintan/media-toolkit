@@ -1,11 +1,14 @@
 """``artifact`` 的 ``classify`` 业务子 Tab。
 
-布局：``QVBoxLayout`` → 按钮行（修改配置 + 重载配置 + 刷新别名）+ WorkDirs
-摘要 label + :class:`~module.artifact.gui.widgets.drop_area.DropArea`（大块）。
+布局：``QHBoxLayout`` → :class:`~module.artifact.gui.widgets.drop_area.DropArea`
+（左侧占满）+ 右侧单列按钮（修改配置 / 重载配置 / 刷新别名）。
+
+workdirs / 别名摘要通过 :attr:`status_changed` 信号推送到模块底部状态栏，
+详细路径保留在 :meth:`status_tooltip` 供鼠标悬浮查看。
 
 业务流：启动时 :func:`~module.artifact.core.runtime_config.load_config` 加载
 workdirs + :func:`~module.artifact.workflow.classify.alias.load_aliases` 从
-缓存恢复 alias_map（同时校验目录是否仍存在，失效条目剔除并在 label 提示）；
+缓存恢复 alias_map（同时校验目录是否仍存在，失效条目剔除并在状态栏提示）；
 三个按钮职责单一互不联动：
 
 - 「修改配置」用关联程序打开 artifact.json
@@ -23,10 +26,11 @@ from pathlib import Path
 from PySide6.QtCore import QThread, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QHBoxLayout, QMessageBox, QPushButton, QWidget,
 )
 
 from base.console import emit, error, set_output, warn
+from base.gui import make_btn_col
 from base.gui.qt_sink import QtSink
 from module.artifact.gui.widgets.candidate_dialog import ask_candidate
 from module.artifact.gui.widgets.drop_area import DropArea
@@ -62,9 +66,11 @@ class ClassifyTab(QWidget):
     """``classify`` 业务 Tab：拖入归类。
 
     :ivar busy_changed: 预留信号；当前无长任务，恒为 ``False``。
+    :ivar status_changed: workdirs / 别名状态文本变更时发出，由模块底部状态栏消费。
     """
 
     busy_changed = Signal(bool)
+    status_changed = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -74,56 +80,59 @@ class ClassifyTab(QWidget):
         self._workdirs_paths: list[Path] = []
         self._alias_map: dict[str, Path] = {}
         self._alias_invalid: list[str] = []   # 缓存中已失效的别名（启动校验产生）
+        self._status_text_val: str = ''
+        self._status_tooltip_val: str = ''
 
-        self._edit_cfg_btn = QPushButton('📝 修改配置')
+        self._edit_cfg_btn = QPushButton('修改配置')
         self._edit_cfg_btn.setToolTip(
             f'用关联程序打开配置文件：\n{config_path()}\n'
             '编辑保存后点「重载配置」生效。'
         )
         self._edit_cfg_btn.clicked.connect(self._on_edit_config)
 
-        self._reload_cfg_btn = QPushButton('🔁 重载配置')
+        self._reload_cfg_btn = QPushButton('重载配置')
         self._reload_cfg_btn.setToolTip(
             '重新读取 artifact.json（workdirs）；'
-            '别名需要时另点「🔄 刷新别名」'
+            '别名需要时另点「刷新别名」'
         )
         self._reload_cfg_btn.clicked.connect(self._on_reload_config)
 
-        self._refresh_alias_btn = QPushButton('🔄 刷新别名')
+        self._refresh_alias_btn = QPushButton('刷新别名')
         self._refresh_alias_btn.setToolTip(
             '仅重新扫描所有 WorkDir 下的 [别名]：*.txt（不重读 artifact.json）'
         )
         self._refresh_alias_btn.clicked.connect(self._on_refresh_alias)
 
-        btn_lay = QHBoxLayout()
-        btn_lay.addWidget(self._edit_cfg_btn)
-        btn_lay.addWidget(self._reload_cfg_btn)
-        btn_lay.addWidget(self._refresh_alias_btn)
-        btn_lay.addStretch(1)
-
-        self._workdirs_label = QLabel('（配置加载中...）')
-        self._workdirs_label.setProperty('muted', True)
-        self._workdirs_label.setWordWrap(True)
-
         self._drop = DropArea()
         self._drop.paths_dropped.connect(self._on_paths_dropped)
 
-        lay = QVBoxLayout(self)
+        lay = QHBoxLayout(self)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
-        lay.addLayout(btn_lay)
-        lay.addWidget(self._workdirs_label)
         lay.addWidget(self._drop, 1)
+        lay.addWidget(make_btn_col(
+            [self._edit_cfg_btn, self._reload_cfg_btn, self._refresh_alias_btn],
+            top_margin=0,
+        ))
 
         self._load_workdirs()
         self._load_alias_cache()
-        self._update_status_label()
+        self._update_status()
+
+    # ── 状态文本 API ──────────────────────────────────────────────────
+    def status_text(self) -> str:
+        """供模块底部状态栏读取当前摘要文本。"""
+        return self._status_text_val
+
+    def status_tooltip(self) -> str:
+        """供模块底部状态栏更新 tooltip（完整路径列表）。"""
+        return self._status_tooltip_val
 
     # ── 配置加载 & UI 同步 ────────────────────────────────────────────
     def _load_workdirs(self) -> None:
         """读取 artifact.json → 更新 ``_cfg`` / ``_workdirs_paths`` / 拖入区可用性。
 
-        UI 文本由 :meth:`_update_status_label` 在调用方负责更新（合并别名状态）。
+        UI 文本由 :meth:`_update_status` 在调用方负责更新（合并别名状态）。
         """
         self._cfg = load_config()
         if not self._cfg.workdirs:
@@ -139,18 +148,18 @@ class ClassifyTab(QWidget):
         self._alias_map = alias_map
         self._alias_invalid = invalid
 
-    def _update_status_label(self) -> None:
-        """合并 workdirs / 别名状态到顶部 label。
+    def _update_status(self) -> None:
+        """合并 workdirs / 别名状态，推送到模块底部状态栏。
 
-        紧凑显示：workdirs 仅一行摘要（名字 join），完整路径放 tooltip；
+        主文本精简为一行摘要（名字 join），完整路径放 tooltip；
         别名失效信息保留显式提示，避免静默。
         """
         if not self._workdirs_paths:
-            self._workdirs_label.setText(
-                '⚠️ artifact.workdirs 为空 —— 点「📝 修改配置」'
-                '编辑后再点「🔁 重载配置」。'
+            self._status_text_val = (
+                '⚠️ artifact.workdirs 为空 —— 点「修改配置」'
+                '编辑后再点「重载配置」。'
             )
-            self._workdirs_label.setToolTip('')
+            self._status_tooltip_val = ''
         else:
             names = ', '.join(p.name or str(p) for p in self._workdirs_paths)
             parts = [f'📁 WorkDirs ({len(self._workdirs_paths)}): {names}']
@@ -162,15 +171,17 @@ class ClassifyTab(QWidget):
                 parts.append(
                     f'📇 别名: {len(self._alias_map)} 可用 / '
                     f'🟡 {len(self._alias_invalid)} 失效 — '
-                    f'点「🔄 刷新别名」更新（示例: {preview}{more}）'
+                    f'点「刷新别名」更新（示例: {preview}{more}）'
                 )
             elif self._alias_map:
                 parts.append(f'📇 别名: {len(self._alias_map)} 条已加载')
 
-            self._workdirs_label.setText(' · '.join(parts))
-            self._workdirs_label.setToolTip(
+            self._status_text_val = ' · '.join(parts)
+            self._status_tooltip_val = (
                 'WorkDirs:\n' + '\n'.join(f'• {p}' for p in self._workdirs_paths)
             )
+
+        self.status_changed.emit(self._status_text_val)
 
     def _do_scan_aliases(self) -> None:
         set_output(self._sink)
@@ -186,7 +197,7 @@ class ClassifyTab(QWidget):
         self._alias_invalid = []   # 新扫结果一定全部有效；scan_aliases 已落盘
         self._reload_cfg_btn.setEnabled(True)
         self._refresh_alias_btn.setEnabled(True)
-        self._update_status_label()
+        self._update_status()
 
     # ── 按钮回调 ──────────────────────────────────────────────────────
     def _on_edit_config(self) -> None:
@@ -196,7 +207,7 @@ class ClassifyTab(QWidget):
             # load_config() 启动时已落盘；走到这里通常是被人为删除
             QMessageBox.warning(
                 self, '配置缺失',
-                f'未找到 {path}\n点「🔁 重载配置」会自动重建空配置。',
+                f'未找到 {path}\n点「重载配置」会自动重建空配置。',
             )
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
@@ -204,7 +215,7 @@ class ClassifyTab(QWidget):
     def _on_reload_config(self) -> None:
         """仅重读 artifact.json → 更新 workdirs / UI；不触发别名扫描。"""
         self._load_workdirs()
-        self._update_status_label()
+        self._update_status()
 
     def _on_refresh_alias(self) -> None:
         """仅重新扫描别名（workdirs 未变时使用，省略一次 IO）。"""

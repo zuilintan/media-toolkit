@@ -233,9 +233,14 @@ QToolTip {{
     padding: 4px 8px;
 }}
 
-/* IDE 风格底部状态栏 —— MangaModule 等模块底栏（objectName=StatusBar） */
+/* 日志面板 + IDE 风格底部状态栏：左边框延续上方 QTabWidget pane 的左边竖线，
+   让侧边栏与右侧详情页的分割线一路贯穿整高（避免到 LogView 就断掉） */
+QWidget#LogPanel {{
+    border-left: 1px solid {BORDER};
+}}
 QWidget#StatusBar {{
     background: {BG_SUBTLE};
     border-top: 1px solid {BORDER};
+    border-left: 1px solid {BORDER};
 }}
 """

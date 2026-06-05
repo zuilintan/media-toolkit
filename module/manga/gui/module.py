@@ -83,9 +83,13 @@ class MangaModule(QWidget):
         # LogView 没 GroupBox 包裹，按钮列顶部不留 GroupBox 偏移
         log_btn_wrap = make_btn_col([export_btn, clear_btn], top_margin=0)
 
+        # 横向 margins 与 BaseTab 内容一致（root_lay 用 10），让 LogView 宽度对齐
+        # 输入框 / 选项框 / 预览框，按钮列右边界对齐 Tab 内按钮列。
+        # objectName=LogPanel：QSS 添加 border-left 延续 QTabWidget pane 的左竖线
         log_panel = QWidget()
+        log_panel.setObjectName('LogPanel')
         lh = QHBoxLayout(log_panel)
-        lh.setContentsMargins(0, 0, 0, 0)
+        lh.setContentsMargins(10, 0, 10, 0)
         lh.addWidget(self._log_stack, 1)
         lh.addWidget(log_btn_wrap)
 
@@ -95,6 +99,8 @@ class MangaModule(QWidget):
         self._splitter.setStretchFactor(0, 0)
         self._splitter.setStretchFactor(1, 1)
         self._splitter.setSizes([280, 520])
+        # 拖动后立即落盘，让 manga / artifact 切换时能即时同步
+        self._splitter.splitterMoved.connect(self._save_splitter)
 
         # ── 底部状态栏（IDE 风格）─────────────────────────────────────
         # 左侧主状态文本；右侧用 stretch 撑住，后续可在右边 addWidget 追加
@@ -180,11 +186,21 @@ class MangaModule(QWidget):
             tab._apply_btn.click()
 
     # ── splitter 状态持久化 ──────────────────────────────────────────
+    # 使用全局 key ``module.splitter``，与
+    # :class:`~module.artifact.gui.module.ArtifactModule` 共享；
+    # 切换大模块时 :meth:`showEvent` 重新拉取最新值，保持视觉一致
     def _restore_splitter(self) -> None:
-        sizes = get_config().get('manga.splitter')
+        sizes = get_config().get('module.splitter')
         if sizes:
             self._splitter.setSizes(sizes)
 
+    def _save_splitter(self, *_) -> None:
+        get_config().set('module.splitter', self._splitter.sizes())
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._restore_splitter()
+
     def save_state(self) -> None:
         """由 ``Shell`` 在 ``closeEvent`` 调用（也可由子类显式触发）。"""
-        get_config().set('manga.splitter', self._splitter.sizes())
+        self._save_splitter()
