@@ -10,7 +10,7 @@ from module.manga.core import patterns as P
 from module.manga.naming.text import (
     norm_punct, trad_to_simp,
     extract_flag, to_circle, conv_roman_suffix,
-    similar, strip_leading_prefix,
+    similar, strip_leading_prefix, parse_bracket_head,
 )
 from base.console import debug, CYAN, RESET
 
@@ -395,11 +395,16 @@ def parse_name(author: str, name: str) -> MangaInfo:
     stem = P.normalize_translation_delim(stem)
     stem, language, pre_part_tag, is_colorized, is_ongoing = _extract_special_flags(stem)
 
-    # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
+    # 1. 去除开头噪音前缀 & 抽取首个方括号（支持嵌套 [社团 (作者)] 形态）
     stem = strip_leading_prefix(stem)
-    m = P.AUTHOR_TAG_RE.search(stem)
-    if m and similar(m.group(1), author):
-        stem = stem[m.end():].strip()
+    head_author, publisher = parse_bracket_head(stem)
+    if head_author and similar(head_author, author):
+        m = P.AUTHOR_TAG_RE.search(stem)
+        if m:
+            stem = stem[m.end():].strip()
+    else:
+        # 首块作者与目录作者不一致：不视为作者标签，publisher 不采纳
+        publisher = ''
 
     # 2. 初步去除噪音标签 & 版本标记
     bare = P.NOISE_TAG_RE.sub('', stem).strip()
@@ -450,6 +455,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
         is_colorized  = is_colorized,
         is_ongoing    = is_ongoing,
         part_tag      = part_tag,
+        publisher     = publisher,
         original      = name,
     )
 
@@ -471,6 +477,7 @@ def emit_parse_debug(mi: MangaInfo) -> None:
     )
     debug(
         f"author='{CYAN}{mi.author}{RESET}' "
+        f"publisher='{CYAN}{mi.publisher}{RESET}' "
         f"main='{CYAN}{mi.main_title}{RESET}' "
         f"vol='{CYAN}{mi.volume}{RESET}' "
         f"ch='{CYAN}{mi.chapter}{RESET}' "

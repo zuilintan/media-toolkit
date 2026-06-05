@@ -4,8 +4,8 @@
 
 - 顶部源文件路径 + 状态标签
 - 旧名 / 新名 两列表格（差异时新名红底加粗）
-- 归入目录 + publisher_file（按需）
-- MangaInfo 解析字段表（作者 / 主标题 / 卷 / 话 / 系列 / 翻译 / 语言 / 章节标题 / 修饰）
+- 归入目录 + 旧标识清理（按需）
+- MangaInfo 解析字段表（作者 / 社团 / 主标题 / 卷 / 话 / 系列 / 翻译 / 语言 / 章节标题 / 修饰）
 - warnings 行（按需）
 - 「重命名」（可执行时）+ Close
 """
@@ -60,12 +60,14 @@ class StdTitleDetailDialog(QDialog):
         else:
             rows.append(('新名', plan.new_name, False))
         rows.append(('归入目录', _author_dir_display(plan), False))
-        if plan.publisher_file:
-            rows.append(('社团标识', os.path.basename(plan.publisher_file), False))
+        if plan.legacy_publisher_txt:
+            rows.append(('待清理', os.path.basename(plan.legacy_publisher_txt), False))
 
         mi = plan.info
         if mi is not None:
             rows.append(('作者', mi.author, False))
+            if mi.publisher:
+                rows.append(('社团', mi.publisher, False))
             rows.append(('主标题', mi.main_title, False))
             if mi.volume is not None:
                 rows.append(('卷', str(mi.volume), False))

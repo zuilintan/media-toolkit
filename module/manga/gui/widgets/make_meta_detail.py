@@ -6,15 +6,14 @@
 - :class:`~PySide6.QtWidgets.QTableWidget` 两列（标签 / 值）。无差异 tag 占 1 行；
   有差异 tag 占 2 行（旧上 / 新下），标签列 ``setSpan(row, 0, 2, 1)`` 跨 2 行
   合并，旧 / 新值上下对齐方便逐字符比对，用底色区分（无需文字标识）
-- 底部 warnings / 出版商冲突 / encoding 行（按需可见）
-- 「执行写入」（可写时）+ Close
+- 底部 warnings / encoding 行（按需可见）
+- 「执行写入」（有变化时）+ Close
 
 模态弹窗，由 :class:`~module.manga.gui.widgets.make_meta_tree.MakeMetaTree`
 的双击信号触发。
 """
 
 from __future__ import annotations
-import os
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
@@ -72,8 +71,8 @@ class _TagBoundaryDelegate(QStyledItemDelegate):
 class MakeMetaDetailDialog(QDialog):
     """单 plan 的完整 diff 表格弹窗（QTableWidget 实现）。
 
-    :ivar apply_requested: 「执行写入」按钮点击时发出（仅对 writable + changed
-        的 plan 显示）；具体写入由
+    :ivar apply_requested: 「执行写入」按钮点击时发出（仅对 changed 的 plan
+        显示）；具体写入由
         :class:`~module.manga.gui.tabs.make_meta_tab.MakeMetaTab` 统一处理，
         成功后会调 :meth:`accept` 关闭本对话框。
     """
@@ -162,11 +161,6 @@ class MakeMetaDetailDialog(QDialog):
             lay.addWidget(QLabel(
                 '🟡 警告: ' + '; '.join(plan.mi.warnings)
             ))
-        if plan.pub_conflict:
-            names = ', '.join(os.path.basename(p) for p in plan.pub_conflict)
-            warn = QLabel(f'⛔ 出版商冲突文件: {names}')
-            warn.setWordWrap(True)
-            lay.addWidget(warn)
         cur_enc = plan.existing_encoding or '—'
         new_enc = plan.new_encoding
         enc_line = (f'{cur_enc} → {new_enc}' if cur_enc != new_enc
@@ -177,7 +171,7 @@ class MakeMetaDetailDialog(QDialog):
         btns = QDialogButtonBox(QDialogButtonBox.Close, parent=self)
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
-        if plan.writable and plan.changed:
+        if plan.changed:
             apply_btn = QPushButton('执行写入', self)
             apply_btn.setToolTip('只对当前文件写入 ComicInfo.xml')
             apply_btn.setProperty('primary', True)
@@ -206,8 +200,6 @@ class MakeMetaDetailDialog(QDialog):
 
 
 def _status_label(p: MakeMetaPlan) -> str:
-    if not p.writable:
-        return '⛔ 出版商冲突（跳过）'
     if not p.changed:
         return '─ 已是最新（无需写入）'
     if p.existing_xml is None:

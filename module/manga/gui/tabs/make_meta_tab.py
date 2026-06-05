@@ -115,7 +115,7 @@ class MakeMetaTab(BaseTab):
         )
 
     def _count_actionable(self, plans: list[MakeMetaPlan]) -> int:
-        return sum(1 for p in plans if p.writable and p.changed)
+        return sum(1 for p in plans if p.changed)
 
     # ── 自动化管线钩子 ────────────────────────────────────────────────
     def auto_set_inputs(self, paths: list[Path]) -> None:
@@ -125,10 +125,9 @@ class MakeMetaTab(BaseTab):
     def auto_collect_outputs(self) -> list[Path]:
         """末端 Tab，输出供未来扩展（如再串外部链路）；写元数据不改文件名。"""
         plans = self._auto_snapshot or []
-        return [Path(p.cbz_path) for p in plans if p.writable]
+        return [Path(p.cbz_path) for p in plans]
 
     def _classify_plans(self, plans: list[MakeMetaPlan]) -> dict[str, int]:
-        writable = sum(1 for p in plans if p.writable and p.changed)
-        unchanged = sum(1 for p in plans if p.writable and not p.changed)
-        return {'可写入': writable, '无变化': unchanged,
-                '冲突': len(plans) - writable - unchanged}
+        changed   = sum(1 for p in plans if p.changed)
+        unchanged = sum(1 for p in plans if not p.changed)
+        return {'可写入': changed, '无变化': unchanged}

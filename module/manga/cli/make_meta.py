@@ -62,9 +62,8 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
     )
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
-    n_changed   = sum(1 for p in plans if p.writable and p.changed)
-    n_unchanged = sum(1 for p in plans if p.writable and not p.changed)
-    n_conflict  = sum(1 for p in plans if not p.writable)
+    n_changed   = sum(1 for p in plans if p.changed)
+    n_unchanged = sum(1 for p in plans if not p.changed)
     n_warn      = sum(1 for p in plans if p.mi.warnings)
     emit(f'\n{SEP2}')
     print_summary(
@@ -72,7 +71,6 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
         [
             ('✅', n_changed,   '待写入'),
             ('—',  n_unchanged, '已是最新'),
-            ('⛔', n_conflict,  '出版商冲突'),
             ('🟡', n_warn,      '有警告'),
         ],
         note='' if args.apply else '（预览，未实际修改）',
@@ -86,7 +84,7 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
 
     # ── 写入分支 ──────────────────────────────────────────────────────────────
     if not n_changed:
-        emit('  没有需要写入的文件（全部已是最新或全部冲突）。')
+        emit('  没有需要写入的文件（全部已是最新）。')
         emit(SEP2)
         return 0
 

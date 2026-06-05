@@ -54,6 +54,34 @@ def strip_leading_prefix(stem: str) -> str:
     return P.LEADING_PREFIX_RE.sub('', stem)
 
 
+#: 文件名首个 ``[xxx]`` 块匹配（不剥噪音前缀，调用方负责先 strip_leading_prefix）
+_BRACKET_HEAD_RE = re.compile(r'^\s*\[([^\]]+)\]')
+#: 嵌套 ``社团 (作者)`` 形态匹配
+_NESTED_PAREN_RE = re.compile(r'^(.+?)\s*\(([^)]+)\)\s*$')
+
+
+def parse_bracket_head(stem: str) -> tuple[str, str]:
+    """解析文件名首个 ``[xxx]`` 块，返回 ``(作者, 社团)``。
+
+    - ``[社团 (作者)]`` → ``('作者', '社团')``
+    - ``[作者]`` → ``('作者', '')``
+    - 未命中 → ``('', '')``
+
+    :func:`~module.manga.workflow.std_title.derive_author` 与
+    :func:`~module.manga.workflow.make_meta.extract_author_publisher` 共用，
+    确保单文件推导和元数据写入对"首个 ``[xxx]``"的认定一致。
+    本函数只做方括号解析，不剥噪音前缀；调用方负责先 :func:`strip_leading_prefix`。
+    """
+    m = _BRACKET_HEAD_RE.match(stem)
+    if not m:
+        return '', ''
+    inner = m.group(1).strip()
+    nm = _NESTED_PAREN_RE.match(inner)
+    if nm:
+        return nm.group(2).strip(), nm.group(1).strip()
+    return inner, ''
+
+
 def extract_flag(stem: str, pattern: re.Pattern) -> tuple[str, bool]:
     """匹配 ``pattern`` 时移除并返回 ``(new_stem, True)``，否则 ``(stem, False)``。"""
     if pattern.search(stem):

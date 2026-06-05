@@ -25,25 +25,36 @@ from module.manga.core.config import (
     SCRIPT_NAME, SCRIPT_VERSION, COMICINFO_FILENAME, PAGE_EXTS, COMICINFO_TAGS,
 )
 from module.manga.naming.parser import parse_name
+from module.manga.naming.text import strip_leading_prefix, parse_bracket_head
 from base.console import (
-    print_op_result, error, debug, info, warn, emit, )
+    print_op_result, error, debug, info, emit, )
 from module.manga.infra.parallel import run_plans
 
 # ── 特殊字符（ComicInfo 文件名格式中使用）──────────────────────────────────────
 WAVE        = '\uff5e'   # ～  全角波浪线（话标题定界符）
 BAR         = '\u00a6'   # ¦   间断竖线  （译名定界符）
 MIDDLE_DOT  = '\u30fb'   # ・  片假名中点（标题内空格替代符）
-FCOLON      = '\uff1a'   # ：  全角冒号  （社团文件分隔符）
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 作者提取（从 CBZ 文件名中）
+# 作者 / 社团提取（从 CBZ 文件名中）
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def extract_author_publisher(filename: str) -> tuple[str, str]:
+    """从 CBZ 文件名首方括号提取 ``(作者, 社团)``。
+
+    - ``[社团 (作者)]`` → ``('作者', '社团')``
+    - ``[作者]`` → ``('作者', '')``
+    - 未命中 → ``('', '')``
+    """
+    stem = strip_leading_prefix(Path(filename).stem)
+    return parse_bracket_head(stem)
+
 
 def extract_author(filename: str) -> str:
-    """从 CBZ 文件名第一个 ``[xxx]`` 括号提取作者名。"""
-    m = re.match(r'^\[(.+?)\]', Path(filename).stem)
-    return m.group(1).strip() if m else ''
+    """从 CBZ 文件名第一个 ``[xxx]`` 括号提取作者名（兼容嵌套 ``[社团 (作者)]``）。"""
+    author, _ = extract_author_publisher(filename)
+    return author
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -172,39 +183,16 @@ def build_comicinfo_xml(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Publisher 查找
+# Publisher 查找（从文件名首方括号 [社团 (作者)] 抽取）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_PUBLISHER_RE = re.compile(
-    rf'^[\[［]社团[\]］][{FCOLON}:]\s*(?P<name>.+)\.txt$',
-    re.IGNORECASE,
-)
+def find_publisher(cbz_path: str) -> str | None:
+    """从 CBZ 文件名首方括号抽取社团名。
 
-
-def _extract_publisher_name(filename: str) -> str | None:
-    m = _PUBLISHER_RE.match(os.path.basename(filename))
-    return m.group('name').strip() if m else None
-
-
-def find_publisher(cbz_path: str) -> tuple[str | None, list[str] | None]:
-    """在 CBZ 所在目录搜索 ``[社团]：XX.txt``。
-
-    :return:
-
-        - ``(name, None)``     — 找到唯一社团文件
-        - ``(None, None)``     — 未找到
-        - ``(None, [paths…])`` — 多文件冲突
+    :return: 嵌套 ``[社团 (作者)]`` 时返回社团；其它形态返回 ``None``。
     """
-    hits: list[tuple[str, str]] = []
-    for f in Path(cbz_path).parent.iterdir():
-        if not f.is_file():
-            continue
-        name = _extract_publisher_name(f.name)
-        if name:
-            hits.append((name, str(f)))
-    if len(hits) == 0: return None, None
-    if len(hits) == 1: return hits[0][0], None
-    return None, [h[1] for h in hits]
+    _, publisher = extract_author_publisher(os.path.basename(cbz_path))
+    return publisher or None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -330,8 +318,7 @@ def preview_plan(cbz_path: str) -> MakeMetaPlan | None:
 
     :return: ``None`` 表示文件名无法提取作者（跳过）；否则返回
         :class:`~module.manga.core.models.MakeMetaPlan`，由
-        :attr:`~module.manga.core.models.MakeMetaPlan.writable` /
-        :attr:`~module.manga.core.models.MakeMetaPlan.changed` 标识是否可写 / 需写。
+        :attr:`~module.manga.core.models.MakeMetaPlan.changed` 标识是否需写。
     """
     filename = os.path.basename(cbz_path)
     author   = extract_author(filename)
@@ -339,7 +326,7 @@ def preview_plan(cbz_path: str) -> MakeMetaPlan | None:
         return None
 
     mi                          = parse_name(author, Path(filename).stem)
-    publisher, pub_conflict     = find_publisher(cbz_path)
+    publisher                   = mi.publisher or None
     page_count, tags_val, existing_xml = read_cbz_meta(cbz_path)
     fields                      = collect_fields(mi, publisher, tags_val, page_count)
     existing_fields             = _parse_existing_fields(existing_xml)
@@ -354,7 +341,6 @@ def preview_plan(cbz_path: str) -> MakeMetaPlan | None:
         cbz_path        = cbz_path,
         mi              = mi,
         publisher       = publisher,
-        pub_conflict    = pub_conflict,
         page_count      = page_count,
         tags_val        = tags_val,
         fields          = fields,
@@ -386,9 +372,7 @@ def apply_plan(plan: MakeMetaPlan) -> str:
 def _progress_line(idx: int, total: int, plan: MakeMetaPlan | None) -> str:
     if plan is None:
         return f'   ! [{idx}/{total}] (无作者，已跳过)'
-    icon = ('*' if plan.writable and plan.changed
-            else '-' if plan.writable
-            else '!')
+    icon = '*' if plan.changed else '-'
     return f'   {icon} [{idx}/{total}] {plan.filename}'
 
 
@@ -430,7 +414,7 @@ def apply_plans(
 ) -> int:
     """整批写入 ``ComicInfo.xml``。
 
-    :param plans:   预览阶段产出的 plan 列表（含 writable / 不可写两类）。
+    :param plans:   预览阶段产出的 plan 列表。
     :param dry_run: ``True`` 时仅预览提示，不实际写入。
     :param cancel_token: ``threading.Event``，已 set 时提前退出。
     :return: 失败数量（``dry_run`` 时为 0）。
@@ -447,10 +431,6 @@ def apply_plans(
         if _cancelled():
             emit('  ⏹️  已取消')
             break
-        if not plan.writable:
-            warn(f'跳过（出版商冲突）: {os.path.basename(plan.cbz_path)}')
-            skip += 1
-            continue
         if not plan.changed:
             skip += 1   # ComicInfo.xml 已存在且与目标完全一致：幂等跳过
             continue

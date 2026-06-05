@@ -3,16 +3,17 @@
 两种输入模式：
 
 - **批量模式** :func:`preview_plans` ← 给定根目录，按 ``{root}/{author}/*.{zip,cbz}``
-  结构扫描；作者目录名即作者，无 publisher 推导。
+  结构扫描；作者目录名即作者，社团从同目录旧方案 ``[社团]：XX.txt`` 兼容读取
+  （即「迁移路径」），apply 后顺手清理。
 - **单文件 / 混合模式** :func:`derive_inputs` → :func:`preview_plans_for_inputs`
   ← 单文件作者推导（含 ``[社团 (作者)]`` 嵌套抽取）统一在 :func:`derive_inputs`
   完成：``auto_author`` 命中即直采，否则回调 ``resolve_fn`` 交互式补全；apply
   阶段统一保证文件落入 ``{父目录}/{作者}/`` 子目录（必要时新建），抽取出的社团
-  顺带写入 ``[社团]：{社团名}.txt`` 标识（下游
-  :func:`~module.manga.workflow.make_meta.find_publisher` 自动识别）。
+  会以 ``[社团 (作者)]`` 形式回写到目标文件名上。
 """
 
 from __future__ import annotations
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,18 +23,41 @@ from module.manga.core.models import StdTitlePlan
 from module.manga.core.config import FILE_EXTS
 from module.manga.naming.parser import parse_name
 from module.manga.naming.builder import build_new_name
-from module.manga.naming.text import strip_leading_prefix
+from module.manga.naming.text import strip_leading_prefix, parse_bracket_head
 from base.fs import try_rename
 from base.console import print_op_result, warn, error, info, emit
 from module.manga.infra.parallel import run_plans
 
 
-#: 发版商标识文件名分隔符（全角冒号），与
-#: :data:`~module.manga.workflow.make_meta.FCOLON` 对齐
+#: 旧方案发版商标识文件名分隔符（全角冒号），仅作迁移兼容读取使用
 _FCOLON = '\uff1a'
+_LEGACY_PUBLISHER_RE = re.compile(
+    rf'^[\[［]社团[\]］][{_FCOLON}:]\s*(?P<name>.+)\.txt$',
+    re.IGNORECASE,
+)
 
-_BRACKET_HEAD_RE = re.compile(r'^\s*\[([^\]]+)\]')
-_NESTED_PAREN_RE = re.compile(r'^(.+?)\s*\(([^)]+)\)\s*$')
+
+def find_legacy_publisher(dir_path: Path) -> tuple[str, str | None]:
+    """旧方案兼容：扫 ``dir_path`` 下的 ``[社团]：XX.txt``，返回 ``(社团, txt 路径)``。
+
+    用于一次性迁移：找到即把社团信息合入新文件名 ``[社团 (作者)]``，
+    apply 成功后顺手删除该 ``.txt``。多文件冲突或无文件时返回 ``('', None)``。
+    """
+    if not dir_path.is_dir():
+        return '', None
+    hits: list[tuple[str, str]] = []
+    try:
+        for f in os.scandir(dir_path):
+            if not f.is_file(follow_symlinks=False):
+                continue
+            m = _LEGACY_PUBLISHER_RE.match(f.name)
+            if m:
+                hits.append((m.group('name').strip(), f.path))
+    except OSError:
+        return '', None
+    if len(hits) == 1:
+        return hits[0]
+    return '', None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -82,36 +106,17 @@ class AuthorDerivation:
         return not self.parent_author and not self.bracket_author
 
 
-def _parse_bracket_head(stem: str) -> tuple[str, str]:
-    """解析文件名首个 ``[xxx]`` 块，返回 ``(作者, 社团)``。
-
-    - ``[社团 (作者)]`` → ``('作者', '社团')``
-    - ``[作者]`` → ``('作者', '')``
-    - 未命中 → ``('', '')``
-
-    本函数仅做方括号解析，不处理开头噪音前缀；调用方负责先剥离
-    ``(同人CG集)`` 这类噪音（参见 :func:`derive_author`）。
-    """
-    m = _BRACKET_HEAD_RE.match(stem)
-    if not m:
-        return '', ''
-    inner = m.group(1).strip()
-    nm = _NESTED_PAREN_RE.match(inner)
-    if nm:
-        return nm.group(2).strip(), nm.group(1).strip()
-    return inner, ''
-
-
 def derive_author(src_path: str) -> AuthorDerivation:
     """从源文件路径推导作者候选，返回 :class:`AuthorDerivation` 供调用方决策。
 
     预处理顺序与 :func:`~module.manga.naming.parser.parse_name` 对齐：复用
     :func:`~module.manga.naming.text.strip_leading_prefix` 剥离 ``(同人CG集)``
-    这类开头噪音前缀，再交 :func:`_parse_bracket_head` 解析方括号头。
+    这类开头噪音前缀，再交 :func:`~module.manga.naming.text.parse_bracket_head`
+    解析方括号头。
     """
     p = Path(src_path)
     stem = strip_leading_prefix(p.stem)
-    bracket_author, bracket_publisher = _parse_bracket_head(stem)
+    bracket_author, bracket_publisher = parse_bracket_head(stem)
     return AuthorDerivation(
         src_path          = str(p),
         parent_author     = p.parent.name,
@@ -130,31 +135,35 @@ class StdTitleInput:
 
     :ivar author_dir:     目标作者目录完整路径；父目录名 == ``author`` 时即父目录，
         否则为 ``父目录/{author}/`` 新建目标。
-    :ivar publisher_file: 发版商标识文件完整路径；``None`` 表示本项不创建。
+    :ivar publisher:      社团名；空表示无社团。
+    :ivar legacy_publisher_txt: 旧方案 ``[社团]：XX.txt`` 路径，apply 成功后清理；
+        ``None`` 表示无需清理。
     """
-    src_path:       str
-    author:         str
-    author_dir:     str
-    publisher_file: str | None = None
+    src_path:             str
+    author:               str
+    author_dir:           str
+    publisher:            str = ''
+    legacy_publisher_txt: str | None = None
 
 
-def build_input(src_path: str, author: str, publisher: str = '') -> StdTitleInput:
+def build_input(
+    src_path: str, author: str, publisher: str = '',
+    legacy_publisher_txt: str | None = None,
+) -> StdTitleInput:
     """根据已确定作者构造 :class:`StdTitleInput`。
 
     - 父目录名 == ``author`` → ``author_dir`` 沿用父目录，不新建
     - 否则 → ``author_dir`` 指向 ``父目录/{author}/``，apply 阶段创建
-    - ``publisher`` 非空时同步生成 ``[社团]：{publisher}.txt`` 路径
     """
     p          = Path(src_path)
     parent     = p.parent
     author_dir = parent if parent.name == author else parent / author
-    pub_file   = (str(author_dir / f'[社团]{_FCOLON}{publisher}.txt')
-                  if publisher else None)
     return StdTitleInput(
-        src_path       = str(p),
-        author         = author,
-        author_dir     = str(author_dir),
-        publisher_file = pub_file,
+        src_path             = str(p),
+        author               = author,
+        author_dir           = str(author_dir),
+        publisher            = publisher,
+        legacy_publisher_txt = legacy_publisher_txt,
     )
 
 
@@ -201,6 +210,8 @@ def derive_inputs(
       :meth:`~module.manga.workflow.author_library.AuthorLibrary.resolve`，按
       简繁归一对齐到库里既有主名，避免出现"作者甲（繁）"与"作者甲（简）"
       两份目录
+    - 若文件名首块没有抽到社团，但父目录里有旧方案 ``[社团]：XX.txt``，按迁移
+      路径自动采纳并把 .txt 路径挂在输入上，apply 成功后清理
 
     所有交互（CLI prompt / GUI 弹窗）由调用方在 ``resolve_fn`` 内完成，本函数
     本身不做任何 I/O，便于在 :class:`~module.manga.gui.tabs.base_tab.BaseTab._validate_scan_target`
@@ -223,7 +234,13 @@ def derive_inputs(
             continue
         if normalize_author is not None:
             author = normalize_author(author) or author
-        inputs.append(build_input(str(path), author, publisher))
+        # 迁移路径：bracket 没抽到社团时回退扫父目录旧方案 .txt
+        legacy_txt: str | None = None
+        if not publisher:
+            legacy_pub, legacy_txt = find_legacy_publisher(path.parent)
+            if legacy_pub:
+                publisher = legacy_pub
+        inputs.append(build_input(str(path), author, publisher, legacy_txt))
     return inputs
 
 
@@ -239,16 +256,21 @@ def _plan_one(inp: StdTitleInput) -> StdTitlePlan:
     """
     file     = Path(inp.src_path)
     mi       = parse_name(inp.author, file.stem)
+    # 显式 publisher 覆盖：bracket head 未抽到，但 derive_inputs 通过旧方案
+    # .txt 或 GUI/CLI 交互拿到了社团名，需把这一信息塞回 mi 才能在 builder
+    # 输出 [社团 (作者)] 形态
+    if inp.publisher and not mi.publisher:
+        mi.publisher = inp.publisher
     suffix   = '.cbz' if file.suffix.lower() == '.zip' else file.suffix
     new_name = build_new_name(mi) + suffix
     return StdTitlePlan(
-        src_path       = inp.src_path,
-        author_dir     = inp.author_dir,
-        author         = inp.author,
-        old_name       = file.name,
-        new_name       = new_name,
-        info           = mi,
-        publisher_file = inp.publisher_file,
+        src_path             = inp.src_path,
+        author_dir           = inp.author_dir,
+        author               = inp.author,
+        old_name             = file.name,
+        new_name             = new_name,
+        info                 = mi,
+        legacy_publisher_txt = inp.legacy_publisher_txt,
     )
 
 
@@ -262,20 +284,23 @@ def _progress_line(idx: int, total: int, plan: StdTitlePlan) -> str:
 def _iter_root_inputs(root: Path) -> list[StdTitleInput]:
     """批量模式：``{root}/{author}/*.{zip,cbz}`` → :class:`StdTitleInput` 列表。
 
-    父目录名即作者，无 publisher 推导（批量模式假设输入已按作者归档）。
+    父目录名即作者；若作者目录下存在旧方案 ``[社团]：XX.txt``，按迁移路径采纳
+    该社团并把 .txt 路径挂在每个输入上，apply 成功后清理。
     """
     inputs: list[StdTitleInput] = []
     for author_dir in sorted(root.iterdir()):
         if not author_dir.is_dir():
             continue
         author = author_dir.name
+        legacy_pub, legacy_txt = find_legacy_publisher(author_dir)
         for f in sorted(author_dir.iterdir()):
             if f.is_file() and f.suffix.lower() in FILE_EXTS:
                 inputs.append(StdTitleInput(
-                    src_path       = str(f),
-                    author         = author,
-                    author_dir     = str(author_dir),
-                    publisher_file = None,
+                    src_path             = str(f),
+                    author               = author,
+                    author_dir           = str(author_dir),
+                    publisher            = legacy_pub,
+                    legacy_publisher_txt = legacy_txt,
                 ))
     return inputs
 
@@ -331,36 +356,25 @@ def preview_plans(
 # 执行重命名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _write_publisher_file(path: Path) -> str:
-    """落 ``[社团]：XX.txt`` 标识。
-
-    幂等：同名已存在直接复用；同目录存在不同社团文件则 warn 并跳过创建（罕见，
-    通常表示原始数据需人工介入）。
-
-    :return: ``'created'`` / ``'exists'`` / ``'conflict'``
-    """
-    if path.exists():
-        return 'exists'
-    # 同目录扫一遍是否已有「[社团]：XX.txt」（不同社团名）
-    for sibling in path.parent.iterdir():
-        if (sibling.is_file()
-                and sibling.name != path.name
-                and sibling.name.startswith(f'[社团]{_FCOLON}')
-                and sibling.name.endswith('.txt')):
-            warn(f'已存在不同社团标识，跳过创建: {sibling.name} (本次预期 {path.name})')
-            return 'conflict'
-    path.write_bytes(b'')
-    return 'created'
+def _cleanup_legacy_txt(path_str: str) -> None:
+    """旧方案 ``[社团]：XX.txt`` 一次性清理（best effort，失败仅 warn）。"""
+    p = Path(path_str)
+    try:
+        if p.exists():
+            p.unlink()
+            emit(f'   🧹 已清理旧标识: {p.name}')
+    except OSError as e:
+        warn(f'旧标识清理失败: {p.name} — {e}')
 
 
 def apply_plan(plan: StdTitlePlan) -> str:
-    """执行单个 plan 的重命名 + publisher 标识写入。
+    """执行单个 plan 的重命名。
 
     apply 顺序：
 
     1. ``author_dir`` 不存在则 ``mkdir``（仅在父目录下建一层）
     2. ``try_rename(src_path, author_dir / new_name)``
-    3. rename 成功后处理 ``publisher_file``（幂等 + 多社团 warn 跳过）
+    3. rename 成功后若挂有旧方案 ``[社团]：XX.txt``，best-effort 清理
 
     :return: ``'ok'`` / ``'skip'`` / ``'error'``；``'skip'`` 表示需审核 /
         无变化 / 目标已存在等不阻断的跳过原因。
@@ -385,12 +399,9 @@ def apply_plan(plan: StdTitlePlan) -> str:
         error(f'{plan.old_name} — {e}')
         return 'error'
 
-    # rename 成功后再落 publisher（失败仅 warn，不影响主流程）
-    if plan.publisher_file:
-        try:
-            _write_publisher_file(Path(plan.publisher_file))
-        except Exception as e:
-            warn(f'发版商标识写入失败: {Path(plan.publisher_file).name} — {e}')
+    # rename 成功后清理旧方案 .txt（迁移路径专用，幂等）
+    if plan.legacy_publisher_txt:
+        _cleanup_legacy_txt(plan.legacy_publisher_txt)
 
     return 'ok'
 

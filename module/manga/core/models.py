@@ -93,6 +93,7 @@ class MangaInfo:
         - 结构类：``上篇`` / ``中篇`` / ``下篇``（与 ``CH.`` 同级且互斥）
         - 合集类：``总集篇``（作为 ``[总集篇]`` tag 输出）
     :ivar language: 语言代码（``zh`` / ``ja`` / ``ko`` / ``en`` / ``zxx`` / ``''``）。
+    :ivar publisher: 社团名（嵌套形态 ``[社团 (作者)]`` 中的社团部分）；空表示无社团。
     """
     author:        str
     main_title:    str
@@ -106,6 +107,7 @@ class MangaInfo:
     is_colorized:  bool           = False
     is_ongoing:    bool           = False
     part_tag:      str            = ""
+    publisher:     str            = ""
     original:      str            = ""
 
     @property
@@ -129,8 +131,8 @@ class StdTitlePlan:
     :ivar author_dir:     **目标**作者目录完整路径；apply 时必要时创建。
         批量模式下与 ``src_path`` 父目录一致；单文件模式下当 ``[]`` 抽取的作者
         与父目录不一致时，会指向父目录下新建的 ``{author}/`` 子目录。
-    :ivar publisher_file: 发版商标识文件完整路径（``[社团]：XX.txt``），仅在
-        ``[社团 (作者)]`` 形态被采纳时非 ``None``；apply 阶段幂等落盘。
+    :ivar legacy_publisher_txt: 旧方案 ``[社团]：XX.txt`` 文件完整路径，仅在
+        从旧方案迁移时非 ``None``；apply 成功后顺手清理。
     """
     src_path:       str
     author_dir:     str
@@ -138,7 +140,7 @@ class StdTitlePlan:
     old_name:       str
     new_name:       str
     info:           MangaInfo | None
-    publisher_file: str | None = None
+    legacy_publisher_txt: str | None = None
 
     @property
     def changed(self) -> bool:
@@ -167,18 +169,12 @@ class MakeMetaPlan:
     cbz_path:        str
     mi:              MangaInfo
     publisher:       str | None
-    pub_conflict:    list[str] | None
     page_count:      int
     tags_val:        str
     fields:          dict[str, str]  #: 本次构建的字段（新值）
     existing_fields: dict[str, str]  #: 现有 ``ComicInfo.xml`` 解析出的字段（旧值）
     existing_xml:    bytes | None    #: 现有 ``ComicInfo.xml`` 原始字节（无则 ``None``）
     new_xml:         bytes           #: 本次构建的目标字节
-
-    @property
-    def writable(self) -> bool:
-        """是否可写入：无出版商冲突即可。"""
-        return not self.pub_conflict
 
     @property
     def changed(self) -> bool:

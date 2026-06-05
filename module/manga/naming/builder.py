@@ -2,7 +2,7 @@
 
 目标命名格式::
 
-  [作者] 漫画标题( VOL.XX)?
+  [(社团 (作者))?] 漫画标题( VOL.XX)?
   ( CH.XX(-YY)?(+番外篇)? | 番外篇 | 后日谈 | 上篇 | 中篇 | 下篇)?
   ( ～话标题～)?( (系列))? ( ¦译名¦)?
   ([总集篇])? ([zh])? ([uncensored])? ([colorized])? ([ongoing])?
@@ -21,8 +21,16 @@ from module.manga.naming.text import dot, norm_punct
 
 
 def build_new_name(info: MangaInfo) -> str:
-    """根据 :class:`~module.manga.core.models.MangaInfo` 拼合目标名称（不含后缀）。"""
-    parts: list[str] = [f'[{info.author}]', dot(info.main_title)]
+    """根据 :class:`~module.manga.core.models.MangaInfo` 拼合目标名称（不含后缀）。
+
+    首方括号语义:
+
+    - 有 ``publisher`` → ``[社团 (作者)]``
+    - 无 ``publisher`` → ``[作者]``
+    """
+    head = (f'[{info.publisher} ({info.author})]'
+            if info.publisher else f'[{info.author}]')
+    parts: list[str] = [head, dot(info.main_title)]
 
     if info.volume is not None:
         parts.append(str(info.volume))

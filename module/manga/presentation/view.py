@@ -90,8 +90,8 @@ def print_std_title_preview(plans: list[StdTitlePlan]) -> None:
             src_parent = os.path.dirname(p.src_path)
             if os.path.normcase(src_parent) != os.path.normcase(p.author_dir):
                 emit(f'     📁 归入: ./{os.path.basename(p.author_dir)}/')
-            if p.publisher_file:
-                emit(f'     📌 标识: {os.path.basename(p.publisher_file)}')
+            if p.legacy_publisher_txt:
+                emit(f'     🧹 待清理: {os.path.basename(p.legacy_publisher_txt)}')
             if p.info:
                 for w in p.info.warnings:
                     emit(f'     🟡 {w}')
@@ -119,7 +119,7 @@ def emit_make_meta_card(plan: MakeMetaPlan, idx: int) -> None:
     emit(f'   📄 [{idx}] {plan.filename}')
     emit_parse_debug(plan.mi)
     print_make_meta_diff_table(
-        plan.existing_fields, plan.fields, plan.pub_conflict,
+        plan.existing_fields, plan.fields,
         indent='     ',
     )
     for w in plan.mi.warnings:
@@ -158,15 +158,14 @@ def print_make_meta_preview(
     - **常见组** → 仅渲染前 ``sample_per_group`` 个样本卡，其余折叠为计数行
     - ``sample_per_group == 0`` 时强制全量渲染（小批量场景退化为旧行为）
 
-    冲突 / 警告同样采样输出（默认前 ``sample_per_group``）以兼顾"看全特例"和"不刷屏"。
+    警告采样输出（默认前 ``sample_per_group``）以兼顾"看全特例"和"不刷屏"。
 
     :param plans: :func:`~module.manga.workflow.make_meta.preview_plans` 的产物。
     :param sample_per_group: 常见组的样本卡数；``0`` 表示全量。
     :param rare_threshold:   出现次数 ≤ 此值的组视为稀有，强制全量渲染。
     """
-    changed   = [p for p in plans if p.writable and p.changed]
-    unchanged = [p for p in plans if p.writable and not p.changed]
-    conflict  = [p for p in plans if not p.writable]
+    changed   = [p for p in plans if p.changed]
+    unchanged = [p for p in plans if not p.changed]
     warns     = [p for p in plans if p.mi.warnings]
 
     _print_preview_header('预览')
@@ -203,18 +202,8 @@ def print_make_meta_preview(
     else:
         emit('\n没有需要写入的 ComicInfo.xml。')
 
-    # ── 冲突 / 警告（独立段，采样输出避免再次刷屏）──────────────────────
+    # ── 警告（独立段，采样输出避免再次刷屏）─────────────────────────────
     cap = sample_per_group if sample_per_group > 0 else None
-    if conflict:
-        emit(f'\n⛔ 出版商冲突: {len(conflict)} 个（apply 阶段会自动跳过）')
-        shown = conflict if cap is None else conflict[:cap]
-        for p in shown:
-            emit(f'   • {p.filename}')
-            for pc in (p.pub_conflict or []):
-                emit(f'     - {os.path.basename(pc)}')
-        if cap is not None and len(conflict) > cap:
-            emit(f'   … 另有 {len(conflict) - cap} 个未列出')
-
     if warns:
         emit(f'\n🟡 有警告: {len(warns)} 个')
         shown = warns if cap is None else warns[:cap]
@@ -226,7 +215,7 @@ def print_make_meta_preview(
     _print_preview_footer(
         len(plans),
         [('计划处理', len(changed)), ('无需处理', len(unchanged)),
-         ('冲突',   len(conflict)), ('警告',     len(warns))],
+         ('警告',     len(warns))],
     )
 
 
@@ -237,7 +226,6 @@ def print_make_meta_preview(
 def print_make_meta_diff_table(
     old_fields:   dict[str, str],
     new_fields:   dict[str, str],
-    pub_conflict: list[str] | None = None,
     *,
     indent:       str = '         ',
 ) -> None:
@@ -246,7 +234,6 @@ def print_make_meta_diff_table(
     - 新列差异字符用 RED 高亮（与 :func:`print_std_title_preview` 的
       :func:`~base.console.highlight_diff` 对齐）
     - 行尾 ``*`` 标记本行新旧不一致（含字段从无到有 / 从有到无）
-    - ``pub_conflict`` 非空时在表下追加冲突文件列表
     """
     tag_w = max(len(t) for t in COMICINFO_TAGS)
     old_w = max(_vis_width('旧'), *(_vis_width(old_fields.get(t, '')) for t in COMICINFO_TAGS))
@@ -268,11 +255,6 @@ def print_make_meta_diff_table(
             marker   = f'  {YELLOW}*{RESET}'
         emit(f'{indent}{_pad(tag, tag_w)}  {_pad(ov, old_w)}  {new_cell}{marker}')
     emit(sep)
-
-    if pub_conflict:
-        emit(f'{indent}🟡 Publisher: 多个社团文件，请手动确认！')
-        for p in pub_conflict:
-            emit(f'{indent}  • {os.path.basename(p)}')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

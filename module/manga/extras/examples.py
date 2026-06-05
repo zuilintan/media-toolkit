@@ -15,14 +15,11 @@ from pathlib import Path
 from module.manga.core.config import COMICINFO_TAGS
 from module.manga.naming.parser import parse_name, emit_parse_debug
 from module.manga.naming.builder import build_new_name
-from module.manga.workflow.make_meta import collect_fields, _extract_publisher_name
+from module.manga.workflow.make_meta import collect_fields
 from base.console import highlight_diff, SEP2, RED, GREEN, emit, print_summary
 from module.manga.presentation.view import print_make_meta_diff_table
 
 _DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'examples.json'
-
-# :func:`run_make_meta_examples` 用来模拟出版商提取的样本文件名
-_EXAMPLES_PUBLISHER_FILE = '[社团]：青年晚报.txt'
 
 
 def load_examples() -> list[tuple[str, str, str]]:
@@ -71,16 +68,15 @@ def run_std_title_examples() -> int:
 def run_make_meta_examples() -> int:
     """把规范化文件名（``expected``）解析为 ComicInfo 字段并展示。
 
-    Publisher 取自 :data:`_EXAMPLES_PUBLISHER_FILE` 的模拟提取结果，PageCount 留空。
+    Publisher 直接从文件名嵌套 ``[社团 (作者)]`` 抽取（即 ``mi.publisher``），
+    PageCount 留空。
 
     :return: 失败条数（0 表示全部通过），供调用方据此设定退出码。
     """
     examples = load_examples()
-    sim_pub  = _extract_publisher_name(_EXAMPLES_PUBLISHER_FILE)
 
     emit(SEP2)
     emit(f'  make_meta  —  内置示例解析（共 {len(examples)} 条）')
-    emit(f'  模拟出版商文件: {_EXAMPLES_PUBLISHER_FILE}  →  Publisher: {sim_pub}')
     emit(SEP2)
 
     ok_n = fail = warn_n = 0
@@ -94,7 +90,7 @@ def run_make_meta_examples() -> int:
         emit(f'   📄 [{idx}] {expected}')
         mi = parse_name(author, expected)
         emit_parse_debug(mi)
-        fields = collect_fields(mi, sim_pub)
+        fields = collect_fields(mi, mi.publisher or None)
         # 旧列恒空：示例模拟"首次写入"语义
         print_make_meta_diff_table(empty_old, fields, indent='     ')
         for w in mi.warnings:
