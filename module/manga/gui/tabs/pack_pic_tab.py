@@ -9,20 +9,26 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
+    QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
 )
 
 from base.gui.path_list import PathListWidget
 from module.manga.core.models import PackPicPlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.gui.widgets.pack_pic_detail import PackPicDetailDialog
+from module.manga.gui.widgets.pack_pic_tree import PackPicTree
+from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 from module.manga.presentation.view import print_pack_pic_preview
-from module.manga.workflow.pack_pic import apply_plans, preview_plans_for_dirs
+from module.manga.workflow.pack_pic import (
+    apply_plan, apply_plans, preview_plans_for_dirs,
+)
 
 
 class PackPicTab(BaseTab):
     cmd_name        = 'pack_pic'
     apply_btn_text  = '打包'
     confirm_verb    = '打包并删除源目录'
+    single_verb     = '打包'
     no_change_msg   = '没有可打包的目录'
 
     def _create_input_widget(self) -> QWidget:
@@ -75,6 +81,15 @@ class PackPicTab(BaseTab):
 
     def _apply_fn(self):
         return apply_plans
+
+    def _apply_one(self, plan: PackPicPlan) -> str:
+        return apply_plan(plan)
+
+    def _create_preview_tree(self) -> PreviewTreeBase:
+        return PackPicTree(self)
+
+    def _create_detail_dialog(self, plan: PackPicPlan) -> QDialog:
+        return PackPicDetailDialog(plan, parent=self)
 
     def _render_preview(self, plans: list[PackPicPlan]) -> None:
         print_pack_pic_preview(plans)

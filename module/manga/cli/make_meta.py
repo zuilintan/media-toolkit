@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import argparse
 
-from base.console import SEP2, emit, confirm, error, ok, print_summary
+from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.presentation.view import print_make_meta_preview, print_run_banner
-from module.manga.presentation.export import export_plans
 from module.manga.workflow.make_meta import (
     apply_plans, preview_plans, preview_plans_for_files,
 )
@@ -61,15 +60,6 @@ def cmd_make_meta(args: argparse.Namespace) -> int:
         sample_per_group=args.sample_per_group,
         rare_threshold=args.rare_threshold,
     )
-
-    # ── 可选导出（不影响后续 apply 流程）─────────────────────────────────────
-    if args.export:
-        try:
-            out = export_plans(plans, args.export)
-            ok(f'已导出预览到 {out}')
-        except ValueError as e:
-            error(str(e))
-            return 2
 
     # ── 预览汇总 ──────────────────────────────────────────────────────────────
     n_changed   = sum(1 for p in plans if p.writable and p.changed)
@@ -128,6 +118,3 @@ def add_make_meta_args(p: argparse.ArgumentParser) -> None:
                    help='预览阶段每类差异展示的样本卡数（默认 3；0=全量，不折叠）')
     p.add_argument('--rare-threshold', type=int, default=5, metavar='N',
                    help='出现 ≤ N 次的差异类视为稀有，强制全量渲染（默认 5）')
-    p.add_argument('--export', default='', metavar='PATH',
-                   help='将预览结构化导出到文件（按后缀分派：.csv / .json）；'
-                        '与 --apply 可并存，仅在预览后写出一次')

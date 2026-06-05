@@ -9,20 +9,26 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
+    QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
 )
 
 from module.manga.core.models import StdTitlePlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.gui.widgets.preview_tree import PreviewTreeBase
+from module.manga.gui.widgets.std_title_detail import StdTitleDetailDialog
 from module.manga.gui.widgets.std_title_input import InputListWidget
+from module.manga.gui.widgets.std_title_tree import StdTitleTree
 from module.manga.presentation.view import print_std_title_preview
-from module.manga.workflow.std_title import apply_plans, preview_plans_for_inputs
+from module.manga.workflow.std_title import (
+    apply_plan, apply_plans, preview_plans_for_inputs,
+)
 
 
 class StdTitleTab(BaseTab):
     cmd_name         = 'std_title'
     apply_btn_text   = '执行'
     confirm_verb     = '执行'
+    single_verb      = '重命名'
     no_change_msg    = '没有可执行的重命名'
 
     def _input_box_title(self) -> str:
@@ -60,11 +66,25 @@ class StdTitleTab(BaseTab):
     def _format_banner_target(self, target: Any) -> object:
         return f'已添加 {len(target)} 个文件'
 
+    def _has_inputs(self) -> bool:
+        return bool(self._input_list.inputs())
+
     def _plan_call(self, target: Any) -> tuple[Callable[..., Any], tuple, dict]:
         return preview_plans_for_inputs, (target,), {'jobs': self._jobs.value()}
 
     def _apply_fn(self):
         return apply_plans
+
+    def _apply_one(self, plan: StdTitlePlan) -> str:
+        result = apply_plan(plan)
+        # apply_plan 返回 'skip' 表示需审核 / 无变化 / 目标已存在；GUI 不视为失败
+        return 'ok' if result in ('ok', 'skip') else 'error'
+
+    def _create_preview_tree(self) -> PreviewTreeBase:
+        return StdTitleTree(self)
+
+    def _create_detail_dialog(self, plan: StdTitlePlan) -> QDialog:
+        return StdTitleDetailDialog(plan, parent=self)
 
     def _render_preview(self, plans: list[StdTitlePlan]) -> None:
         print_std_title_preview(plans)
@@ -77,13 +97,6 @@ class StdTitleTab(BaseTab):
         review     = sum(1 for p in plans if p.needs_review)
         return {'可重命名': actionable, '需审核': review,
                 '无变化': len(plans) - actionable - review}
-
-    # ── 输入列表变化：列表清空时直接复位 apply / status ───────────────
-    def _on_inputs_changed(self) -> None:
-        if not self._input_list.inputs():
-            self._plans = None
-            self._apply_btn.setEnabled(False)
-            self._set_status('待扫描')
 
     def _on_applied(self, fail: int) -> None:
         # apply 后所有列表项的 src_path 都已失效（文件被移走 / 改名），

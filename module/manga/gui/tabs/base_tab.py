@@ -2,13 +2,15 @@
 
 承担共性:
 
-- 装配通用 UI（根目录 / 扫描+执行按钮 / 状态行）
+- 装配通用 UI（输入区 / 选项 + 动作按钮列 / 预览框）
 - 后台 ``QThread`` + ``Worker`` 调度（含防 GC、自动清理）
 - 扫描 → 预览 → 二次确认 → 写入 → 重置 状态机
+- 内嵌预览树（子类提供 :class:`~module.manga.gui.widgets.preview_tree.PreviewTreeBase`
+  实例）+ 单条 apply 流程：右键 / 双击 / 详情对话框统一走 :meth:`_apply_single`
 
 子类只提供策略方法（:meth:`BaseTab._plan_call` / :meth:`BaseTab._apply_fn` /
 :meth:`BaseTab._render_preview` / :meth:`BaseTab._count_actionable` /
-:meth:`BaseTab._build_options_box` 等）。
+:meth:`BaseTab._build_options_box` / :meth:`BaseTab._create_preview_tree` 等）。
 """
 
 from __future__ import annotations
@@ -18,8 +20,8 @@ from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSizePolicy,
-    QVBoxLayout, QWidget,
+    QDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from base.gui import BUTTON_COL_WIDTH, make_btn_col
@@ -28,6 +30,7 @@ from base.gui.path_picker import PathPicker
 from base.gui.qt_sink import QtSink
 from base.gui.worker import Worker
 from base.console import SEP2, emit, set_output
+from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 from module.manga.presentation.view import print_run_banner
 
 
@@ -48,9 +51,11 @@ class BaseTab(QWidget):
     cmd_name:        str = ''          # QSettings key 前缀（snake_case 标识符）
     apply_btn_text:  str = '执行'      # 写入按钮文案
     confirm_verb:    str = '写入'      # QMessageBox 中的动词
+    single_verb:     str = '执行'      # 单条 apply confirm 中的动词
     no_change_msg:   str = '没有需要写入的项目'
     root_label:      str = '根目录:'
     root_placeholder: str = '选择或拖入目录...'
+    search_placeholder: str = '过滤：文件名 / 分组（大小写不敏感）'
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -58,14 +63,15 @@ class BaseTab(QWidget):
         self._thread: QThread | None = None
         self._worker: Worker | None = None
         self._plans: list[Any] | None = None
+        self._tree:  PreviewTreeBase | None = None
 
         # ── UI 装配 ───────────────────────────────────────────────────
         input_widget = self._create_input_widget()
         dir_box = QGroupBox(self._input_box_title())
         dir_lay = QVBoxLayout(dir_box)
         dir_lay.addWidget(input_widget)
-        # 垂直 Fixed：保证子类若在下方追加 stretch sibling（如 make_meta 的树
-        # 面板）时，输入区不被布局压力压扁——四个 Tab 输入区高度始终一致
+        # 垂直 Fixed：保证子类若在下方追加 stretch sibling（如预览框）时，
+        # 输入区不被布局压力压扁——四个 Tab 输入区高度始终一致
         dir_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
         self._scan_btn  = QPushButton('预览')
@@ -112,7 +118,36 @@ class BaseTab(QWidget):
             opt_row.addStretch(1)
         opt_row.addWidget(action_btn_col)
         root_lay.addLayout(opt_row)
-        root_lay.addStretch(1)
+
+        # ── 预览框（子类提供 tree 时启用）─────────────────────────────
+        # 搜索 + 树 包入 GroupBox，与输入框 / 选项框 / 状态框视觉一致；
+        # 右侧空出与按钮列等宽的占位，使预览框右边界与上方各行对齐
+        tree = self._create_preview_tree()
+        if tree is not None:
+            self._tree = tree
+            tree.plan_double_clicked.connect(self._on_plan_double_clicked)
+            tree.plan_apply_requested.connect(self._apply_single)
+
+            self._search = QLineEdit(self)
+            self._search.setPlaceholderText(self.search_placeholder)
+            self._search.setClearButtonEnabled(True)
+            self._search.textChanged.connect(tree.apply_filter)
+
+            panel_box = QGroupBox('预览', self)
+            panel_lay = QVBoxLayout(panel_box)
+            panel_lay.setSpacing(4)
+            panel_lay.addWidget(self._search)
+            panel_lay.addWidget(tree, 1)
+
+            panel_row = QHBoxLayout()
+            panel_row.setContentsMargins(0, 0, 0, 0)
+            panel_row.addWidget(panel_box, 1)
+            spacer = QWidget(self)
+            spacer.setFixedWidth(BUTTON_COL_WIDTH)
+            panel_row.addWidget(spacer)
+            root_lay.addLayout(panel_row, 1)
+        else:
+            root_lay.addStretch(1)
 
         self.busy_changed.connect(self._on_busy)
         self._load_settings()
@@ -134,14 +169,13 @@ class BaseTab(QWidget):
         return '输入'
 
     def _on_inputs_changed(self) -> None:
-        """输入控件清空时复位 apply / status；列表式输入 Tab 通用钩子。
-
-        子类有额外清空动作（如 make_meta 的树视图）可 ``super()`` 后追加。
-        """
+        """输入控件清空时复位 apply / status / 树；列表式输入 Tab 通用钩子。"""
         if not self._has_inputs():
             self._plans = None
             self._apply_btn.setEnabled(False)
             self._set_status('待扫描')
+            if self._tree is not None:
+                self._tree.set_plans([])
 
     def _has_inputs(self) -> bool:
         """是否已有可扫描的输入；子类按自己的 input 控件覆盖。"""
@@ -162,6 +196,14 @@ class BaseTab(QWidget):
 
     def _build_options_box(self) -> QWidget | None:
         """返回放在「目录」组下方的选项组（``QGroupBox``）；无可返回 ``None``。"""
+        return None
+
+    def _create_preview_tree(self) -> PreviewTreeBase | None:
+        """返回预览树实例；为 ``None`` 时不显示预览框（保持 stretch 占位）。"""
+        return None
+
+    def _create_detail_dialog(self, plan: Any) -> QDialog | None:
+        """双击 plan 时弹出的详情对话框；``None`` 表示不弹（无详情）。"""
         return None
 
     def _extra_action_buttons(self) -> list[QPushButton]:
@@ -221,6 +263,14 @@ class BaseTab(QWidget):
         """返回 apply 函数（签名 ``(plans, dry_run) -> fail``）。"""
         raise NotImplementedError
 
+    def _apply_one(self, plan: Any) -> str:
+        """对单个 plan 执行写入；返回 ``'ok'`` / ``'error'``。
+
+        默认抛 ``NotImplementedError``；子类若启用单条 apply（右键 / 详情对话框）
+        必须覆盖。
+        """
+        raise NotImplementedError
+
     def _render_preview(self, plans: list[Any]) -> None:
         """在日志面板渲染预览（调用对应的 ``print_*_preview``）。"""
         raise NotImplementedError
@@ -248,6 +298,8 @@ class BaseTab(QWidget):
         set_output(self._sink)
         self._plans = None
         self._apply_btn.setEnabled(False)
+        if self._tree is not None:
+            self._tree.set_plans([])
         self._set_status('扫描中...')
 
         print_run_banner(
@@ -271,6 +323,8 @@ class BaseTab(QWidget):
             emit('\n  没有需要处理的文件。')
             emit(SEP2)
             self._set_status('扫描完成：无可处理项')
+            if self._tree is not None:
+                self._tree.set_plans([])
             return
         self._render_preview(plans)
         n = self._count_actionable(plans)
@@ -281,6 +335,8 @@ class BaseTab(QWidget):
         )
         self._set_status(f'扫描完成：{len(plans)} 项（{parts}）')
         self._apply_btn.setEnabled(n > 0)
+        if self._tree is not None:
+            self._tree.set_plans(plans)
 
     def _on_apply(self) -> None:
         if not self._plans:
@@ -339,6 +395,70 @@ class BaseTab(QWidget):
         self._cancel_btn.setEnabled(busy)
         if busy:
             self._apply_btn.setEnabled(False)
+
+    # ── 单条 apply（共用入口：树右键 + 详情对话框）─────────────────────
+    def _on_plan_double_clicked(self, plan: Any) -> None:
+        dlg = self._create_detail_dialog(plan)
+        if dlg is None:
+            return
+        # 详情对话框只发意图，写入仍走 _apply_single；成功后关闭对话框
+        if hasattr(dlg, 'apply_requested'):
+            dlg.apply_requested.connect(
+                lambda p, d=dlg: self._apply_single(p, dialog=d)
+            )
+        dlg.exec()
+
+    def _apply_single(self, plan: Any, *, dialog: QDialog | None = None) -> None:
+        """对单个 plan 写入，并局部更新树 / 状态行。
+
+        :param dialog: 若来自详情对话框，成功后调用其 ``accept()`` 关闭。
+        """
+        if self._thread is not None and self._thread.isRunning():
+            QMessageBox.warning(self, '忙', '后台任务运行中，请先取消')
+            return
+        if self._tree is not None and not self._tree._is_actionable(plan):
+            return
+
+        label = self._tree._plan_label(plan) if self._tree else str(plan)
+        if QMessageBox.question(
+            self, '确认',
+            f'对单个项目{self.single_verb}？\n\n{label}',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        ) != QMessageBox.Yes:
+            return
+
+        # 确保写入日志落到本 Tab 的 LogView（sink 线程本地，用户可能切过 Tab）
+        set_output(self._sink)
+        emit(f'\n▶ 单条{self.single_verb}: {label}')
+        result = self._apply_one(plan)
+        if result != 'ok':
+            QMessageBox.warning(
+                self, f'{self.single_verb}失败',
+                f'{label}\n详情见日志',
+            )
+            return
+
+        # 状态更新：从 plans 列表移除 + 树局部刷新 + 状态行
+        if self._plans:
+            self._plans = [p for p in self._plans if p is not plan]
+        if self._tree is not None:
+            self._tree.remove_plan(plan)
+        self._refresh_post_apply_ui()
+        if dialog is not None:
+            dialog.accept()
+
+    def _refresh_post_apply_ui(self) -> None:
+        """单条 apply 成功后刷新状态行 / 按钮启用；子类可覆盖加自家逻辑。"""
+        if not self._plans:
+            self._apply_btn.setEnabled(False)
+            self._set_status('扫描完成：所有项目已处理')
+            return
+        n    = self._count_actionable(self._plans)
+        cats = self._classify_plans(self._plans)
+        parts = ' / '.join(f'{v} {k}' for k, v in cats.items() if v)
+        self._set_status(f'剩余：{len(self._plans)} 项（{parts}）')
+        self._apply_btn.setEnabled(n > 0)
 
     # ── 后台任务调度 ───────────────────────────────────────────────────
     def _run(

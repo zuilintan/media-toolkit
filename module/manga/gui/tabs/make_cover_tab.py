@@ -8,16 +8,20 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QCheckBox, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
+    QCheckBox, QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox,
+    QWidget,
 )
 
 from base.gui.config import get_config
 from base.gui.path_list import PathListWidget
 from module.manga.core.models import MakeCoverPlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.gui.widgets.make_cover_detail import MakeCoverDetailDialog
+from module.manga.gui.widgets.make_cover_tree import MakeCoverTree
+from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 from module.manga.presentation.view import print_make_cover_preview
 from module.manga.workflow.make_cover import (
-    DEFAULT_QUALITY, apply_plans, preview_plans_for_files,
+    DEFAULT_QUALITY, apply_plan, apply_plans, preview_plans_for_files,
 )
 
 
@@ -25,6 +29,7 @@ class MakeCoverTab(BaseTab):
     cmd_name        = 'make_cover'
     apply_btn_text  = '执行'
     confirm_verb    = '执行'
+    single_verb     = '写入封面'
     no_change_msg   = '没有需要写入的封面'
 
     def _create_input_widget(self) -> QWidget:
@@ -111,6 +116,15 @@ class MakeCoverTab(BaseTab):
 
     def _apply_fn(self):
         return apply_plans
+
+    def _apply_one(self, plan: MakeCoverPlan) -> str:
+        return apply_plan(plan)
+
+    def _create_preview_tree(self) -> PreviewTreeBase:
+        return MakeCoverTree(self)
+
+    def _create_detail_dialog(self, plan: MakeCoverPlan) -> QDialog:
+        return MakeCoverDetailDialog(plan, parent=self)
 
     def _render_preview(self, plans: list[MakeCoverPlan]) -> None:
         print_make_cover_preview(plans)

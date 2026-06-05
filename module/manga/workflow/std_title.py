@@ -272,16 +272,52 @@ def _write_publisher_file(path: Path) -> str:
     return 'created'
 
 
-def apply_plans(
-    plans: list[StdTitlePlan], dry_run: bool = True, cancel_token=None,
-) -> int:
-    """执行重命名计划。
+def apply_plan(plan: StdTitlePlan) -> str:
+    """执行单个 plan 的重命名 + publisher 标识写入。
 
-    apply 顺序（每项）:
+    apply 顺序：
 
     1. ``author_dir`` 不存在则 ``mkdir``（仅在父目录下建一层）
     2. ``try_rename(src_path, author_dir / new_name)``
     3. rename 成功后处理 ``publisher_file``（幂等 + 多社团 warn 跳过）
+
+    :return: ``'ok'`` / ``'skip'`` / ``'error'``；``'skip'`` 表示需审核 /
+        无变化 / 目标已存在等不阻断的跳过原因。
+    """
+    if not plan.changed:
+        return 'skip'
+    if plan.needs_review:
+        warn(f'跳过（需审核）: {plan.old_name}')
+        return 'skip'
+
+    src_path   = Path(plan.src_path)
+    author_dir = Path(plan.author_dir)
+    new_path   = author_dir / plan.new_name
+    try:
+        author_dir.mkdir(parents=False, exist_ok=True)
+        result = try_rename(src_path, new_path)
+        if result == 'exists':
+            warn(f'跳过（目标已存在）: {plan.new_name}')
+            return 'skip'
+        emit(f'   ✅ {plan.old_name} — 已处理')
+    except Exception as e:
+        error(f'{plan.old_name} — {e}')
+        return 'error'
+
+    # rename 成功后再落 publisher（失败仅 warn，不影响主流程）
+    if plan.publisher_file:
+        try:
+            _write_publisher_file(Path(plan.publisher_file))
+        except Exception as e:
+            warn(f'发版商标识写入失败: {Path(plan.publisher_file).name} — {e}')
+
+    return 'ok'
+
+
+def apply_plans(
+    plans: list[StdTitlePlan], dry_run: bool = True, cancel_token=None,
+) -> int:
+    """执行重命名计划。
 
     :param dry_run: ``True`` 时仅预览，不实际执行。
     :param cancel_token: ``threading.Event``，已 set 时提前退出。
@@ -299,36 +335,13 @@ def apply_plans(
         if _cancelled():
             emit('  ⏹️  已取消')
             break
-        if not p.changed:
-            continue
-        if p.needs_review:
-            warn(f'跳过（需审核）: {p.old_name}')
-            skip += 1
-            continue
-
-        src_path   = Path(p.src_path)
-        author_dir = Path(p.author_dir)
-        new_path   = author_dir / p.new_name
-        try:
-            author_dir.mkdir(parents=False, exist_ok=True)
-            result = try_rename(src_path, new_path)
-            if result == 'exists':
-                warn(f'跳过（目标已存在）: {p.new_name}')
-                skip += 1
-                continue
-            emit(f'   ✅ {p.old_name} — 已处理')
+        result = apply_plan(p)
+        if result == 'ok':
             ok_n += 1
-        except Exception as e:
-            error(f'{p.old_name} — {e}')
+        elif result == 'skip':
+            skip += 1
+        else:
             fail += 1
-            continue
-
-        # rename 成功后再落 publisher（失败仅 warn，不影响主流程）
-        if p.publisher_file:
-            try:
-                _write_publisher_file(Path(p.publisher_file))
-            except Exception as e:
-                warn(f'发版商标识写入失败: {Path(p.publisher_file).name} — {e}')
 
     print_op_result(ok_n, fail, skip)
     return fail
