@@ -20,8 +20,6 @@ from module.manga.presentation.view import diff_signature, format_signature
 
 
 class MakeMetaTree(PreviewTreeBase):
-    _COL_WIDTHS_KEY = 'make_meta.tree_col_widths'
-
     def _build_groups(
         self, plans: list[MakeMetaPlan],
     ) -> list[tuple[str, list[MakeMetaPlan], bool]]:

@@ -5,21 +5,20 @@
 - 顶层组 + 占位 child 懒加载（避免万级 plan 一次性 materialize 卡顿）
 - 用户展开 / 折叠状态记忆 + 过滤回滚（filter 自身的 setExpanded 不污染）
 - 顶部搜索框（外部传入）：按文件名 / 分组标题大小写不敏感子串过滤
-- 列宽跨会话持久化（``_COL_WIDTHS_KEY`` 由子类指定）
+- 列宽跨会话持久化 + 同进程内所有预览树之间实时同步（共享 key
+  ``preview_tree.col_widths``，由 :class:`_ColWidthSync` 信号广播）
 - 右键 → ``plan_apply_requested``、双击 → ``plan_double_clicked``、
   局部 :meth:`remove_plan` 单条执行成功后调用
 
-子类只需:
-
-- 类常量 ``_COL_WIDTHS_KEY`` + 重写 :meth:`_build_groups` /
-  :meth:`_row_status_text` / :meth:`_is_actionable` / :meth:`_plan_label`
+子类只需重写 :meth:`_build_groups` / :meth:`_row_status_text` /
+:meth:`_is_actionable` / :meth:`_plan_label`。
 """
 
 from __future__ import annotations
 from abc import abstractmethod
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
 from base.gui.config import get_config
@@ -27,6 +26,20 @@ from base.gui.config import get_config
 
 # 子项 QTreeWidgetItem 上挂 plan 引用所用的 role
 _PLAN_ROLE = Qt.UserRole + 1
+
+
+class _ColWidthSync(QObject):
+    """进程内列宽变更广播。
+
+    任一 :class:`PreviewTreeBase` 实例被拖宽列时发出，其他实例同步应用，
+    实现「在打包改列宽 → 命名 / 封面 / 元数据预览树立即跟上」。
+    """
+
+    widths_changed = Signal(list, object)   # widths, sender
+
+
+# 模块级单例：所有预览树共享同一个广播器
+_sync = _ColWidthSync()
 
 
 class PreviewTreeBase(QTreeWidget):
@@ -41,8 +54,8 @@ class PreviewTreeBase(QTreeWidget):
     plan_double_clicked  = Signal(object)
     plan_apply_requested = Signal(object)
 
-    #: QSettings key for column widths persistence; 子类必须覆盖
-    _COL_WIDTHS_KEY: str = ''
+    #: 所有预览树共享同一份列宽配置，跨 Tab 同步
+    _COL_WIDTHS_KEY: str = 'preview_tree.col_widths'
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -68,8 +81,11 @@ class PreviewTreeBase(QTreeWidget):
         self._in_filter_update: bool = False
         # 当前过滤词（lower）
         self._filter_text: str = ''
+        # 屏蔽外部同步触发的 sectionResized 反弹（避免广播环）
+        self._applying_widths: bool = False
 
         self._restore_column_widths()
+        _sync.widths_changed.connect(self._on_external_widths)
 
     # ── 子类钩子 ──────────────────────────────────────────────────────
     @abstractmethod
@@ -225,22 +241,35 @@ class PreviewTreeBase(QTreeWidget):
         finally:
             self._in_filter_update = False
 
-    # ── 列宽持久化 ────────────────────────────────────────────────────
+    # ── 列宽持久化 + 跨树同步 ────────────────────────────────────────
+    def _apply_widths(self, widths: list) -> None:
+        """把 ``widths`` 套到当前 header；屏蔽期间 ``sectionResized`` 不回写。"""
+        self._applying_widths = True
+        try:
+            for i, w in enumerate(widths):
+                if i < self.columnCount() and isinstance(w, int) and w > 0:
+                    self.setColumnWidth(i, w)
+        finally:
+            self._applying_widths = False
+
     def _restore_column_widths(self) -> None:
-        if not self._COL_WIDTHS_KEY:
-            return
         widths = get_config().get(self._COL_WIDTHS_KEY)
         if not widths or not isinstance(widths, list):
             return
-        for i, w in enumerate(widths):
-            if i < self.columnCount() and isinstance(w, int) and w > 0:
-                self.setColumnWidth(i, w)
+        self._apply_widths(widths)
 
     def _on_section_resized(self, *_args) -> None:
-        if not self._COL_WIDTHS_KEY:
-            return
+        if self._applying_widths:
+            return                  # 外部同步触发的 resize，不回写不广播
         widths = [self.columnWidth(i) for i in range(self.columnCount())]
         get_config().set(self._COL_WIDTHS_KEY, widths)
+        _sync.widths_changed.emit(widths, self)
+
+    def _on_external_widths(self, widths: list, sender: object) -> None:
+        """收到其他预览树发出的列宽变更：本树非源头就跟随应用。"""
+        if sender is self:
+            return
+        self._apply_widths(widths)
 
     # ── 信号回调 ──────────────────────────────────────────────────────
     def _on_expanded(self, item: QTreeWidgetItem) -> None:

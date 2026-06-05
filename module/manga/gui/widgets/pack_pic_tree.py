@@ -16,8 +16,6 @@ from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 
 
 class PackPicTree(PreviewTreeBase):
-    _COL_WIDTHS_KEY = 'pack_pic.tree_col_widths'
-
     def _build_groups(
         self, plans: list[PackPicPlan],
     ) -> list[tuple[str, list[PackPicPlan], bool]]:

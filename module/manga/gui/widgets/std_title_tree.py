@@ -16,8 +16,6 @@ from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 
 
 class StdTitleTree(PreviewTreeBase):
-    _COL_WIDTHS_KEY = 'std_title.tree_col_widths'
-
     def _build_groups(
         self, plans: list[StdTitlePlan],
     ) -> list[tuple[str, list[StdTitlePlan], bool]]:

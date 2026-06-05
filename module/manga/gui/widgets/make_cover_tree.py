@@ -16,8 +16,6 @@ from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 
 
 class MakeCoverTree(PreviewTreeBase):
-    _COL_WIDTHS_KEY = 'make_cover.tree_col_widths'
-
     def _build_groups(
         self, plans: list[MakeCoverPlan],
     ) -> list[tuple[str, list[MakeCoverPlan], bool]]:
