@@ -286,6 +286,16 @@ class InputListWidget(QWidget):
         self._list.clear()
         self.inputs_changed.emit()
 
+    def add_inputs(self, inputs: list[StdTitleInput]) -> None:
+        """编排器入口：已构造好的 :class:`StdTitleInput` 直接挂入列表，
+        跳过本控件自带的弹窗 / 推导流程。"""
+        if not inputs:
+            return
+        for inp in inputs:
+            self._inputs.append(inp)
+            self._append_list_item(inp)
+        self.inputs_changed.emit()
+
     # ── 添加流程 ──────────────────────────────────────────────────────
     def _add_manga_files(self) -> None:
         """add menu「添加漫画文件…」：多选文件，逐文件 derive + 弹窗。"""

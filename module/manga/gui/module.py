@@ -20,11 +20,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSplitter, QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
+    QAbstractSpinBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QSplitter, QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from base.gui import make_btn_col
@@ -44,6 +44,9 @@ class MangaModule(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._busy_count = 0
+        # 自动化管线状态：running 期间禁掉按钮 / 禁切 Tab 由各 Tab 自身的
+        # busy 控制；编排器只需记一个 flag 防止重入
+        self._auto_running: bool = False
 
         tab0 = PackPicTab()
         tab1 = StdTitleTab()
@@ -61,6 +64,19 @@ class MangaModule(QWidget):
         self._tabs.addTab(tab1, '2. 命名')
         self._tabs.addTab(tab2, '3. 封面')
         self._tabs.addTab(tab3, '4. 元数据')
+
+        # ── 「一键自动化」按钮（贴齐 tab 栏右端，靠窗口右侧） ────────
+        # corner widget 由 QTabWidget 放到 tab bar 同行的右上角，整行天然
+        # 与最右一个 tab 共占同一水平带；橙色 accent 属性让按钮与流水线动作
+        # （蓝色 primary）有视觉区分
+        self._auto_btn = QPushButton('⚡ 一键自动化')
+        self._auto_btn.setToolTip(
+            '从当前 Tab 开始顺序执行到末尾，期间不再确认。\n'
+            '上一个 Tab 的产物自动作为下一个 Tab 的输入。'
+        )
+        self._auto_btn.setProperty('accent', True)
+        self._auto_btn.clicked.connect(self._on_auto_click)
+        self._tabs.setCornerWidget(self._auto_btn, Qt.TopRightCorner)
 
         self._log_stack = QStackedWidget()
         self._logs: list[LogView] = []
@@ -127,6 +143,76 @@ class MangaModule(QWidget):
     def default_sink(self):
         """供 ``Shell`` 在首次注册时调 :func:`base.console.set_output` 的初始 sink。"""
         return self._tab_list[0]._sink
+
+    # ── 一键自动化编排器 ──────────────────────────────────────────────
+    # 用户在哪个 Tab 点击就从哪开始，逐级把 ``auto_done`` 输出注入下一 Tab：
+    # PackPic.zip_path → StdTitle 文件输入 → StdTitle 改名后路径 → MakeCover
+    # cbz 输入 → MakeMeta cbz 输入。途中任一段 emit 空列表（无产出 / 失败 /
+    # 用户取消）即终止管线，按钮恢复可点。
+    def _on_auto_click(self) -> None:
+        if self._auto_running:
+            return
+        start = self._tabs.currentIndex()
+        tail  = len(self._tab_list) - 1
+        if start >= tail:
+            QMessageBox.information(
+                self, '一键自动化',
+                f'当前在末尾 Tab「{self._tabs.tabText(start)}」，无后续步骤可串接。',
+            )
+            return
+        names = ' → '.join(
+            self._tabs.tabText(i) for i in range(start, len(self._tab_list))
+        )
+        ans = QMessageBox.question(
+            self, '一键自动化',
+            f'即将从「{self._tabs.tabText(start)}」开始顺序执行到末尾：\n\n'
+            f'  {names}\n\n'
+            '期间不再弹出确认对话框，上一步产物自动作为下一步输入。\n'
+            '继续？',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+        )
+        if ans != QMessageBox.Yes:
+            return
+        self._auto_running = True
+        self._auto_btn.setEnabled(False)
+        self._auto_btn.setText('⏳ 自动化中…')
+        self._chain_at(start, inputs=None)
+
+    def _chain_at(self, idx: int, *, inputs) -> None:
+        """在 ``idx`` Tab 上启动 :meth:`auto_start`；完成时挂一次性回调串下一段。"""
+        self._tabs.setCurrentIndex(idx)
+        tab = self._tab_list[idx]
+
+        if inputs is not None:
+            try:
+                tab.auto_set_inputs(inputs)
+            except Exception as e:
+                QMessageBox.warning(
+                    self, '自动化终止',
+                    f'第 {idx + 1} 步「{self._tabs.tabText(idx)}」注入输入失败：\n{e}',
+                )
+                self._auto_pipeline_finish()
+                return
+
+        def _on_done(outputs):
+            try:
+                tab.auto_done.disconnect(_on_done)
+            except (RuntimeError, TypeError):
+                pass
+            next_idx = idx + 1
+            if not outputs or next_idx >= len(self._tab_list):
+                self._auto_pipeline_finish()
+                return
+            # 上一 Tab 的 thread.quit() 是 async，延后到当前栈展开后再启动下一段
+            QTimer.singleShot(0, lambda: self._chain_at(next_idx, inputs=outputs))
+
+        tab.auto_done.connect(_on_done)
+        tab.auto_start()
+
+    def _auto_pipeline_finish(self) -> None:
+        self._auto_running = False
+        self._auto_btn.setEnabled(True)
+        self._auto_btn.setText('⚡ 一键自动化')
 
     # ── 状态 ──────────────────────────────────────────────────────────
     def _on_tab_busy(self, busy: bool) -> None:

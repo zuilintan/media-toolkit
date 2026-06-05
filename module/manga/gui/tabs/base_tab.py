@@ -46,6 +46,9 @@ class BaseTab(QWidget):
 
     busy_changed   = Signal(bool)
     status_changed = Signal(str)   # 推到 MangaModule 底部状态栏
+    #: 自动化管线一段执行完成（成功 / 失败 / 取消）后发出；list 是给下一 Tab 的
+    #: 输入路径，空列表表示「不必继续」（无产出 / 失败 / 用户取消）。
+    auto_done      = Signal(list)
 
     # ── 子类必须覆盖的类常量 ───────────────────────────────────────────
     cmd_name:        str = ''          # QSettings key 前缀（snake_case 标识符）
@@ -64,6 +67,19 @@ class BaseTab(QWidget):
         self._worker: Worker | None = None
         self._plans: list[Any] | None = None
         self._tree:  PreviewTreeBase | None = None
+        # 自动化管线状态：_auto_mode=True 期间跳过所有交互式确认；
+        # _auto_aborted 记录用户在 auto 期间点了「取消」，让 _on_applied 知道
+        # 即使 worker 正常返回也要终止管线。
+        # _auto_pending_apply 由 _on_planned 设置，_on_thread_done 收尾后触发
+        # _on_apply —— 避免「worker.finished → _on_planned 同步排 apply」与
+        # 「thread.quit() async 完成 → _thread 清空」之间的竞态。
+        self._auto_mode:          bool = False
+        self._auto_aborted:       bool = False
+        self._auto_pending_apply: bool = False
+        # _auto_snapshot: 启动 apply 时拍下的 plans 副本，供 auto_collect_outputs
+        # 读取。绕开「子类 _on_applied 先 input_list.clear() → _on_inputs_changed
+        # 把 self._plans 置 None → super 这边读到空」的级联。
+        self._auto_snapshot:      list[Any] | None = None
 
         # ── UI 装配 ───────────────────────────────────────────────────
         input_widget = self._create_input_widget()
@@ -289,6 +305,44 @@ class BaseTab(QWidget):
         默认为空，子类可覆盖。"""
         return ''
 
+    # ── 自动化管线钩子 ─────────────────────────────────────────────────
+    # 编排器在 :class:`~module.manga.gui.module.MangaModule` 里，通过
+    # :meth:`auto_start` 触发本 Tab 跑「预览 → 写入」全自动流程，完成后通过
+    # :attr:`auto_done` 把产出路径吐给下一 Tab 的 :meth:`auto_set_inputs`。
+    def auto_set_inputs(self, paths: list[Any]) -> None:
+        """编排器调用：把上一 Tab 的产出路径注入本 Tab 输入控件。
+        子类必须覆盖（除非是管线起点：起点用 UI 已添加的输入）。"""
+        raise NotImplementedError(
+            f'{type(self).__name__}.auto_set_inputs 未实现'
+        )
+
+    def auto_collect_outputs(self) -> list[Any]:
+        """编排器调用（在 :attr:`_plans` 清空之前）：返回本次 apply 产出路径，
+        交给下一 Tab。返回空列表则编排器终止管线。"""
+        return []
+
+    def auto_start(self) -> None:
+        """非交互式启动：sca + apply 全程不弹确认；完成后 emit :attr:`auto_done`。"""
+        if self._auto_mode or (self._thread is not None and self._thread.isRunning()):
+            self.auto_done.emit([])
+            return
+        if not self._has_inputs():
+            set_output(self._sink)
+            emit(f'⚠️ {self.cmd_name}: 无输入，自动化跳过')
+            self.auto_done.emit([])
+            return
+        self._auto_mode    = True
+        self._auto_aborted = False
+        self._on_scan()
+
+    def _auto_finish(self, outputs: list[Any]) -> None:
+        """清状态 + emit。统一出口避免漏清 flag。"""
+        self._auto_mode          = False
+        self._auto_aborted       = False
+        self._auto_pending_apply = False
+        self._auto_snapshot      = None
+        self.auto_done.emit(outputs)
+
     # ── 通用回调 ───────────────────────────────────────────────────────
     def _on_scan(self) -> None:
         target = self._validate_scan_target()
@@ -325,6 +379,8 @@ class BaseTab(QWidget):
             self._set_status('扫描完成：无可处理项')
             if self._tree is not None:
                 self._tree.set_plans([])
+            if self._auto_mode:
+                self._auto_finish([])
             return
         self._render_preview(plans)
         n = self._count_actionable(plans)
@@ -337,6 +393,18 @@ class BaseTab(QWidget):
         self._apply_btn.setEnabled(n > 0)
         if self._tree is not None:
             self._tree.set_plans(plans)
+        # 自动化：预览完毕直接走 apply（无需二次确认），无可执行项则收尾。
+        # ── 时序：worker.finished 同时连了 `_quit`（async thread.quit()）和本
+        # 槽，此处 _thread 仍在 quit 过程中、isRunning() 可能仍为 True，直接
+        # 调 _on_apply 会被 _run 静默拒绝。改为打个 flag，让 _on_thread_done
+        # 在线程真清空后再触发 _on_apply。
+        if self._auto_mode:
+            if self._auto_aborted:
+                self._auto_finish([])
+            elif n > 0:
+                self._auto_pending_apply = True
+            else:
+                self._auto_finish([])
 
     def _on_apply(self) -> None:
         if not self._plans:
@@ -344,19 +412,27 @@ class BaseTab(QWidget):
         set_output(self._sink)
         n = self._count_actionable(self._plans)
         if not n:
-            QMessageBox.information(self, '提示', self.no_change_msg)
+            if self._auto_mode:
+                self._auto_finish([])
+            else:
+                QMessageBox.information(self, '提示', self.no_change_msg)
             return
 
-        ans = QMessageBox.question(
-            self, '确认',
-            f'确认对 {n} 个项目{self.confirm_verb}？',
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
-        )
-        if ans != QMessageBox.Yes:
-            return
+        # 自动化下跳过 Yes/No 确认（已在编排器入口统一确认过）
+        if not self._auto_mode:
+            ans = QMessageBox.question(
+                self, '确认',
+                f'确认对 {n} 个项目{self.confirm_verb}？',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if ans != QMessageBox.Yes:
+                return
 
         self._actionable_n = n
+        # 拍快照：apply 跑完后 _on_applied 时，自动管线靠这份读产物，避免被
+        # 子类 _on_applied 中的 input_list.clear() 级联清成 None
+        self._auto_snapshot = list(self._plans)
         self._set_status('写入中...')
         self._run(
             _run_apply,
@@ -368,6 +444,22 @@ class BaseTab(QWidget):
 
     def _on_applied(self, fail: int) -> None:
         set_output(self._sink)
+        # 产物收集走 _auto_snapshot（apply 启动时拍的副本）：下面 clear input
+        # 会经 _on_inputs_changed 把 self._plans 置 None，但 snapshot 不受影响
+        outputs: list[Any] = []
+        if self._auto_mode and not self._auto_aborted:
+            try:
+                outputs = self.auto_collect_outputs()
+            except Exception as e:
+                emit(f'⚠️ 自动化产物收集失败: {e}')
+                outputs = []
+        # 统一清空输入列表：apply 后入参语义已变（pack_pic rmtree 了源、
+        # std_title 改了名、make_cover/meta 本批已写入），保留只会误导用户
+        # 「还在等待处理」。必须在 _set_status 之前 clear——_on_inputs_changed
+        # 会把状态覆写成「待扫描」，随后 _set_status('写入完成…') 才能盖回去。
+        input_widget = getattr(self, '_input_list', None)
+        if input_widget is not None:
+            input_widget.clear()
         ok = self._actionable_n - fail
         self._set_status(
             f'写入完成：成功 {ok} / 失败 {fail}'
@@ -376,18 +468,24 @@ class BaseTab(QWidget):
         emit(SEP2)
         self._plans = None
         self._apply_btn.setEnabled(False)
+        if self._auto_mode:
+            self._auto_finish([] if (fail or self._auto_aborted) else outputs)
 
     def _on_task_failed(self, msg: str) -> None:
         set_output(self._sink)
         self._set_status('任务失败')
         emit(f'❌ 后台任务异常:\n{msg}')
         emit(SEP2)
+        if self._auto_mode:
+            self._auto_finish([])
 
     def _on_cancel(self) -> None:
         if self._worker is not None:
             self._worker.cancel()
             self._cancel_btn.setEnabled(False)
             self._set_status('取消中...')
+            if self._auto_mode:
+                self._auto_aborted = True
 
     def _on_busy(self, busy: bool) -> None:
         self._scan_btn.setEnabled(not busy)
@@ -503,3 +601,7 @@ class BaseTab(QWidget):
         self._thread = None
         self._worker = None
         self.busy_changed.emit(False)
+        # 自动化：scan 完成后 _on_planned 排的 apply，必须等线程真清完才能启
+        if self._auto_mode and self._auto_pending_apply:
+            self._auto_pending_apply = False
+            self._on_apply()

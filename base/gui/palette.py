@@ -16,6 +16,13 @@ PRIMARY_DISABLED = '#1f3d6e'
 # PRIMARY 背景之上的前景色（按钮文字 / 选区文字 —— 深浅主题都恒为白）
 ON_PRIMARY = '#ffffff'
 
+# 强调色 —— 跨流水线的「一键自动化」类全局动作按钮（GitHub Dark orange）
+# 与 PRIMARY 蓝形成对比，提示「这不是单步操作」
+ACCENT          = '#f0883e'
+ACCENT_HOVER    = '#d8762e'
+ACCENT_ACTIVE   = '#b85c1a'
+ACCENT_DISABLED = '#5a3a20'
+
 # 文本（整体去除纯白感，GitHub Dark 标准灰白）
 TEXT        = '#c9d1d9'
 TEXT_MUTED  = '#8b949e'         # 状态行 / 次要 label
@@ -131,6 +138,17 @@ QPushButton[primary="true"]:hover   {{ background: {PRIMARY_HOVER}; }}
 QPushButton[primary="true"]:pressed {{ background: {PRIMARY_ACTIVE}; }}
 QPushButton[primary="true"]:disabled {{
     background: {PRIMARY_DISABLED}; color: {TEXT_DIM}; border-color: {PRIMARY_DISABLED};
+}}
+QPushButton[accent="true"] {{
+    background: {ACCENT};
+    color: {ON_PRIMARY};
+    border-color: {ACCENT_HOVER};
+    font-weight: 600;
+}}
+QPushButton[accent="true"]:hover   {{ background: {ACCENT_HOVER}; }}
+QPushButton[accent="true"]:pressed {{ background: {ACCENT_ACTIVE}; }}
+QPushButton[accent="true"]:disabled {{
+    background: {ACCENT_DISABLED}; color: {TEXT_DIM}; border-color: {ACCENT_DISABLED};
 }}
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{

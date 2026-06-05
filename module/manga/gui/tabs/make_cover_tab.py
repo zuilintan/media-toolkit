@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
@@ -131,6 +132,17 @@ class MakeCoverTab(BaseTab):
 
     def _count_actionable(self, plans: list[MakeCoverPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
+
+    # ── 自动化管线钩子 ────────────────────────────────────────────────
+    def auto_set_inputs(self, paths: list[Path]) -> None:
+        self._input_list.clear()
+        self._input_list.add_paths([Path(p) for p in paths])
+
+    def auto_collect_outputs(self) -> list[Path]:
+        """产出 = 处理过的 cbz 路径透传（写封面不改文件名）。读 snapshot 与
+        其它 Tab 对齐——确保 super().on_applied 取到的是 apply 启动时的 plans。"""
+        plans = self._auto_snapshot or []
+        return [Path(p.cbz_path) for p in plans if p.writable]
 
     def _classify_plans(self, plans: list[MakeCoverPlan]) -> dict[str, int]:
         writable = sum(1 for p in plans if p.writable and p.changed)

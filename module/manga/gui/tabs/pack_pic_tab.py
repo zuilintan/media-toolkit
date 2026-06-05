@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
@@ -54,11 +55,6 @@ class PackPicTab(BaseTab):
     def _has_inputs(self) -> bool:
         return bool(self._input_list.paths())
 
-    def _on_applied(self, fail: int) -> None:
-        # 识别出的打包单位会被 rmtree，列表中的路径可能已失效；apply 后清空
-        self._input_list.clear()
-        super()._on_applied(fail)
-
     def _build_options_box(self) -> QWidget:
         self._jobs = QSpinBox()
         self._jobs.setRange(0, 32)
@@ -96,6 +92,22 @@ class PackPicTab(BaseTab):
 
     def _count_actionable(self, plans: list[PackPicPlan]) -> int:
         return sum(1 for p in plans if p.writable)
+
+    # ── 自动化管线钩子 ────────────────────────────────────────────────
+    def auto_set_inputs(self, paths: list[Path]) -> None:
+        """编排器入口：通常本 Tab 是管线起点，但仍支持外部注入目录。"""
+        self._input_list.clear()
+        self._input_list.add_paths([Path(p) for p in paths])
+
+    def auto_collect_outputs(self) -> list[Path]:
+        """产出 = 已成功生成的 zip 路径；apply 后 rmtree 源目录但 zip 独立落盘。
+        以文件存在过滤本次成功项；读 :attr:`_auto_snapshot`：基类
+        :meth:`_on_applied` 会先 clear input list 把 ``_plans`` 置 None。"""
+        plans = self._auto_snapshot or []
+        return [
+            Path(p.zip_path) for p in plans
+            if p.writable and Path(p.zip_path).exists()
+        ]
 
     def _classify_plans(self, plans: list[PackPicPlan]) -> dict[str, int]:
         flat     = sum(1 for p in plans if p.writable and p.kind == 'flat')

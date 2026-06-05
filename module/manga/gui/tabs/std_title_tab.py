@@ -6,12 +6,15 @@
 
 from __future__ import annotations
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
     QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
 )
 
+from base.console import emit
+from module.manga.core.config import FILE_EXTS
 from module.manga.core.models import StdTitlePlan
 from module.manga.gui.tabs.base_tab import BaseTab
 from module.manga.gui.widgets.preview_tree import PreviewTreeBase
@@ -20,7 +23,7 @@ from module.manga.gui.widgets.std_title_input import InputListWidget
 from module.manga.gui.widgets.std_title_tree import StdTitleTree
 from module.manga.presentation.view import print_std_title_preview
 from module.manga.workflow.std_title import (
-    apply_plan, apply_plans, preview_plans_for_inputs,
+    apply_plan, apply_plans, build_input, derive_author, preview_plans_for_inputs,
 )
 
 
@@ -98,9 +101,42 @@ class StdTitleTab(BaseTab):
         return {'可重命名': actionable, '需审核': review,
                 '无变化': len(plans) - actionable - review}
 
-    def _on_applied(self, fail: int) -> None:
-        # apply 后所有列表项的 src_path 都已失效（文件被移走 / 改名），
-        # 继续保留列表会误导用户「这些文件还在等待处理」。先清列表（会经
-        # _on_inputs_changed 暂设「待扫描」），再调 super 覆盖为「写入完成…」。
+    # ── 自动化管线钩子 ────────────────────────────────────────────────
+    def auto_set_inputs(self, paths: list[Path]) -> None:
+        """编排器入口：为上游 zip/cbz 推导作者并构造
+        :class:`~module.manga.workflow.std_title.StdTitleInput`，无可用推导即跳过。
+
+        Fallback 顺序：``auto_author`` → ``bracket_author`` → ``parent_author``。
+        pack_pic 产出的 zip 通常落在「漫画根目录」（如 ``Comic/`` 下）而非作者
+        目录，``parent_author = 'Comic'`` 不可用——文件名里的 ``[社团 (作者)]``
+        bracket 头才是可靠来源，故 bracket 优先于 parent。
+        """
         self._input_list.clear()
-        super()._on_applied(fail)
+        inputs = []
+        for p in paths:
+            p = Path(p)
+            if p.suffix.lower() not in FILE_EXTS or not p.is_file():
+                continue
+            deriv  = derive_author(str(p))
+            author = (deriv.auto_author or deriv.bracket_author
+                      or deriv.parent_author)
+            if not author:
+                emit(f'⚠️ std_title 自动化跳过（无作者推导）: {p.name}')
+                continue
+            publisher = (deriv.bracket_publisher
+                         if author == deriv.bracket_author else '')
+            inputs.append(build_input(str(p), author, publisher))
+        self._input_list.add_inputs(inputs)
+
+    def auto_collect_outputs(self) -> list[Path]:
+        """产出 = 重命名后的目标路径（``author_dir / new_name``）。
+        以文件存在与否过滤本次成功项。读 :attr:`_auto_snapshot`：基类
+        :meth:`_on_applied` 会先 clear input list 把 ``_plans`` 置 None。
+        """
+        plans = self._auto_snapshot or []
+        out: list[Path] = []
+        for p in plans:
+            np = Path(p.author_dir) / p.new_name
+            if np.exists():
+                out.append(np)
+        return out

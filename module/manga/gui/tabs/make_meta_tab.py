@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
@@ -115,6 +116,16 @@ class MakeMetaTab(BaseTab):
 
     def _count_actionable(self, plans: list[MakeMetaPlan]) -> int:
         return sum(1 for p in plans if p.writable and p.changed)
+
+    # ── 自动化管线钩子 ────────────────────────────────────────────────
+    def auto_set_inputs(self, paths: list[Path]) -> None:
+        self._input_list.clear()
+        self._input_list.add_paths([Path(p) for p in paths])
+
+    def auto_collect_outputs(self) -> list[Path]:
+        """末端 Tab，输出供未来扩展（如再串外部链路）；写元数据不改文件名。"""
+        plans = self._auto_snapshot or []
+        return [Path(p.cbz_path) for p in plans if p.writable]
 
     def _classify_plans(self, plans: list[MakeMetaPlan]) -> dict[str, int]:
         writable = sum(1 for p in plans if p.writable and p.changed)
