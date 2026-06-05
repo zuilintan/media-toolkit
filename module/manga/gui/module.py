@@ -4,6 +4,7 @@
 
     MangaModule (QWidget)
     └── QVBoxLayout
+        ├── library_row          — 漫画库根目录 (全模块共享) + 重建索引按钮
         ├── QSplitter (Vertical)
         │   ├── QTabWidget       — 打包 / 命名 / 封面 / 元数据 四个子 Tab
         │   └── log_panel        — QStackedWidget + 日志按钮列
@@ -16,9 +17,13 @@
   避免多模块共存时跨模块触发
 - 各 Tab 的状态文本走 :attr:`BaseTab.status_changed` 推到底栏，切 Tab 时同步当前
   Tab 的最近状态
+- 漫画库根目录是 module 级全局状态（持久化 key ``manga.library_root``）：
+  std_title Tab 在 scan 阶段会读它做作者规范化（详见
+  :mod:`module.manga.workflow.author_library`）；其它 Tab 暂未消费但保留扩展
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence
@@ -27,13 +32,16 @@ from PySide6.QtWidgets import (
     QPushButton, QSplitter, QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from base.console import emit, set_output
 from base.gui import make_btn_col
 from base.gui.config import get_config
 from base.gui.log_view import LogView
+from base.gui.path_picker import PathPicker
 from module.manga.gui.tabs.make_cover_tab import MakeCoverTab
 from module.manga.gui.tabs.make_meta_tab import MakeMetaTab
 from module.manga.gui.tabs.pack_pic_tab import PackPicTab
 from module.manga.gui.tabs.std_title_tab import StdTitleTab
+from module.manga.workflow.author_library import scan_library
 
 
 class MangaModule(QWidget):
@@ -48,8 +56,26 @@ class MangaModule(QWidget):
         # busy 控制；编排器只需记一个 flag 防止重入
         self._auto_running: bool = False
 
+        # ── 漫画库根目录（module 级全局，先建好供 std_title Tab 绑回调） ──
+        self._migrate_legacy_library_history()
+        self._library_picker = PathPicker(
+            '漫画库根目录:',
+            '可选：留空跳过；指定后扫一级子目录建作者索引',
+            history_key='manga.library_root',
+        )
+        self._library_picker.setToolTip(
+            '指向 {root}/{作者}/ 组织的漫画库根。\n'
+            'std_title Tab 推导作者后会按简繁归一对齐到库里既有主名 / 别名 '
+            '([别名]：xxx.txt)，命中即归入库主名目录。\n'
+            '留空则跳过规范化（保留旧行为，可能出现简繁两份同名作者目录）。'
+        )
+        self._rebuild_btn = QPushButton('重建索引')
+        self._rebuild_btn.setToolTip('强制重新扫描漫画库（默认懒加载已落盘的 cache）')
+        self._rebuild_btn.clicked.connect(self._on_rebuild_library)
+
         tab0 = PackPicTab()
         tab1 = StdTitleTab()
+        tab1.set_library_root_getter(self._library_picker.path)
         tab2 = MakeCoverTab()
         tab3 = MakeMetaTab()
         self._tab_list = [tab0, tab1, tab2, tab3]
@@ -130,9 +156,19 @@ class MangaModule(QWidget):
         sb_lay.addWidget(self._status_label)
         sb_lay.addStretch(1)
 
+        # ── 顶部：漫画库根目录工具条 ──────────────────────────────────
+        # 模块级全局：四个 Tab 都能复用，目前仅 std_title 真正消费。横向 margins
+        # 与各 Tab 内容对齐（root_lay 用 10），让 picker 左边界与下方一致
+        library_row = QWidget()
+        lib_lay = QHBoxLayout(library_row)
+        lib_lay.setContentsMargins(10, 6, 10, 4)
+        lib_lay.addWidget(self._library_picker, 1)
+        lib_lay.addWidget(self._rebuild_btn)
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        outer.addWidget(library_row)
         outer.addWidget(self._splitter, 1)
         outer.addWidget(status_bar)
 
@@ -143,6 +179,43 @@ class MangaModule(QWidget):
     def default_sink(self):
         """供 ``Shell`` 在首次注册时调 :func:`base.console.set_output` 的初始 sink。"""
         return self._tab_list[0]._sink
+
+    # ── 漫画库 ────────────────────────────────────────────────────────
+    def _migrate_legacy_library_history(self) -> None:
+        """老版本把库根目录历史存在 ``std_title.library_root`` 下；module 级提升
+        后改用 ``manga.library_root``。首次启动把老历史搬过来（一次性，幂等：
+        新 key 已有内容时不动）。
+        """
+        cfg = get_config()
+        if cfg.get_history('manga.library_root'):
+            return
+        old = cfg.get_history('std_title.library_root')
+        if not old:
+            return
+        for p in reversed(old):
+            cfg.push_history('manga.library_root', p)
+
+    def _on_rebuild_library(self) -> None:
+        """「重建索引」按钮：把当前 picker 路径交给 :func:`scan_library` 重扫并落盘。
+
+        日志走当前 Tab 的 sink；操作通常毫秒级，同步执行无需开线程。
+        """
+        root = self._library_picker.path()
+        if not root:
+            QMessageBox.warning(self, '提示', '请先选择漫画库根目录')
+            return
+        p = Path(root)
+        if not p.is_dir():
+            QMessageBox.warning(self, '提示', f'不是有效目录:\n{root}')
+            return
+        # 日志落到当前 Tab —— 用户能看到扫描进度反馈
+        current_tab = self._tab_list[self._tabs.currentIndex()]
+        set_output(current_tab._sink)
+        emit('')
+        lib = scan_library(p)
+        QMessageBox.information(
+            self, '完成', f'已重建索引：{len(lib)} 个作者',
+        )
 
     # ── 一键自动化编排器 ──────────────────────────────────────────────
     # 用户在哪个 Tab 点击就从哪开始，逐级把 ``auto_done`` 输出注入下一 Tab：

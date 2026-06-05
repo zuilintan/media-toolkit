@@ -6,6 +6,12 @@
 :func:`~module.manga.workflow.std_title.derive_inputs` 推导作者：``auto_author``
 直采，缺失 / 冲突弹 :class:`~module.manga.gui.widgets.author_choice.AuthorChoiceDialog`。
 自动化管线下改用 :func:`~module.manga.workflow.std_title.auto_fallback` 无弹窗回调。
+
+漫画库根目录是 module 级全局设置（持久化 + UI 在
+:class:`~module.manga.gui.module.MangaModule` 顶部工具条），本 Tab 通过
+:meth:`set_library_root_getter` 接受 module 注入的取值回调，scan 阶段拉取
+当前值给 :func:`~module.manga.workflow.author_library.load_or_scan`，命中即
+对齐到库主名，避免简繁两份目录。
 """
 
 from __future__ import annotations
@@ -14,14 +20,11 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-    QSpinBox, QWidget,
+    QDialog, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QSpinBox, QWidget,
 )
 
 from base.console import emit
-from base.gui.config import get_config
 from base.gui.path_list import PathListWidget
-from base.gui.path_picker import PathPicker
 from module.manga.core.config import FILE_EXTS
 from module.manga.core.models import StdTitlePlan
 from module.manga.gui.tabs.base_tab import BaseTab
@@ -30,7 +33,7 @@ from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 from module.manga.gui.widgets.std_title_detail import StdTitleDetailDialog
 from module.manga.gui.widgets.std_title_tree import StdTitleTree
 from module.manga.presentation.view import print_std_title_preview
-from module.manga.workflow.author_library import scan_library, load_or_scan
+from module.manga.workflow.author_library import load_or_scan
 from module.manga.workflow.std_title import (
     auto_fallback,
     apply_plan, apply_plans, derive_inputs, preview_plans_for_inputs,
@@ -43,6 +46,22 @@ class StdTitleTab(BaseTab):
     confirm_verb     = '执行'
     single_verb      = '重命名'
     no_change_msg    = '没有可执行的重命名'
+
+    def __init__(self, parent=None) -> None:
+        # 库根取值回调，默认空字符串 → 跳过规范化；
+        # :class:`~module.manga.gui.module.MangaModule` 在装配阶段会注入真实的
+        # getter（从顶部工具条 PathPicker 读当前路径）
+        self._get_library_root: Callable[[], str] = lambda: ''
+        super().__init__(parent)
+
+    def set_library_root_getter(self, getter: Callable[[], str]) -> None:
+        """供 :class:`~module.manga.gui.module.MangaModule` 注入"当前漫画库根目录"
+        的取值回调；scan 阶段调用以拉取最新值。
+
+        以 callable 而非 path string 注入：用户可以在 UI 上随时改库根，scan 时
+        才取值即可保证用最新的库做规范化。
+        """
+        self._get_library_root = getter
 
     def _input_box_title(self) -> str:
         return '输入'
@@ -68,52 +87,12 @@ class StdTitleTab(BaseTab):
         self._jobs.setToolTip(
             'plan 阶段并行进程数；1=串行（默认），0=自动 min(cpu, 4)'
         )
-        # 漫画库根目录：推导作者后用库索引做简繁归一对齐，避免同作者两份目录。
-        # 持久化 + 历史复用 PathPicker（同 root_picker 套路）；置空即关闭规范化。
-        self._library_picker = PathPicker(
-            '漫画库根目录:',
-            '可选：留空跳过；指定后会扫一级子目录建作者索引',
-            history_key=f'{self.cmd_name}.library_root',
-        )
-        self._library_picker.setToolTip(
-            '指向 {root}/{作者}/ 组织的漫画库根；推导作者后会按简繁归一对齐到'
-            '库里既有主名 / 别名（[别名]：xxx.txt）'
-        )
-        self._rebuild_btn = QPushButton('重建索引')
-        self._rebuild_btn.setToolTip('强制重新扫描漫画库（默认懒加载已落盘的 cache）')
-        self._rebuild_btn.clicked.connect(self._on_rebuild_library)
-
         box = QGroupBox('选项')
         lay = QHBoxLayout(box)
         lay.addWidget(QLabel('并行 jobs:'))
         lay.addWidget(self._jobs)
-        lay.addSpacing(16)
-        lay.addWidget(self._library_picker, 1)
-        lay.addWidget(self._rebuild_btn)
+        lay.addStretch(1)
         return box
-
-    def _on_rebuild_library(self) -> None:
-        """「重建索引」按钮：当前 picker 路径非空才扫；同步动作（库通常很快）。"""
-        root = self._library_picker.path()
-        if not root:
-            QMessageBox.warning(self, '提示', '请先选择漫画库根目录')
-            return
-        p = Path(root)
-        if not p.is_dir():
-            QMessageBox.warning(self, '提示', f'不是有效目录:\n{root}')
-            return
-        lib = scan_library(p)
-        QMessageBox.information(
-            self, '完成', f'已重建索引：{len(lib)} 个作者',
-        )
-
-    def _load_settings(self) -> None:
-        super()._load_settings()
-        # PathPicker 自带历史复用；这里仅复位 picker 的 placeholder 路径
-        cfg = get_config()
-        last = cfg.get_history(f'{self.cmd_name}.library_root')
-        if last:
-            self._library_picker.set_path(last[0])
 
     def _banner_subtitle(self) -> str:
         return '源文件批量重命名'
@@ -141,9 +120,10 @@ class StdTitleTab(BaseTab):
             def resolve_fn(path, deriv):
                 return resolve_author_via_dialog(self, path, deriv)
 
-        # 漫画库索引（可选）：仅在 picker 给出有效目录时启用规范化
+        # 漫画库索引（可选）：从 module 顶部工具条注入的 getter 拉当前路径；
+        # 空字符串或无效目录都走"跳过规范化"分支（保留旧行为）
         normalize_author = None
-        lib_root = self._library_picker.path()
+        lib_root = self._get_library_root() if self._get_library_root else ''
         if lib_root:
             p = Path(lib_root)
             if p.is_dir():
