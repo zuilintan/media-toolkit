@@ -4,15 +4,17 @@
 
 - **批量模式** :func:`preview_plans` ← 给定根目录，按 ``{root}/{author}/*.{zip,cbz}``
   结构扫描；作者目录名即作者，无 publisher 推导。
-- **单文件 / 混合模式** :func:`preview_plans_for_inputs` ← 调用方先用
-  :func:`derive_author` 推导作者（含 ``[社团 (作者)]`` 嵌套抽取），交互式解决
-  冲突 / 缺失，再以 :class:`StdTitleInput` 喂入；apply 阶段统一保证文件落入
-  ``{父目录}/{作者}/`` 子目录（必要时新建），抽取出的社团顺带写入
-  ``[社团]：{社团名}.txt`` 标识（下游 :func:`~module.manga.workflow.make_meta.find_publisher` 自动识别）。
+- **单文件 / 混合模式** :func:`derive_inputs` → :func:`preview_plans_for_inputs`
+  ← 单文件作者推导（含 ``[社团 (作者)]`` 嵌套抽取）统一在 :func:`derive_inputs`
+  完成：``auto_author`` 命中即直采，否则回调 ``resolve_fn`` 交互式补全；apply
+  阶段统一保证文件落入 ``{父目录}/{作者}/`` 子目录（必要时新建），抽取出的社团
+  顺带写入 ``[社团]：{社团名}.txt`` 标识（下游
+  :func:`~module.manga.workflow.make_meta.find_publisher` 自动识别）。
 """
 
 from __future__ import annotations
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,7 +121,7 @@ def derive_author(src_path: str) -> AuthorDerivation:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 输入项构造
+# 输入项构造（主线程 scan 阶段调用）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
@@ -154,6 +156,67 @@ def build_input(src_path: str, author: str, publisher: str = '') -> StdTitleInpu
         author_dir     = str(author_dir),
         publisher_file = pub_file,
     )
+
+
+#: ``resolve_fn(path, derivation) -> (author, publisher) | None``；返回 ``None``
+#: 表示跳过该文件。详见 :func:`derive_inputs`。
+AuthorResolveFn = Callable[[Path, AuthorDerivation], tuple[str, str] | None]
+
+
+class StdTitleAbort(Exception):
+    """``resolve_fn`` 抛出以中止整批推导。
+
+    典型场景：CLI non-tty 模式遇到无法自动推导且无法 prompt 的文件，必须整批
+    停下让用户先整理输入。:func:`derive_inputs` 让它原样冒泡，调用方捕获即可。
+    """
+
+
+def auto_fallback(path: Path, deriv: AuthorDerivation) -> tuple[str, str] | None:
+    """编排器 / GUI 自动模式的默认 ``resolve_fn``。
+
+    优先级：``bracket_author`` → ``parent_author``；两者皆空才放弃。
+    pack_pic 产物常落在「漫画根目录」（``Comic/``）而非作者目录，``parent_author``
+    不可用，故 bracket 优先。"""
+    author = deriv.bracket_author or deriv.parent_author
+    if not author:
+        return None
+    publisher = (deriv.bracket_publisher
+                 if author == deriv.bracket_author else '')
+    return author, publisher
+
+
+def derive_inputs(
+    paths: list[Path],
+    resolve_fn: AuthorResolveFn | None = None,
+) -> list[StdTitleInput]:
+    """主线程批量推导作者并构造 :class:`StdTitleInput` 列表（单文件 / 混合模式入口）。
+
+    - ``auto_author`` 命中 → 直采（无副作用）
+    - 否则调用 ``resolve_fn(path, deriv)``；返回 ``None`` 即跳过该文件，
+      ``resolve_fn`` 为 ``None`` 时不可解析项一律跳过（auto-only 语义）
+    - ``resolve_fn`` 抛 :class:`StdTitleAbort` 表示整批终止，原样向外冒泡
+
+    所有交互（CLI prompt / GUI 弹窗）由调用方在 ``resolve_fn`` 内完成，本函数
+    本身不做任何 I/O，便于在 :class:`~module.manga.gui.tabs.base_tab.BaseTab._validate_scan_target`
+    主线程内同步调用。
+    """
+    inputs: list[StdTitleInput] = []
+    for p in paths:
+        path  = Path(p)
+        deriv = derive_author(str(path))
+        author = deriv.auto_author
+        if author:
+            publisher = (deriv.bracket_publisher
+                         if author == deriv.bracket_author else '')
+        elif resolve_fn is not None:
+            result = resolve_fn(path, deriv)
+            if result is None:
+                continue
+            author, publisher = result
+        else:
+            continue
+        inputs.append(build_input(str(path), author, publisher))
+    return inputs
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -217,8 +280,8 @@ def preview_plans_for_inputs(
 ) -> list[StdTitlePlan]:
     """对已确定输入项批量产出 plan。
 
-    供单文件 / 混合模式使用：调用方负责用 :func:`derive_author` 推导 + 交互式
-    解决冲突 / 缺失，再 :func:`build_input` 构造每一项。
+    供单文件 / 混合模式使用：调用方负责用 :func:`derive_inputs` 统一推导 +
+    交互式补全作者，再喂入本函数。
 
     :param jobs: 1=串行；>1=并行进程数；0=自动 ``min(cpu, 4)``。
     """

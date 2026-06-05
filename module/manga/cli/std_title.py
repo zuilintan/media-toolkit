@@ -21,8 +21,8 @@ from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.core.config import FILE_EXTS
 from module.manga.presentation.view import print_std_title_preview, print_run_banner
 from module.manga.workflow.std_title import (
-    AuthorDerivation, StdTitleInput,
-    apply_plans, build_input, derive_author,
+    AuthorDerivation, StdTitleAbort,
+    apply_plans, derive_inputs,
     preview_plans, preview_plans_for_inputs,
 )
 from module.manga.cli import validate_root
@@ -70,13 +70,35 @@ def _prompt_author(path: Path, deriv: AuthorDerivation) -> tuple[str, str]:
     return (author, '') if author else ('', '')
 
 
-def _resolve_file_inputs(files: list[str]) -> list[StdTitleInput] | None:
-    """解析 ``--file`` 列表为 :class:`StdTitleInput` 列表。
+def _cli_resolve(path: Path, deriv: AuthorDerivation) -> tuple[str, str] | None:
+    """``derive_inputs`` 的 CLI 回调：tty → prompt；non-tty → 报错 + 抛中止。
 
-    任一文件作者无法确定（non-tty 推导失败 / tty 用户跳过）即返回 ``None``。
+    返回 ``None`` 表示用户跳过该文件 → 整批取消（CLI 语义：任一文件未确定即停）。
     """
-    is_tty = sys.stdin.isatty()
-    inputs: list[StdTitleInput] = []
+    if not sys.stdin.isatty():
+        if deriv.conflict:
+            error(
+                f'作者推导冲突: {path.name}\n'
+                f'  父目录: {deriv.parent_author}\n'
+                f'  []:     {deriv.bracket_author}\n'
+                f'  → 请整理后重试（交互式终端下可 prompt 选择）'
+            )
+        else:
+            error(
+                f'无法推导作者: {path.name}'
+                f'（父目录 / [] 均未命中）'
+            )
+        raise StdTitleAbort
+    author, publisher = _prompt_author(path, deriv)
+    if not author:
+        emit('  已跳过 → 操作取消。')
+        raise StdTitleAbort
+    return author, publisher
+
+
+def _resolve_file_paths(files: list[str]) -> list[Path] | None:
+    """``--file`` 列表合法性校验，返回 :class:`Path` 列表；任一非法即 ``None``。"""
+    paths: list[Path] = []
     for f in files:
         path = Path(f).resolve()
         if not path.is_file():
@@ -85,34 +107,8 @@ def _resolve_file_inputs(files: list[str]) -> list[StdTitleInput] | None:
         if path.suffix.lower() not in FILE_EXTS:
             error(f'文件类型不支持（仅 .zip / .cbz）: {f}')
             return None
-
-        deriv     = derive_author(str(path))
-        author    = deriv.auto_author
-        publisher = (deriv.bracket_publisher
-                     if author and author == deriv.bracket_author else '')
-
-        if not author:
-            if not is_tty:
-                if deriv.conflict:
-                    error(
-                        f'作者推导冲突: {path.name}\n'
-                        f'  父目录: {deriv.parent_author}\n'
-                        f'  []:     {deriv.bracket_author}\n'
-                        f'  → 请整理后重试（交互式终端下可 prompt 选择）'
-                    )
-                else:
-                    error(
-                        f'无法推导作者: {path.name}'
-                        f'（父目录 / [] 均未命中）'
-                    )
-                return None
-            author, publisher = _prompt_author(path, deriv)
-            if not author:
-                emit('  已跳过 → 操作取消。')
-                return None
-
-        inputs.append(build_input(str(path), author, publisher))
-    return inputs
+        paths.append(path)
+    return paths
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -137,8 +133,13 @@ def cmd_std_title(args: argparse.Namespace) -> int:
         banner_target = f'单文件模式（{len(args.file)} 个文件）'
         print_run_banner(args.command, '源文件批量重命名',
                          banner_target, args.apply)
-        inputs = _resolve_file_inputs(args.file)
-        if inputs is None:
+        paths = _resolve_file_paths(args.file)
+        if paths is None:
+            emit(SEP2)
+            return 2
+        try:
+            inputs = derive_inputs(paths, resolve_fn=_cli_resolve)
+        except StdTitleAbort:
             emit(SEP2)
             return 2
         plans = preview_plans_for_inputs(inputs, jobs=args.jobs)

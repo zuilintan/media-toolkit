@@ -1,7 +1,11 @@
 """标题标准化 GUI Tab；复用 :mod:`module.manga.workflow.std_title`。
 
-输入语义与 CLI 对齐：用户增量添加文件 / 目录，每个文件自动推导作者
-（``[社团 (作者)]`` 抽取），冲突 / 缺失时弹窗交互。
+输入语义与 make_meta / make_cover 对齐：
+:class:`~base.gui.path_list.PathListWidget` 收路径（拖入或菜单添加，目录在添加时
+``rglob`` 展开成 ``.zip`` / ``.cbz``），scan 阶段统一跑
+:func:`~module.manga.workflow.std_title.derive_inputs` 推导作者：``auto_author``
+直采，缺失 / 冲突弹 :class:`~module.manga.gui.widgets.author_choice.AuthorChoiceDialog`。
+自动化管线下改用 :func:`~module.manga.workflow.std_title.auto_fallback` 无弹窗回调。
 """
 
 from __future__ import annotations
@@ -14,16 +18,18 @@ from PySide6.QtWidgets import (
 )
 
 from base.console import emit
+from base.gui.path_list import PathListWidget
 from module.manga.core.config import FILE_EXTS
 from module.manga.core.models import StdTitlePlan
 from module.manga.gui.tabs.base_tab import BaseTab
+from module.manga.gui.widgets.author_choice import resolve_author_via_dialog
 from module.manga.gui.widgets.preview_tree import PreviewTreeBase
 from module.manga.gui.widgets.std_title_detail import StdTitleDetailDialog
-from module.manga.gui.widgets.std_title_input import InputListWidget
 from module.manga.gui.widgets.std_title_tree import StdTitleTree
 from module.manga.presentation.view import print_std_title_preview
 from module.manga.workflow.std_title import (
-    apply_plan, apply_plans, build_input, derive_author, preview_plans_for_inputs,
+    auto_fallback,
+    apply_plan, apply_plans, derive_inputs, preview_plans_for_inputs,
 )
 
 
@@ -38,8 +44,17 @@ class StdTitleTab(BaseTab):
         return '输入'
 
     def _create_input_widget(self) -> QWidget:
-        self._input_list = InputListWidget()
-        self._input_list.inputs_changed.connect(self._on_inputs_changed)
+        self._input_list = PathListWidget(
+            accept_file_exts=tuple(FILE_EXTS),
+            accept_dirs=True,
+            expand_dirs_on_add=True,
+            file_dialog_filter='ZIP/CBZ (*.zip *.cbz);;所有文件 (*)',
+            file_dialog_title='添加漫画文件',
+            dir_dialog_title='添加漫画作者文件夹（递归扫描 .zip / .cbz）',
+            add_file_label='添加漫画文件…',
+            add_dir_label='添加漫画作者文件夹…',
+        )
+        self._input_list.paths_changed.connect(self._on_inputs_changed)
         return self._input_list
 
     def _build_options_box(self) -> QWidget:
@@ -60,9 +75,42 @@ class StdTitleTab(BaseTab):
         return '源文件批量重命名'
 
     def _validate_scan_target(self) -> Any | None:
-        inputs = self._input_list.inputs()
+        """主线程跑作者推导：``auto_author`` 直采，缺失 / 冲突按模式分派——
+        ``_auto_mode`` 下用 :func:`auto_fallback` 静默回退，交互模式弹
+        :class:`~module.manga.gui.widgets.author_choice.AuthorChoiceDialog`。
+
+        返回 ``None`` 时基类 :meth:`~module.manga.gui.tabs.base_tab.BaseTab._on_scan`
+        直接退出；auto 管线下必须在此自行 :meth:`_auto_finish` 收尾，否则下游
+        会等不到 :attr:`auto_done` 而挂起。
+        """
+        paths = self._input_list.paths()
+        if not paths:
+            if self._auto_mode:
+                self._auto_finish([])
+            else:
+                QMessageBox.warning(self, '提示', '请先添加文件或目录')
+            return None
+
+        if self._auto_mode:
+            resolve_fn = auto_fallback
+        else:
+            def resolve_fn(path, deriv):
+                return resolve_author_via_dialog(self, path, deriv)
+
+        inputs = derive_inputs(paths, resolve_fn=resolve_fn)
+        skipped = len(paths) - len(inputs)
+        if skipped:
+            reason = ('作者无法推导' if self._auto_mode
+                      else '用户取消或未填作者')
+            emit(f'⚠️ 已跳过 {skipped} 个文件（{reason}），未参与本次扫描')
         if not inputs:
-            QMessageBox.warning(self, '提示', '请先添加文件或目录')
+            if self._auto_mode:
+                self._auto_finish([])
+            else:
+                QMessageBox.information(
+                    self, '提示',
+                    '所选文件均无法确定作者，已全部跳过',
+                )
             return None
         return inputs
 
@@ -70,7 +118,7 @@ class StdTitleTab(BaseTab):
         return f'已添加 {len(target)} 个文件'
 
     def _has_inputs(self) -> bool:
-        return bool(self._input_list.inputs())
+        return bool(self._input_list.paths())
 
     def _plan_call(self, target: Any) -> tuple[Callable[..., Any], tuple, dict]:
         return preview_plans_for_inputs, (target,), {'jobs': self._jobs.value()}
@@ -103,30 +151,13 @@ class StdTitleTab(BaseTab):
 
     # ── 自动化管线钩子 ────────────────────────────────────────────────
     def auto_set_inputs(self, paths: list[Path]) -> None:
-        """编排器入口：为上游 zip/cbz 推导作者并构造
-        :class:`~module.manga.workflow.std_title.StdTitleInput`，无可用推导即跳过。
-
-        Fallback 顺序：``auto_author`` → ``bracket_author`` → ``parent_author``。
-        pack_pic 产出的 zip 通常落在「漫画根目录」（如 ``Comic/`` 下）而非作者
-        目录，``parent_author = 'Comic'`` 不可用——文件名里的 ``[社团 (作者)]``
-        bracket 头才是可靠来源，故 bracket 优先于 parent。
+        """编排器入口：仅收路径，不做推导——scan 阶段
+        :meth:`_validate_scan_target` 会用 :func:`auto_fallback` 统一处理。
         """
         self._input_list.clear()
-        inputs = []
-        for p in paths:
-            p = Path(p)
-            if p.suffix.lower() not in FILE_EXTS or not p.is_file():
-                continue
-            deriv  = derive_author(str(p))
-            author = (deriv.auto_author or deriv.bracket_author
-                      or deriv.parent_author)
-            if not author:
-                emit(f'⚠️ std_title 自动化跳过（无作者推导）: {p.name}')
-                continue
-            publisher = (deriv.bracket_publisher
-                         if author == deriv.bracket_author else '')
-            inputs.append(build_input(str(p), author, publisher))
-        self._input_list.add_inputs(inputs)
+        usable = [Path(p) for p in paths
+                  if Path(p).suffix.lower() in FILE_EXTS and Path(p).is_file()]
+        self._input_list.add_paths(usable)
 
     def auto_collect_outputs(self) -> list[Path]:
         """产出 = 重命名后的目标路径（``author_dir / new_name``）。
