@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from base.console import emit, set_output
-from base.gui import make_btn_col
+from base.gui import apply_col_btn_style, make_btn_col
 from base.gui.config import get_config
 from base.gui.log_view import LogView
 from base.gui.path_picker import PathPicker
@@ -72,6 +72,9 @@ class MangaModule(QWidget):
         self._rebuild_btn = QPushButton('重建索引')
         self._rebuild_btn.setToolTip('强制重新扫描漫画库（默认懒加载已落盘的 cache）')
         self._rebuild_btn.clicked.connect(self._on_rebuild_library)
+        # 顶部库工具条按钮与各 Tab 内按钮列右边界对齐（含 ⚡ 自动化角部按钮）
+        for btn in (self._library_picker.browse_btn, self._rebuild_btn):
+            apply_col_btn_style(btn)
 
         tab0 = PackPicTab()
         tab1 = StdTitleTab()
@@ -95,13 +98,15 @@ class MangaModule(QWidget):
         # corner widget 由 QTabWidget 放到 tab bar 同行的右上角，整行天然
         # 与最右一个 tab 共占同一水平带；橙色 accent 属性让按钮与流水线动作
         # （蓝色 primary）有视觉区分
-        self._auto_btn = QPushButton('⚡ 一键自动化')
+        # accent 已带 font-weight: 600 + 橙色，不再加 emoji 以免在 80px 宽里被裁
+        self._auto_btn = QPushButton('自动化')
         self._auto_btn.setToolTip(
             '从当前 Tab 开始顺序执行到末尾，期间不再确认。\n'
             '上一个 Tab 的产物自动作为下一个 Tab 的输入。'
         )
         self._auto_btn.setProperty('accent', True)
         self._auto_btn.clicked.connect(self._on_auto_click)
+        apply_col_btn_style(self._auto_btn)
         self._tabs.setCornerWidget(self._auto_btn, Qt.TopRightCorner)
 
         self._log_stack = QStackedWidget()
@@ -248,7 +253,7 @@ class MangaModule(QWidget):
             return
         self._auto_running = True
         self._auto_btn.setEnabled(False)
-        self._auto_btn.setText('⏳ 自动化中…')
+        self._auto_btn.setText('运行中')
         self._chain_at(start, inputs=None)
 
     def _chain_at(self, idx: int, *, inputs) -> None:
@@ -273,9 +278,26 @@ class MangaModule(QWidget):
             except (RuntimeError, TypeError):
                 pass
             next_idx = idx + 1
-            if not outputs or next_idx >= len(self._tab_list):
+            if next_idx >= len(self._tab_list):
                 self._auto_pipeline_finish()
                 return
+            # 空产出：起点无上游可沿用直接终止；中段询问是否跳过本步、把上一
+            # 步产物 pass-through 给下一步
+            if not outputs:
+                if inputs is None:
+                    self._auto_pipeline_finish()
+                    return
+                ans = QMessageBox.question(
+                    self, '一键自动化',
+                    f'「{self._tabs.tabText(idx)}」没有可处理的产物。\n\n'
+                    '继续到下一步（沿用上一步产物作为输入）？\n'
+                    '否则将终止管线。',
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+                )
+                if ans != QMessageBox.Yes:
+                    self._auto_pipeline_finish()
+                    return
+                outputs = inputs
             # 上一 Tab 的 thread.quit() 是 async，延后到当前栈展开后再启动下一段
             QTimer.singleShot(0, lambda: self._chain_at(next_idx, inputs=outputs))
 
@@ -285,7 +307,7 @@ class MangaModule(QWidget):
     def _auto_pipeline_finish(self) -> None:
         self._auto_running = False
         self._auto_btn.setEnabled(True)
-        self._auto_btn.setText('⚡ 一键自动化')
+        self._auto_btn.setText('自动化')
 
     # ── 状态 ──────────────────────────────────────────────────────────
     def _on_tab_busy(self, busy: bool) -> None:

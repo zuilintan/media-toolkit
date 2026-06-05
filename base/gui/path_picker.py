@@ -49,14 +49,15 @@ class PathPicker(QWidget):
         if history_key:
             self._reload_items()
 
-        self._btn = QPushButton('浏览…')
-        self._btn.clicked.connect(self._pick)
+        #: 浏览按钮 —— 公开供外部统一尺寸 / 样式（与同行其它按钮对齐时使用）。
+        self.browse_btn = QPushButton('浏览…')
+        self.browse_btn.clicked.connect(self._pick)
 
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(QLabel(label))
         lay.addWidget(self._combo, 1)
-        lay.addWidget(self._btn)
+        lay.addWidget(self.browse_btn)
 
     # ── 公共 API ──────────────────────────────────────────────────────
     def path(self) -> str:

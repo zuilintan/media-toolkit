@@ -14,6 +14,18 @@ BUTTON_COL_WIDTH = 80
 GROUPBOX_CONTENT_TOP = 18
 
 
+def apply_col_btn_style(btn) -> None:
+    """按"按钮列"标准统一单个按钮的尺寸 + 内边距。
+
+    适用于不走 :func:`make_btn_col` 但仍需与按钮列右边界对齐的散落按钮
+    （如顶部工具条 / tab corner widget）。默认 QSS 的
+    ``padding: 5px 14px`` 在 :data:`BUTTON_COL_WIDTH` 宽里只剩 ~50 px 内容
+    区，4 个汉字会被裁；压缩到 ``2px 4px`` 后能容纳 4 字以内的文案。
+    """
+    btn.setStyleSheet('QPushButton { padding: 2px 4px; }')
+    btn.setFixedWidth(BUTTON_COL_WIDTH)
+
+
 def make_btn_col(btns, *, top_margin: int = GROUPBOX_CONTENT_TOP):
     """把若干按钮排成单列；外裹固定宽度 :data:`BUTTON_COL_WIDTH` 的
     :class:`~PySide6.QtWidgets.QWidget`，便于让每行内容区右边界对齐到同一 x。
@@ -31,8 +43,7 @@ def make_btn_col(btns, *, top_margin: int = GROUPBOX_CONTENT_TOP):
     col.setContentsMargins(0, top_margin, 0, 0)
     col.setSpacing(4)
     for b in btns:
-        b.setStyleSheet('QPushButton { padding: 2px 4px; }')
-        b.setFixedWidth(BUTTON_COL_WIDTH)
+        apply_col_btn_style(b)
         col.addWidget(b)
     col.addStretch(1)
     return wrap
