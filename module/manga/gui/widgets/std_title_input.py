@@ -247,7 +247,7 @@ class InputListWidget(QWidget):
         self._list.setSelectionMode(QListWidget.ExtendedSelection)
         # 默认 sizeHint 约 256 px，对横排上下叠加的 GUI 偏高；锁个上限让输入区
         # 紧凑——长列表仍可滚动浏览
-        self._list.setMaximumHeight(128)
+        self._list.setMaximumHeight(85)
 
         # 添加按钮 + 二级菜单
         self._add_btn  = QPushButton('添加…')

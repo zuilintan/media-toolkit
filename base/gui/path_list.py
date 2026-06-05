@@ -64,7 +64,7 @@ class PathListWidget(QWidget):
         self._list.setSelectionMode(QListWidget.ExtendedSelection)
         # 默认 sizeHint 约 256 px，对横排上下叠加的 GUI 偏高；锁个上限让输入区
         # 紧凑——长列表仍可滚动浏览
-        self._list.setMaximumHeight(128)
+        self._list.setMaximumHeight(85)
 
         # 「添加」按钮:文件 + 目录都启用 → 二级菜单;仅一个 → 按钮直点
         accepts_file = self._exts is None or len(self._exts) > 0
