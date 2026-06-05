@@ -188,6 +188,7 @@ def auto_fallback(path: Path, deriv: AuthorDerivation) -> tuple[str, str] | None
 def derive_inputs(
     paths: list[Path],
     resolve_fn: AuthorResolveFn | None = None,
+    normalize_author: Callable[[str], str] | None = None,
 ) -> list[StdTitleInput]:
     """主线程批量推导作者并构造 :class:`StdTitleInput` 列表（单文件 / 混合模式入口）。
 
@@ -195,6 +196,11 @@ def derive_inputs(
     - 否则调用 ``resolve_fn(path, deriv)``；返回 ``None`` 即跳过该文件，
       ``resolve_fn`` 为 ``None`` 时不可解析项一律跳过（auto-only 语义）
     - ``resolve_fn`` 抛 :class:`StdTitleAbort` 表示整批终止，原样向外冒泡
+    - 拿到 ``author`` 后（无论来源）若提供 ``normalize_author``，统一过一道
+      规范化——典型用法是
+      :meth:`~module.manga.workflow.author_library.AuthorLibrary.resolve`，按
+      简繁归一对齐到库里既有主名，避免出现"作者甲（繁）"与"作者甲（简）"
+      两份目录
 
     所有交互（CLI prompt / GUI 弹窗）由调用方在 ``resolve_fn`` 内完成，本函数
     本身不做任何 I/O，便于在 :class:`~module.manga.gui.tabs.base_tab.BaseTab._validate_scan_target`
@@ -215,6 +221,8 @@ def derive_inputs(
             author, publisher = result
         else:
             continue
+        if normalize_author is not None:
+            author = normalize_author(author) or author
         inputs.append(build_input(str(path), author, publisher))
     return inputs
 

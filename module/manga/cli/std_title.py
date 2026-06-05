@@ -7,6 +7,11 @@
   ``[社团 (作者)]`` 自动抽取社团并生成 ``[社团]：XX.txt`` 标识；
   冲突 / 缺失时在 tty 下 prompt，non-tty 下报错退出
 
+可选 ``--library-root`` 指向漫画库根目录：``--file`` 模式下推导出的作者会
+先经 :mod:`~module.manga.workflow.author_library` 简繁归一对齐到库里既有
+主名 / 别名（``[别名]：XX.txt``），命中即替换为库主名，避免一作者出现
+"作者甲（繁）" 与 "作者甲（简）" 两份目录。
+
 流程: scan → 全量 plan → 预览 → 预览汇总 → 二次确认 → 整批写入。结构与
 :mod:`module.manga.cli.make_meta` 对称。
 """
@@ -20,6 +25,7 @@ from pathlib import Path
 from base.console import SEP2, emit, confirm, error, print_summary
 from module.manga.core.config import FILE_EXTS
 from module.manga.presentation.view import print_std_title_preview, print_run_banner
+from module.manga.workflow.author_library import load_or_scan, scan_library
 from module.manga.workflow.std_title import (
     AuthorDerivation, StdTitleAbort,
     apply_plans, derive_inputs,
@@ -111,6 +117,21 @@ def _resolve_file_paths(files: list[str]) -> list[Path] | None:
     return paths
 
 
+def _build_normalizer(library_root: str, force_rescan: bool):
+    """根据 ``--library-root`` 构造 :func:`derive_inputs` 的 ``normalize_author``
+    钩子；未指定库根时返回 ``None``（不做规范化）。
+    """
+    if not library_root:
+        return None
+    root = Path(library_root).resolve()
+    if not root.is_dir():
+        error(f'漫画库根目录不存在: {library_root}（已忽略，跳过规范化）')
+        return None
+    lib = load_or_scan(root, force_rescan=force_rescan)
+    emit(f'  📚 已加载库索引: {len(lib)} 个作者')
+    return lib.resolve
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 命令调度
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -137,8 +158,11 @@ def cmd_std_title(args: argparse.Namespace) -> int:
         if paths is None:
             emit(SEP2)
             return 2
+        normalize_author = _build_normalizer(args.library_root,
+                                             args.rebuild_author_index)
         try:
-            inputs = derive_inputs(paths, resolve_fn=_cli_resolve)
+            inputs = derive_inputs(paths, resolve_fn=_cli_resolve,
+                                   normalize_author=normalize_author)
         except StdTitleAbort:
             emit(SEP2)
             return 2
@@ -148,6 +172,11 @@ def cmd_std_title(args: argparse.Namespace) -> int:
         if root is None:
             return 2
         print_run_banner(args.command, '源文件批量重命名', root, args.apply)
+        # --root 模式下父目录即作者，不需要二次规范化；但若用户指定了
+        # --rebuild-author-index，顺手把这次扫到的库快照存一下，方便后续
+        # --file 模式复用
+        if args.rebuild_author_index:
+            scan_library(root)
         plans = preview_plans(str(root), jobs=args.jobs)
 
     if not plans:
@@ -212,3 +241,10 @@ def add_std_title_args(p: argparse.ArgumentParser) -> None:
                    help='plan 阶段并行进程数（1=串行，默认；'
                         '0=自动 min(cpu, 4)；plan 阶段是纯字符串处理'
                         '故并行收益有限）')
+    p.add_argument('--library-root',  default='', metavar='DIR',
+                   help='漫画库根目录（按 {root}/{author}/ 组织）；--file 模式下'
+                        '指定后推导作者会先在库里查简繁归一一致的主名 / 别名 '
+                        '([别名]：xxx.txt)，命中即对齐，避免一作者出现简繁两份'
+                        '目录。--root 模式父目录即作者，无需指定本选项')
+    p.add_argument('--rebuild-author-index', action='store_true',
+                   help='强制重建漫画库作者索引（默认懒加载已落盘的 cache）')
