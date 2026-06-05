@@ -44,6 +44,16 @@ def norm_punct(s: str) -> str:
     return re.sub(r'(?<=\d),(?=\d)', '，', s)
 
 
+def strip_leading_prefix(stem: str) -> str:
+    """剥离 ``(同人CG集)`` / ``(成年コミック)`` 这类文件名首部噪音括号前缀。
+
+    :func:`~module.manga.naming.parser.parse_name` 的预处理首步与
+    :func:`~module.manga.workflow.std_title.derive_author` 共用，确保两处对
+    "首个 ``[xxx]``" 的认定一致。
+    """
+    return P.LEADING_PREFIX_RE.sub('', stem)
+
+
 def extract_flag(stem: str, pattern: re.Pattern) -> tuple[str, bool]:
     """匹配 ``pattern`` 时移除并返回 ``(new_stem, True)``，否则 ``(stem, False)``。"""
     if pattern.search(stem):

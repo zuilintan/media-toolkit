@@ -20,6 +20,7 @@ from module.manga.core.models import StdTitlePlan
 from module.manga.core.config import FILE_EXTS
 from module.manga.naming.parser import parse_name
 from module.manga.naming.builder import build_new_name
+from module.manga.naming.text import strip_leading_prefix
 from base.fs import try_rename
 from base.console import print_op_result, warn, error, info, emit
 from module.manga.infra.parallel import run_plans
@@ -85,6 +86,9 @@ def _parse_bracket_head(stem: str) -> tuple[str, str]:
     - ``[社团 (作者)]`` → ``('作者', '社团')``
     - ``[作者]`` → ``('作者', '')``
     - 未命中 → ``('', '')``
+
+    本函数仅做方括号解析，不处理开头噪音前缀；调用方负责先剥离
+    ``(同人CG集)`` 这类噪音（参见 :func:`derive_author`）。
     """
     m = _BRACKET_HEAD_RE.match(stem)
     if not m:
@@ -97,9 +101,15 @@ def _parse_bracket_head(stem: str) -> tuple[str, str]:
 
 
 def derive_author(src_path: str) -> AuthorDerivation:
-    """从源文件路径推导作者候选，返回 :class:`AuthorDerivation` 供调用方决策。"""
+    """从源文件路径推导作者候选，返回 :class:`AuthorDerivation` 供调用方决策。
+
+    预处理顺序与 :func:`~module.manga.naming.parser.parse_name` 对齐：复用
+    :func:`~module.manga.naming.text.strip_leading_prefix` 剥离 ``(同人CG集)``
+    这类开头噪音前缀，再交 :func:`_parse_bracket_head` 解析方括号头。
+    """
     p = Path(src_path)
-    bracket_author, bracket_publisher = _parse_bracket_head(p.stem)
+    stem = strip_leading_prefix(p.stem)
+    bracket_author, bracket_publisher = _parse_bracket_head(stem)
     return AuthorDerivation(
         src_path          = str(p),
         parent_author     = p.parent.name,

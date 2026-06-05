@@ -10,7 +10,7 @@ from module.manga.core import patterns as P
 from module.manga.naming.text import (
     norm_punct, trad_to_simp,
     extract_flag, to_circle, conv_roman_suffix,
-    similar,
+    similar, strip_leading_prefix,
 )
 from base.console import debug, CYAN, RESET
 
@@ -396,7 +396,7 @@ def parse_name(author: str, name: str) -> MangaInfo:
     stem, language, pre_part_tag, is_colorized, is_ongoing = _extract_special_flags(stem)
 
     # 1. 去除开头噪音前缀 & 匹配作者名的首个方括号标签
-    stem = P.LEADING_PREFIX_RE.sub('', stem)
+    stem = strip_leading_prefix(stem)
     m = P.AUTHOR_TAG_RE.search(stem)
     if m and similar(m.group(1), author):
         stem = stem[m.end():].strip()
