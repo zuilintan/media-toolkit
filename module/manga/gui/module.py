@@ -107,7 +107,13 @@ class MangaModule(QWidget):
         self._auto_btn.setProperty('accent', True)
         self._auto_btn.clicked.connect(self._on_auto_click)
         apply_col_btn_style(self._auto_btn)
-        self._tabs.setCornerWidget(self._auto_btn, Qt.TopRightCorner)
+        # 外层 wrapper 提供 10px 右留白，对齐上方 library_row 的右 margin，
+        # 让 corner widget 按钮右边界与「重建索引」右边界对齐
+        auto_wrap = QWidget()
+        auto_layout = QHBoxLayout(auto_wrap)
+        auto_layout.setContentsMargins(0, 0, 10, 0)
+        auto_layout.addWidget(self._auto_btn)
+        self._tabs.setCornerWidget(auto_wrap, Qt.TopRightCorner)
 
         self._log_stack = QStackedWidget()
         self._logs: list[LogView] = []
