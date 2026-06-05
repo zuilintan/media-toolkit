@@ -48,4 +48,4 @@ class StdTitleTree(PreviewTreeBase):
         return p.changed and not p.needs_review
 
     def _apply_action_text(self, p: StdTitlePlan) -> str:
-        return f'重命名：{p.old_name}'
+        return f'规范标题：{p.old_name}'

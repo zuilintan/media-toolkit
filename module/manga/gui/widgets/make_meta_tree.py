@@ -60,4 +60,4 @@ class MakeMetaTree(PreviewTreeBase):
         return p.writable and p.changed
 
     def _apply_action_text(self, p: MakeMetaPlan) -> str:
-        return f'执行写入：{p.filename}'
+        return f'生成元数据：{p.filename}'

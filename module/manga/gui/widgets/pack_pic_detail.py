@@ -110,7 +110,7 @@ class PackPicDetailDialog(QDialog):
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
         if plan.writable:
-            apply_btn = QPushButton('打包', self)
+            apply_btn = QPushButton('执行', self)
             apply_btn.setToolTip('只对当前单位打包并删除源目录')
             apply_btn.setProperty('primary', True)
             apply_btn.clicked.connect(

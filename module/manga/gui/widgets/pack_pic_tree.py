@@ -44,4 +44,4 @@ class PackPicTree(PreviewTreeBase):
         return p.writable
 
     def _apply_action_text(self, p: PackPicPlan) -> str:
-        return f'打包：{p.name}'
+        return f'打包图片：{p.name}'

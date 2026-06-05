@@ -27,7 +27,7 @@ from module.manga.workflow.pack_pic import (
 
 class PackPicTab(BaseTab):
     cmd_name        = 'pack_pic'
-    apply_btn_text  = '打包'
+    apply_btn_text  = '执行'
     confirm_verb    = '打包并删除源目录'
     single_verb     = '打包'
     no_change_msg   = '没有可打包的目录'

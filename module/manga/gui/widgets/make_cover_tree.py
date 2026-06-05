@@ -41,4 +41,4 @@ class MakeCoverTree(PreviewTreeBase):
         return p.writable and p.changed
 
     def _apply_action_text(self, p: MakeCoverPlan) -> str:
-        return f'写入封面：{p.filename}'
+        return f'生成封面：{p.filename}'
