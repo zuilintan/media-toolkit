@@ -21,17 +21,9 @@ def apply_col_btn_style(btn) -> None:
     （如顶部工具条 / tab corner widget）。默认 QSS 的
     ``padding: 5px 14px`` 在 :data:`BUTTON_COL_WIDTH` 宽里只剩 ~50 px 内容
     区，4 个汉字会被裁；压缩到 ``2px 4px`` 后能容纳 4 字以内的文案。
-
-    同步覆盖 ``sizeHint()``：:class:`~PySide6.QtWidgets.QTabWidget` 的 corner
-    widget 用 ``sizeHint().width()`` 而非 ``width()`` 定位——只 setFixedWidth
-    会让 Qt 按内容自然宽度（如 46 px）预留位置，但按钮实际渲染 80 px，
-    溢出 34 px 被窗口裁掉。
     """
-    from PySide6.QtCore import QSize
     btn.setStyleSheet('QPushButton { padding: 2px 4px; }')
     btn.setFixedWidth(BUTTON_COL_WIDTH)
-    _orig_size_hint = btn.sizeHint
-    btn.sizeHint = lambda: QSize(BUTTON_COL_WIDTH, _orig_size_hint().height())
 
 
 def make_btn_col(btns, *, top_margin: int = GROUPBOX_CONTENT_TOP):
