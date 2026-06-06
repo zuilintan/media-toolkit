@@ -13,7 +13,7 @@
 注意:
 
 - 窗口标题 / 几何由 ``Shell`` 持有；本模块只管 splitter 状态持久化
-- 业务快捷键（Enter / Ctrl+Enter / Ctrl+L）用 ``WidgetWithChildrenShortcut`` 上下文，
+- 业务快捷键（Shift+Enter / Ctrl+Enter / Ctrl+L）用 ``WidgetWithChildrenShortcut`` 上下文，
   避免多模块共存时跨模块触发
 - 各 Tab 的状态文本走 :attr:`BaseTab.status_changed` 推到底栏，切 Tab 时同步当前
   Tab 的最近状态
@@ -345,7 +345,11 @@ class MangaModule(QWidget):
 
     # ── 快捷键 ────────────────────────────────────────────────────────
     def _install_shortcuts(self) -> None:
-        """Enter / Ctrl+Enter / Ctrl+L —— 限定 ``WidgetWithChildrenShortcut`` 上下文。"""
+        """Shift+Enter / Ctrl+Enter / Ctrl+L —— 限定 ``WidgetWithChildrenShortcut`` 上下文。
+
+        预览（scan）走 Shift+Enter 而非裸 Enter：裸 Enter 在 PathPicker / 输入框
+        外的默认焦点下太容易误触发。
+        """
         def _add(seq: str, cb) -> None:
             act = QAction(self)
             act.setShortcut(QKeySequence(seq))
@@ -353,9 +357,9 @@ class MangaModule(QWidget):
             act.triggered.connect(cb)
             self.addAction(act)
 
-        _add('Return', self._on_enter)
+        _add('Shift+Return', self._on_enter)
         _add('Ctrl+Return', self._on_ctrl_enter)
-        _add('Enter', self._on_enter)
+        _add('Shift+Enter', self._on_enter)
         _add('Ctrl+Enter', self._on_ctrl_enter)
         _add('Ctrl+L', self._clear_current_log)
 
