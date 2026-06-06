@@ -117,8 +117,23 @@ class StdTitleTab(BaseTab):
         if self._auto_mode:
             resolve_fn = auto_fallback
         else:
+            # 闭包持有用户的"全部应用"规则：'parent' / 'bracket' / 未设置。
+            # dialog 勾选后，后续待选文件若能从该来源直接取到作者就短路弹窗
+            rule: dict[str, str] = {}
+
             def resolve_fn(path, deriv):
-                return resolve_author_via_dialog(self, path, deriv)
+                src = rule.get('source')
+                if src == 'parent' and deriv.parent_author:
+                    return deriv.parent_author, ''
+                if src == 'bracket' and deriv.bracket_author:
+                    return deriv.bracket_author, deriv.bracket_publisher
+                result = resolve_author_via_dialog(self, path, deriv)
+                if result is None:
+                    return None
+                author, publisher, source = result
+                if source:
+                    rule['source'] = source
+                return author, publisher
 
         # 漫画库索引（可选）：从 module 顶部工具条注入的 getter 拉当前路径；
         # 空字符串或无效目录都走"跳过规范化"分支（保留旧行为）
